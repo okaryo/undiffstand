@@ -133,6 +133,7 @@
   label > span { color: #c9d2dc; font-size: 12px; font-weight: 550; }
   input, select {
     width: 100%;
+    height: 38px;
     box-sizing: border-box;
     padding: 10px 11px;
     color: var(--text);
