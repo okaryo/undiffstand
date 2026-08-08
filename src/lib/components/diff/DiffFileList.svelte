@@ -36,9 +36,9 @@
   button.active { color: var(--text); background: rgba(87,184,142,.11); }
   .path { display: grid; min-width: 0; gap: 2px; }
   .path strong, .path small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .path strong { color: inherit; font-size: 11px; font-weight: 530; }
-  .path small { color: #66717d; font-size: 9px; }
-  .counts { display: flex; align-items: center; gap: 4px; font-size: 9px; }
+  .path strong { color: inherit; font-size: 12px; font-weight: 530; }
+  .path small { color: #66717d; font-size: 11px; }
+  .counts { display: flex; align-items: center; gap: 4px; font-size: 10px; }
   .counts b { color: var(--green); font-weight: 500; }
   .counts em { color: var(--red); font-style: normal; }
   .status { display: grid; place-items: center; width: 14px; height: 14px; color: #8b97a3; font-style: normal; font-weight: 650; }

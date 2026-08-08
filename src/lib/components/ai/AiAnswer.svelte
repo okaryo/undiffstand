@@ -94,7 +94,7 @@
   .risk {
     padding: 2px 5px;
     border-radius: 4px;
-    font-size: 9px;
+    font-size: 10px;
     text-transform: uppercase;
   }
   .risk.low {

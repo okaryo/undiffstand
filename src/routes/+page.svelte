@@ -524,8 +524,8 @@
     display: block;
     margin-top: 2px;
     color: var(--muted);
-    font-size: 9px;
-    letter-spacing: 0.06em;
+    font-size: 11px;
+    letter-spacing: 0.03em;
   }
   .settings-button,
   .section-heading button {
@@ -607,13 +607,13 @@
   }
   .project-info h3 {
     margin: 0;
-    font-size: 12px;
+    font-size: 14px;
   }
   .project-info p {
     overflow: hidden;
-    margin: 4px 0 8px;
+    margin: 4px 0 7px;
     color: #687581;
-    font: 9px var(--mono);
+    font: 11px/1.35 var(--mono);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -622,7 +622,7 @@
     align-items: center;
     gap: 4px;
     color: #8b9a95;
-    font-size: 9px;
+    font-size: 11px;
   }
   .project-meta {
     display: flex;
@@ -634,7 +634,7 @@
   }
   .project-meta time {
     color: #697681;
-    font-size: 9px;
+    font-size: 11px;
     white-space: nowrap;
   }
   .edit-project {
@@ -772,7 +772,7 @@
     padding: 0 12px;
     color: #78848e;
     border-bottom: 1px solid var(--border);
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 650;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -786,7 +786,7 @@
     color: #7e8b96;
     background: #18212b;
     border-radius: 8px;
-    font-size: 8px;
+    font-size: 10px;
   }
   .content-pane {
     display: grid;
@@ -821,7 +821,7 @@
     background: none;
     border: 1px solid transparent;
     border-radius: 4px;
-    font-size: 9px;
+    font-size: 11px;
     cursor: pointer;
   }
   .view-controls button:hover,

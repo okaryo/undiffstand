@@ -69,7 +69,7 @@
   }
   header span {
     color: #68737e;
-    font-size: 9px;
+    font-size: 10px;
   }
   .action-card {
     display: grid;
@@ -124,7 +124,7 @@
     padding: 9px 12px;
     color: #59636e;
     border-top: 1px solid var(--border);
-    font-size: 8.5px;
+    font-size: 10px;
     line-height: 1.45;
   }
   :global(.spin) {
