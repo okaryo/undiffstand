@@ -9,9 +9,9 @@ describe('normalizeError', () => {
   });
 
   it('parses serialized structured errors', () => {
-    expect(normalizeError('{"code":"AI_KEY_MISSING","message":"Set a key"}')).toEqual({
-      code: 'AI_KEY_MISSING',
-      message: 'Set a key',
+    expect(normalizeError('{"code":"CODEX_NOT_FOUND","message":"Install Codex"}')).toEqual({
+      code: 'CODEX_NOT_FOUND',
+      message: 'Install Codex',
       detail: undefined
     });
   });

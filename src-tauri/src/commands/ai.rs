@@ -2,7 +2,7 @@ use crate::{
     domain::{AiAnswer, CodeSelection, DiffExplanation},
     error::{AppError, AppResult},
     services::{
-        ai::{AiProvider, OpenAiProvider},
+        ai::{AiProvider, CodexProvider},
         config_service, file_service, git_service,
     },
 };
@@ -46,7 +46,7 @@ pub async fn ask_about_code<R: Runtime>(
     let project = config_service::find_project(&app, &project_id)?;
     let file = file_service::read_file(Path::new(&project.repo_path), &selection.path)?;
     let context = numbered_context(&file.content, selection.start_line, selection.end_line);
-    OpenAiProvider::from_environment()?
+    CodexProvider::new()
         .ask_about_code(&selection, question.trim(), &context)
         .await
 }
@@ -67,7 +67,7 @@ pub async fn explain_file_diff<R: Runtime>(
             "This diff is too large for the initial AI analysis flow.",
         ));
     }
-    OpenAiProvider::from_environment()?
+    CodexProvider::new()
         .explain_file_diff(&project.base_ref, &summary.head_sha, &diff)
         .await
 }

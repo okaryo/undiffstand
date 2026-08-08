@@ -1,6 +1,7 @@
 use crate::{
     domain::{DiffFileSummary, DiffStatus, DiffSummary, FileDiff, RepositoryInfo},
     error::{AppError, AppResult},
+    services::file_service,
 };
 use std::{
     ffi::OsStr,
@@ -80,7 +81,17 @@ fn ref_exists(repo: &Path, reference: &str) -> AppResult<bool> {
     .success())
 }
 
+fn current_branch(repo: &Path) -> AppResult<Option<String>> {
+    let output = git_output(repo, ["symbolic-ref", "--quiet", "--short", "HEAD"])?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let branch = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    Ok((!branch.is_empty()).then_some(branch))
+}
+
 pub fn detect_base_ref(repo: &Path) -> AppResult<(Option<String>, Vec<String>)> {
+    let local_branches = list_local_branches(repo)?;
     let remote_head = git_output(
         repo,
         [
@@ -94,32 +105,30 @@ pub fn detect_base_ref(repo: &Path) -> AppResult<(Option<String>, Vec<String>)> 
         let reference = String::from_utf8_lossy(&remote_head.stdout)
             .trim()
             .to_owned();
-        if !reference.is_empty() && ref_exists(repo, &reference)? {
-            return Ok((Some(reference), list_refs(repo)?));
+        let local_name = reference.strip_prefix("origin/").unwrap_or(&reference);
+        if local_branches.iter().any(|branch| branch == local_name) {
+            return Ok((Some(local_name.to_owned()), local_branches));
         }
     }
 
-    for candidate in ["origin/main", "origin/master", "main", "master"] {
-        if ref_exists(repo, candidate)? {
-            return Ok((Some(candidate.to_owned()), list_refs(repo)?));
+    for candidate in ["main", "master"] {
+        if local_branches.iter().any(|branch| branch == candidate) {
+            return Ok((Some(candidate.to_owned()), local_branches));
         }
     }
-    Ok((None, list_refs(repo)?))
+    let detected = current_branch(repo)?
+        .filter(|branch| local_branches.contains(branch))
+        .or_else(|| local_branches.first().cloned());
+    Ok((detected, local_branches))
 }
 
-fn list_refs(repo: &Path) -> AppResult<Vec<String>> {
+fn list_local_branches(repo: &Path) -> AppResult<Vec<String>> {
     let output = git_output(
         repo,
-        [
-            "for-each-ref",
-            "--format=%(refname:short)",
-            "refs/heads",
-            "refs/remotes",
-        ],
+        ["for-each-ref", "--format=%(refname:short)", "refs/heads"],
     )?;
     let mut refs: Vec<String> = output_text(output, "UNKNOWN", "Git refs could not be listed.")?
         .lines()
-        .filter(|line| !line.ends_with("/HEAD"))
         .map(ToOwned::to_owned)
         .collect();
     refs.sort();
@@ -129,7 +138,7 @@ fn list_refs(repo: &Path) -> AppResult<Vec<String>> {
 
 pub fn inspect_repository(path: &Path) -> AppResult<RepositoryInfo> {
     let repo = canonical_repository(path)?;
-    let (detected_base_ref, available_refs) = detect_base_ref(&repo)?;
+    let (detected_base_ref, local_branches) = detect_base_ref(&repo)?;
     let suggested_name = repo
         .file_name()
         .and_then(|name| name.to_str())
@@ -139,7 +148,8 @@ pub fn inspect_repository(path: &Path) -> AppResult<RepositoryInfo> {
         repo_path: repo.to_string_lossy().into_owned(),
         suggested_name,
         detected_base_ref,
-        available_refs,
+        current_branch: current_branch(&repo)?,
+        local_branches,
     })
 }
 
@@ -244,7 +254,6 @@ fn parse_numstat(bytes: &[u8]) -> Vec<(Option<u64>, Option<u64>)> {
 
 pub fn diff_summary(repo: &Path, base_ref: &str) -> AppResult<DiffSummary> {
     let (head_sha, merge_base_sha) = revision_info(repo, base_ref)?;
-    let range = format!("{base_ref}...HEAD");
     let name_bytes = successful(
         git_output(
             repo,
@@ -255,7 +264,7 @@ pub fn diff_summary(repo: &Path, base_ref: &str) -> AppResult<DiffSummary> {
                 "-z",
                 "--find-renames",
                 "--find-copies",
-                &range,
+                &merge_base_sha,
                 "--",
             ],
         )?,
@@ -272,7 +281,7 @@ pub fn diff_summary(repo: &Path, base_ref: &str) -> AppResult<DiffSummary> {
                 "-z",
                 "--find-renames",
                 "--find-copies",
-                &range,
+                &merge_base_sha,
                 "--",
             ],
         )?,
@@ -288,6 +297,20 @@ pub fn diff_summary(repo: &Path, base_ref: &str) -> AppResult<DiffSummary> {
             file.status = DiffStatus::Binary;
         }
     }
+    files.extend(untracked_files(repo)?);
+    files.sort_by(|left, right| {
+        let left_path = left
+            .new_path
+            .as_deref()
+            .or(left.old_path.as_deref())
+            .unwrap_or("");
+        let right_path = right
+            .new_path
+            .as_deref()
+            .or(right.old_path.as_deref())
+            .unwrap_or("");
+        left_path.cmp(right_path)
+    });
     let total_additions = files.iter().filter_map(|file| file.additions).sum();
     let total_deletions = files.iter().filter_map(|file| file.deletions).sum();
     Ok(DiffSummary {
@@ -298,6 +321,35 @@ pub fn diff_summary(repo: &Path, base_ref: &str) -> AppResult<DiffSummary> {
         total_additions,
         total_deletions,
     })
+}
+
+fn untracked_files(repo: &Path) -> AppResult<Vec<DiffFileSummary>> {
+    let bytes = successful(
+        git_output(repo, ["ls-files", "--others", "--exclude-standard", "-z"])?,
+        "UNKNOWN",
+        "Untracked files could not be listed.",
+    )?;
+    Ok(bytes
+        .split(|byte| *byte == 0)
+        .filter(|path| !path.is_empty())
+        .map(|path| {
+            let path = String::from_utf8_lossy(path).into_owned();
+            let additions = file_service::read_file(repo, &path)
+                .ok()
+                .map(|file| file.content.lines().count() as u64);
+            DiffFileSummary {
+                old_path: None,
+                new_path: Some(path),
+                status: if additions.is_some() {
+                    DiffStatus::Added
+                } else {
+                    DiffStatus::Binary
+                },
+                additions,
+                deletions: additions.map(|_| 0),
+            }
+        })
+        .collect())
 }
 
 fn git_show(repo: &Path, revision: &str, path: &str) -> AppResult<Option<String>> {
@@ -349,21 +401,49 @@ pub fn file_diff(repo: &Path, base_ref: &str, path: &str) -> AppResult<FileDiff>
                 "The selected file is not part of this diff.",
             )
         })?;
-    let range = format!("{base_ref}...HEAD");
-    let output = git_output(
-        repo,
-        [
-            "diff",
-            "--no-color",
-            "--no-ext-diff",
-            "--find-renames",
-            "--find-copies",
-            &range,
-            "--",
-            path,
-        ],
-    )?;
-    let bytes = successful(output, "UNKNOWN", "The selected diff could not be read.")?;
+    let tracked = git_output(repo, ["ls-files", "--error-unmatch", "--", path])?
+        .status
+        .success();
+    let bytes = if tracked {
+        successful(
+            git_output(
+                repo,
+                [
+                    "diff",
+                    "--no-color",
+                    "--no-ext-diff",
+                    "--find-renames",
+                    "--find-copies",
+                    &summary.merge_base_sha,
+                    "--",
+                    path,
+                ],
+            )?,
+            "UNKNOWN",
+            "The selected diff could not be read.",
+        )?
+    } else {
+        let output = git_output(
+            repo,
+            [
+                "diff",
+                "--no-index",
+                "--no-color",
+                "--no-ext-diff",
+                "--",
+                "/dev/null",
+                path,
+            ],
+        )?;
+        if output.status.success() || output.status.code() == Some(1) {
+            output.stdout
+        } else {
+            return Err(
+                AppError::new("UNKNOWN", "The untracked file diff could not be read.")
+                    .with_detail(String::from_utf8_lossy(&output.stderr).trim()),
+            );
+        }
+    };
     let truncated = bytes.len() > MAX_DIFF_BYTES;
     let visible = if truncated {
         &bytes[..MAX_DIFF_BYTES]
@@ -378,7 +458,9 @@ pub fn file_diff(repo: &Path, base_ref: &str, path: &str) -> AppResult<FileDiff>
     };
     let new_content = match (&file.new_path, &file.status) {
         (Some(_), DiffStatus::Binary) => None,
-        (Some(new_path), _) => git_show(repo, "HEAD", new_path)?,
+        (Some(new_path), _) => file_service::read_file(repo, new_path)
+            .ok()
+            .map(|file| file.content),
         _ => None,
     };
     let hunks = split_hunks(&unified_diff);
@@ -408,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    fn three_dot_diff_excludes_changes_made_only_on_base() {
+    fn working_tree_diff_excludes_changes_made_only_on_base() {
         let temp = tempfile::tempdir().unwrap();
         let repo = temp.path();
         git(repo, &["init", "-b", "main"]);
@@ -431,6 +513,44 @@ mod tests {
         assert_eq!(summary.files.len(), 1);
         assert_eq!(summary.files[0].new_path.as_deref(), Some("feature.txt"));
         assert_eq!(summary.total_additions, 1);
+    }
+
+    #[test]
+    fn working_tree_diff_includes_staged_unstaged_and_untracked_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        git(repo, &["init", "-b", "main"]);
+        git(repo, &["config", "user.email", "test@example.com"]);
+        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        fs::write(repo.join("base.txt"), "base\n").unwrap();
+        git(repo, &["add", "base.txt"]);
+        git(repo, &["commit", "-m", "base"]);
+        git(repo, &["switch", "-c", "feature"]);
+        fs::write(repo.join("committed.txt"), "committed\n").unwrap();
+        git(repo, &["add", "committed.txt"]);
+        git(repo, &["commit", "-m", "feature"]);
+
+        fs::write(repo.join("committed.txt"), "committed\nunstaged\n").unwrap();
+        fs::write(repo.join("staged.txt"), "staged\n").unwrap();
+        git(repo, &["add", "staged.txt"]);
+        fs::write(repo.join("untracked.txt"), "untracked\n").unwrap();
+
+        let summary = diff_summary(repo, "main").unwrap();
+        let paths: Vec<&str> = summary
+            .files
+            .iter()
+            .filter_map(|file| file.new_path.as_deref())
+            .collect();
+        assert_eq!(paths, ["committed.txt", "staged.txt", "untracked.txt"]);
+        assert_eq!(summary.total_additions, 4);
+
+        let diff = file_diff(repo, "main", "committed.txt").unwrap();
+        assert_eq!(diff.new_content.as_deref(), Some("committed\nunstaged\n"));
+        assert!(diff.unified_diff.contains("+unstaged"));
+
+        let untracked = file_diff(repo, "main", "untracked.txt").unwrap();
+        assert_eq!(untracked.new_content.as_deref(), Some("untracked\n"));
+        assert!(untracked.unified_diff.contains("+untracked"));
     }
 
     #[test]

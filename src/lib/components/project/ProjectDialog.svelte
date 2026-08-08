@@ -20,12 +20,16 @@
   let baseRef = $state('');
   let initialized = false;
   const repoPath = $derived(project?.repoPath ?? repository?.repoPath ?? '');
-  const refs = $derived(repository?.availableRefs ?? []);
+  const refs = $derived(repository?.localBranches ?? []);
 
   $effect(() => {
     if (!initialized) {
       name = project?.name ?? repository?.suggestedName ?? '';
-      baseRef = project?.baseRef ?? repository?.detectedBaseRef ?? '';
+      const configuredRef = project?.baseRef;
+      const configuredLocalBranch = configuredRef
+        ? refs.find((ref) => ref === configuredRef || configuredRef.endsWith(`/${ref}`))
+        : undefined;
+      baseRef = configuredLocalBranch ?? repository?.detectedBaseRef ?? refs[0] ?? '';
       initialized = true;
     }
   });
@@ -58,12 +62,11 @@
       </label>
       <label>
         <span>Compare against</span>
-        <input bind:value={baseRef} list="available-refs" required autocomplete="off" />
-        <small>ReaDiff reviews the merge base of this ref through HEAD.</small>
+        <select bind:value={baseRef} required>
+          {#each refs as ref}<option value={ref}>{ref}{ref === repository?.currentBranch ? ' (current)' : ''}</option>{/each}
+        </select>
+        <small>Local branches only. ReaDiff reviews the merge base through the current working tree.</small>
       </label>
-      <datalist id="available-refs">
-        {#each refs as ref}<option value={ref}></option>{/each}
-      </datalist>
       <footer>
         <button class="secondary" type="button" onclick={onClose}>Cancel</button>
         <button class="primary" type="submit" disabled={saving || !name.trim() || !baseRef.trim()}>
@@ -128,7 +131,7 @@
   form { display: grid; gap: 17px; padding: 20px; }
   label { display: grid; gap: 7px; }
   label > span { color: #c9d2dc; font-size: 12px; font-weight: 550; }
-  input {
+  input, select {
     width: 100%;
     box-sizing: border-box;
     padding: 10px 11px;
@@ -140,7 +143,7 @@
     font: inherit;
     font-size: 13px;
   }
-  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(87, 184, 142, 0.1); }
+  input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(87, 184, 142, 0.1); }
   input[readonly] { color: var(--muted); }
   small { color: var(--muted); font-size: 11px; }
   footer { display: flex; justify-content: flex-end; gap: 9px; padding-top: 3px; }

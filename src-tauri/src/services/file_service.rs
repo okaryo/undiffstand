@@ -15,7 +15,13 @@ pub fn list_files(repo: &Path) -> AppResult<Vec<RepoFile>> {
     let output = Command::new("git")
         .arg("-C")
         .arg(repo)
-        .args(["ls-files", "-z"])
+        .args([
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+        ])
         .output()
         .map_err(|error| {
             if error.kind() == std::io::ErrorKind::NotFound {

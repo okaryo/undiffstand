@@ -54,7 +54,7 @@
     {#if loading && !answer && !explanation}<div class="thinking"><LoaderCircle class="spin" size={17} /><span>Reviewing the available evidence…</span></div>{/if}
     <AiAnswerView {answer} {explanation} {onReference} />
   </div>
-  <footer>Selected code is sent to the OpenAI API. ReaDiff never sends or stores your API key in project settings.</footer>
+  <footer>AI analysis runs through your local Codex CLI in a read-only sandbox. ReaDiff does not read an API key.</footer>
 </aside>
 
 <style>

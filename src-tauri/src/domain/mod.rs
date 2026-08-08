@@ -44,7 +44,8 @@ pub struct RepositoryInfo {
     pub repo_path: String,
     pub suggested_name: String,
     pub detected_base_ref: Option<String>,
-    pub available_refs: Vec<String>,
+    pub current_branch: Option<String>,
+    pub local_branches: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

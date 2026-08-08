@@ -38,7 +38,7 @@ const demoProject: ProjectConfig = {
   id: 'readiff-browser-demo',
   name: 'readiff-demo',
   repoPath: '/Users/example/src/readiff-demo',
-  baseRef: 'origin/main',
+  baseRef: 'main',
   lastOpenedAt: new Date().toISOString()
 };
 
@@ -88,7 +88,7 @@ export async function review(diff: string): Promise<Review> {
 };
 
 const mockSummary: DiffSummary = {
-  baseRef: 'origin/main',
+  baseRef: 'main',
   headSha: '8f31dc290c98f3ebd149ebf4e9cdb594d7356cb7',
   mergeBaseSha: '2cde30b476ecb745ea84ee1fcbd13a51ea4f3a13',
   totalAdditions: 8,
@@ -141,8 +141,9 @@ const mockApi: typeof nativeApi = {
   validateRepository: async (path) => ({
     repoPath: path,
     suggestedName: path.split('/').at(-1) ?? 'repository',
-    detectedBaseRef: 'origin/main',
-    availableRefs: ['origin/main', 'main']
+    detectedBaseRef: 'main',
+    currentBranch: 'feature/readiff',
+    localBranches: ['feature/readiff', 'main']
   }),
   listProjects: async () => mockProjects,
   saveProject: async (input) => {
@@ -171,7 +172,7 @@ const mockApi: typeof nativeApi = {
   askAboutCode: async (_projectId, selection, question) => ({
     answer: `${question}\n\nThis selection builds a structured review result from repository context. The conclusion is inferred from the selected code.`,
     references: [{ path: selection.path, startLine: selection.startLine, endLine: selection.endLine }],
-    caveats: ['Browser demo responses are deterministic and do not call OpenAI.']
+    caveats: ['Browser demo responses are deterministic and do not invoke Codex CLI.']
   }),
   explainFileDiff: async (_projectId, path) => ({
     summary: 'The change introduces a context-building step before producing a structured review result.',

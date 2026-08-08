@@ -1,4 +1,4 @@
-mod openai;
+mod codex;
 
 use crate::{
     domain::{AiAnswer, CodeSelection, DiffExplanation, FileDiff},
@@ -23,4 +23,4 @@ pub trait AiProvider: Send + Sync {
     ) -> AppResult<DiffExplanation>;
 }
 
-pub use openai::OpenAiProvider;
+pub use codex::CodexProvider;

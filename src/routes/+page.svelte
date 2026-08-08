@@ -291,11 +291,16 @@
     history.replaceState(null, '', window.location.pathname);
   }
 
-  function editActiveProject() {
+  async function editActiveProject() {
     if (!activeProject) return;
-    editingProject = activeProject;
-    repositoryDraft = undefined;
-    showProjectDialog = true;
+    workspaceError = null;
+    try {
+      repositoryDraft = await tauriApi.validateRepository(activeProject.repoPath);
+      editingProject = activeProject;
+      showProjectDialog = true;
+    } catch (caught) {
+      workspaceError = normalizeError(caught);
+    }
   }
 
   function formatDate(value: string) {
@@ -313,7 +318,7 @@
   <main class="app-shell">
     <header class="topbar">
       <button class="brand compact" onclick={goHome} title="Back to projects"><span class="brand-mark"><Braces size={16} /></span><strong>ReaDiff</strong></button>
-      <div class="crumb"><ChevronRight size={13} /><FolderGit2 size={14} /><strong>{activeProject.name}</strong><span>{activeProject.baseRef}...HEAD</span></div>
+      <div class="crumb"><ChevronRight size={13} /><FolderGit2 size={14} /><strong>{activeProject.name}</strong><span>{activeProject.baseRef} → working tree</span></div>
       <nav aria-label="Workspace mode">
         <button class:active={mode === 'review'} onclick={() => switchMode('review')}><GitBranch size={14} />Review</button>
         <button class:active={mode === 'browse'} onclick={() => switchMode('browse')}><Code2 size={14} />Browse</button>
@@ -352,8 +357,8 @@
           <div class="viewer-scroll">
             {#if contentLoading}<div class="loading-state"><LoaderCircle class="spin" size={20} />Loading diff…</div>
             {:else if selectedDiff}<DiffViewer diff={selectedDiff} mode={diffMode} wrap={wrapLines} />
-            {:else if summary && summary.files.length === 0}<EmptyState icon={GitBranch} title="No committed changes" message={`HEAD has no changes relative to the merge base with ${activeProject.baseRef}.`} />
-            {:else}<EmptyState icon={FileCode2} title="Choose a changed file" message="Select a file to inspect its committed diff." />{/if}
+            {:else if summary && summary.files.length === 0}<EmptyState icon={GitBranch} title="No changes" message={`The working tree has no changes relative to the merge base with ${activeProject.baseRef}.`} />
+            {:else}<EmptyState icon={FileCode2} title="Choose a changed file" message="Select a file to inspect its working-tree diff." />{/if}
           </div>
         {:else}
           <div class="content-toolbar code-toolbar">
@@ -384,7 +389,7 @@
       <div class="hero-copy">
         <span class="overline"><GitBranch size={13} />Local code intelligence</span>
         <h1>Read the code.<br /><em>See what changed.</em></h1>
-        <p>Review committed changes and ask focused questions about any local repository—without changing a single file.</p>
+        <p>Review committed and uncommitted changes, then ask focused questions about any local repository—without changing a single file.</p>
         <button class="open-button" onclick={addRepository}><FolderOpen size={17} />Open repository</button>
       </div>
       <div class="hero-visual" aria-hidden="true">
@@ -417,7 +422,7 @@
           {/each}
         </div>
       {:else}
-        <div class="empty-projects"><FolderGit2 size={28} strokeWidth={1.4} /><h3>No repositories yet</h3><p>Open a local Git repository to start understanding its committed changes.</p><button onclick={addRepository}>Open your first repository</button></div>
+        <div class="empty-projects"><FolderGit2 size={28} strokeWidth={1.4} /><h3>No repositories yet</h3><p>Open a local Git repository to start understanding its current changes.</p><button onclick={addRepository}>Open your first repository</button></div>
       {/if}
     </section>
   </main>
@@ -432,9 +437,9 @@
     <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <header><div><Settings size={17} /><h2 id="settings-title">AI settings</h2></div><button onclick={() => showSettings = false}><X size={17} /></button></header>
       <div class="settings-content">
-        <div><span>API key</span><strong>OPENAI_API_KEY</strong><p>Read from the environment when ReaDiff starts. It is never written to projects.json or sent to the frontend.</p></div>
-        <div><span>Model</span><strong>gpt-5.6-terra</strong><p>Override with <code>READIFF_OPENAI_MODEL</code>. Requests use the OpenAI Responses API with structured output.</p></div>
-        <div class="privacy"><Bot size={15} /><p>When you use AI, selected code and surrounding context are sent to OpenAI. AI descriptions are inferences and may be wrong.</p></div>
+        <div><span>Runtime</span><strong>codex exec</strong><p>ReaDiff invokes the Codex CLI available on <code>PATH</code> in a read-only, isolated temporary directory.</p></div>
+        <div><span>Authentication</span><strong>codex login</strong><p>Saved Codex CLI authentication and your local Codex configuration are reused. ReaDiff removes API-key environment variables from the child process.</p></div>
+        <div class="privacy"><Bot size={15} /><p>When you use AI, Codex receives the selected code and relevant diff context according to your local Codex configuration. AI descriptions are inferences and may be wrong.</p></div>
       </div>
     </div>
   </div>

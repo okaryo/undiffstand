@@ -16,8 +16,9 @@ export type SaveProjectInput = {
 export type RepositoryInfo = {
   repoPath: string;
   suggestedName: string;
-  detectedBaseRef?: string;
-  availableRefs: string[];
+  detectedBaseRef: string | null;
+  currentBranch: string | null;
+  localBranches: string[];
 };
 
 export type RepoFile = { path: string };
