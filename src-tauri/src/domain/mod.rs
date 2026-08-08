@@ -98,49 +98,6 @@ pub struct FileDiff {
     pub truncated: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RepoFile {
-    pub path: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FileContent {
-    pub path: String,
-    pub content: String,
-    pub language: String,
-    pub line_count: usize,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum CodeRevision {
-    WorkingTree,
-    Head,
-    Base,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum DiffSide {
-    Old,
-    New,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CodeSelection {
-    pub path: String,
-    pub revision: CodeRevision,
-    pub side: Option<DiffSide>,
-    pub start_line: usize,
-    pub start_column: usize,
-    pub end_line: usize,
-    pub end_column: usize,
-    pub text: String,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceReference {
@@ -149,14 +106,6 @@ pub struct SourceReference {
     pub end_line: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub side: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AiAnswer {
-    pub answer: String,
-    pub references: Vec<SourceReference>,
-    pub caveats: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

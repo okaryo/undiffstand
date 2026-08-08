@@ -16,9 +16,6 @@ pub fn run() {
             commands::project::remove_project,
             commands::git::get_diff_summary,
             commands::git::get_file_diff,
-            commands::files::list_repository_files,
-            commands::files::read_repository_file,
-            commands::ai::ask_about_code,
             commands::ai::explain_file_diff,
         ])
         .run(tauri::generate_context!())

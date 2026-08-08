@@ -1,6 +1,6 @@
 use super::AiProvider;
 use crate::{
-    domain::{AiAnswer, CodeSelection, DiffExplanation, FileDiff},
+    domain::{DiffExplanation, FileDiff},
     error::{AppError, AppResult},
 };
 use async_trait::async_trait;
@@ -143,38 +143,6 @@ fn analysis_instructions() -> &'static str {
 
 #[async_trait]
 impl AiProvider for CodexProvider {
-    async fn ask_about_code(
-        &self,
-        selection: &CodeSelection,
-        question: &str,
-        surrounding_code: &str,
-    ) -> AppResult<AiAnswer> {
-        let schema = json!({
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-                "answer": { "type": "string" },
-                "references": { "type": "array", "items": reference_schema() },
-                "caveats": { "type": "array", "items": { "type": "string" } }
-            },
-            "required": ["answer", "references", "caveats"]
-        });
-        let prompt = format!(
-            "{}\n\nQuestion: {question}\nFile: {}\nRevision: {:?}\nDiff side: {:?}\nSelected range: {}:{}-{}:{}\nSelected code:\n```\n{}\n```\nSurrounding code (line numbered):\n```\n{}\n```\nReturn only evidence-based analysis. If intent is uncertain, state that explicitly.",
-            analysis_instructions(),
-            selection.path,
-            selection.revision,
-            selection.side,
-            selection.start_line,
-            selection.start_column,
-            selection.end_line,
-            selection.end_column,
-            selection.text,
-            surrounding_code
-        );
-        self.structured_response(schema, prompt).await
-    }
-
     async fn explain_file_diff(
         &self,
         base_ref: &str,

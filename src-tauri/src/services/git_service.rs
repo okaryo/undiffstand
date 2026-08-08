@@ -336,7 +336,7 @@ fn untracked_files(repo: &Path) -> AppResult<Vec<DiffFileSummary>> {
             let path = String::from_utf8_lossy(path).into_owned();
             let additions = file_service::read_file(repo, &path)
                 .ok()
-                .map(|file| file.content.lines().count() as u64);
+                .map(|content| content.lines().count() as u64);
             DiffFileSummary {
                 old_path: None,
                 new_path: Some(path),
@@ -458,9 +458,7 @@ pub fn file_diff(repo: &Path, base_ref: &str, path: &str) -> AppResult<FileDiff>
     };
     let new_content = match (&file.new_path, &file.status) {
         (Some(_), DiffStatus::Binary) => None,
-        (Some(new_path), _) => file_service::read_file(repo, new_path)
-            .ok()
-            .map(|file| file.content),
+        (Some(new_path), _) => file_service::read_file(repo, new_path).ok(),
         _ => None,
     };
     let hunks = split_hunks(&unified_diff);

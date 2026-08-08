@@ -20,12 +20,3 @@ export type RepositoryInfo = {
   currentBranch: string | null;
   localBranches: string[];
 };
-
-export type RepoFile = { path: string };
-
-export type FileContent = {
-  path: string;
-  content: string;
-  language: string;
-  lineCount: number;
-};

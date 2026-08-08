@@ -28,6 +28,6 @@
     "active": true,
     "targets": "all",
     "category": "DeveloperTool",
-    "shortDescription": "Understand code. Review changes."
+    "shortDescription": "AI-assisted diff understanding for human reviewers."
   }
 }
