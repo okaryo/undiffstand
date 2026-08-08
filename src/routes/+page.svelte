@@ -3,7 +3,6 @@
   import {
     Bot,
     Braces,
-    ChevronRight,
     CirclePlus,
     Code2,
     Columns2,
@@ -28,6 +27,7 @@
   import DiffSummaryView from '$lib/components/diff/DiffSummary.svelte';
   import DiffViewer from '$lib/components/diff/DiffViewer.svelte';
   import ProjectDialog from '$lib/components/project/ProjectDialog.svelte';
+  import ProjectSwitcher from '$lib/components/project/ProjectSwitcher.svelte';
   import type { AiAnswer, DiffExplanation, SourceReference } from '$lib/domain/ai';
   import type { CodeSelection } from '$lib/domain/code-selection';
   import { displayPath, type DiffSummary, type FileDiff } from '$lib/domain/diff';
@@ -333,7 +333,7 @@
   <main class="app-shell">
     <header class="topbar">
       <button class="brand compact" onclick={goHome} title="Back to projects"><span class="brand-mark"><Braces size={16} /></span><strong>ReaDiff</strong></button>
-      <div class="crumb"><ChevronRight size={13} /><FolderGit2 size={14} /><strong>{activeProject.name}</strong><span>{activeProject.baseRef} → working tree</span></div>
+      <ProjectSwitcher {projects} {activeProject} onSelect={openProject} />
       <nav aria-label="Workspace mode">
         <button class:active={mode === 'review'} onclick={() => switchMode('review')}><GitBranch size={14} />Review</button>
         <button class:active={mode === 'browse'} onclick={() => switchMode('browse')}><Code2 size={14} />Browse</button>
@@ -521,7 +521,6 @@
   .app-shell { height:100vh; display:grid; grid-template-rows:48px minmax(0,1fr); overflow:hidden; }
   .topbar { display:grid; grid-template-columns:auto minmax(220px,1fr) auto auto; align-items:center; gap:17px; padding:0 11px; background:#0c1219; border-bottom:1px solid var(--border); }
   .topbar .brand-mark { width:27px; height:27px; border-radius:6px; } .topbar .brand { gap:7px; }
-  .crumb { display:flex; align-items:center; min-width:0; gap:7px; color:#5b6772; font-size:10px; } .crumb strong { overflow:hidden; color:#aeb8c1; font-size:11px; text-overflow:ellipsis; white-space:nowrap; } .crumb span { color:#647079; font:9px var(--mono); }
   nav { display:flex; align-self:stretch; } nav button { display:flex; align-items:center; gap:6px; padding:0 13px; color:#77838e; background:none; border:0; border-bottom:2px solid transparent; font-size:10px; cursor:pointer; } nav button:hover, nav button.active { color:var(--text); } nav button.active { border-bottom-color:var(--accent-bright); }
   .top-actions { display:flex; align-items:center; gap:2px; } .top-actions button { display:grid; place-items:center; width:28px; height:28px; color:#77838e; background:none; border:0; border-radius:5px; cursor:pointer; } .top-actions button:hover, .top-actions button.active { color:var(--text); background:var(--hover); }
   .workspace-error { position:fixed; z-index:20; top:57px; left:50%; width:min(520px,calc(100% - 40px)); transform:translateX(-50%); }
