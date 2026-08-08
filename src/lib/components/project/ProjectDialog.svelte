@@ -6,13 +6,17 @@
     repository,
     project,
     saving = false,
+    deleting = false,
     onSave,
+    onDelete,
     onClose
   }: {
     repository?: RepositoryInfo;
     project?: ProjectConfig;
     saving?: boolean;
+    deleting?: boolean;
     onSave: (input: SaveProjectInput) => void;
+    onDelete?: () => void;
     onClose: () => void;
   } = $props();
 
@@ -68,8 +72,13 @@
         <small>Local branches only. ReaDiff reviews the merge base through the current working tree.</small>
       </label>
       <footer>
+        {#if project && onDelete}
+          <button class="danger" type="button" disabled={saving || deleting} onclick={onDelete}>
+            {deleting ? 'Removing…' : 'Remove project'}
+          </button>
+        {/if}
         <button class="secondary" type="button" onclick={onClose}>Cancel</button>
-        <button class="primary" type="submit" disabled={saving || !name.trim() || !baseRef.trim()}>
+        <button class="primary" type="submit" disabled={saving || deleting || !name.trim() || !baseRef.trim()}>
           {saving ? 'Saving…' : project ? 'Save settings' : 'Add project'}
         </button>
       </footer>
@@ -148,15 +157,18 @@
   input[readonly] { color: var(--muted); }
   small { color: var(--muted); font-size: 11px; }
   footer { display: flex; justify-content: flex-end; gap: 9px; padding-top: 3px; }
-  button.secondary, button.primary {
+  button.danger, button.secondary, button.primary {
     padding: 8px 13px;
     border-radius: 7px;
     font: inherit;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
+    white-space: nowrap;
   }
+  .danger { margin-right: auto; color: var(--red); background: transparent; border: 1px solid rgba(224, 108, 100, 0.28); }
+  .danger:hover { background: rgba(224, 108, 100, 0.08); border-color: rgba(224, 108, 100, 0.45); }
   .secondary { color: var(--text); background: transparent; border: 1px solid var(--border-strong); }
   .primary { color: #06110d; background: var(--accent-bright); border: 1px solid var(--accent-bright); }
-  .primary:disabled { opacity: 0.45; cursor: default; }
+  button:disabled { opacity: 0.45; cursor: default; }
 </style>

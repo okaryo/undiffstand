@@ -9,14 +9,13 @@
     Columns2,
     FileCode2,
     FolderGit2,
-    FolderOpen,
     GitBranch,
     LoaderCircle,
     PanelRight,
+    Pencil,
     RefreshCw,
     Rows3,
     Settings,
-    Trash2,
     WrapText,
     X
   } from '@lucide/svelte';
@@ -50,6 +49,7 @@
   let showSettings = $state(false);
   let loading = $state(true);
   let saving = $state(false);
+  let deleting = $state(false);
   let error = $state<AppError | null>(null);
   let workspaceError = $state<AppError | null>(null);
 
@@ -134,11 +134,20 @@
 
   async function removeProject(project: ProjectConfig) {
     if (!confirm(`Remove ${project.name} from ReaDiff? The repository will not be changed.`)) return;
+    deleting = true;
     try {
       await tauriApi.removeProject(project.id);
       projects = projects.filter((item) => item.id !== project.id);
+      showProjectDialog = false;
+      repositoryDraft = undefined;
+      editingProject = undefined;
+      if (activeProject?.id === project.id) goHome();
     } catch (caught) {
-      error = normalizeError(caught);
+      const normalized = normalizeError(caught);
+      if (activeProject?.id === project.id) workspaceError = normalized;
+      else error = normalized;
+    } finally {
+      deleting = false;
     }
   }
 
@@ -291,16 +300,22 @@
     history.replaceState(null, '', window.location.pathname);
   }
 
-  async function editActiveProject() {
-    if (!activeProject) return;
-    workspaceError = null;
+  async function editProject(project: ProjectConfig) {
+    if (activeProject?.id === project.id) workspaceError = null;
+    else error = null;
     try {
-      repositoryDraft = await tauriApi.validateRepository(activeProject.repoPath);
-      editingProject = activeProject;
+      repositoryDraft = await tauriApi.validateRepository(project.repoPath);
+      editingProject = project;
       showProjectDialog = true;
     } catch (caught) {
-      workspaceError = normalizeError(caught);
+      const normalized = normalizeError(caught);
+      if (activeProject?.id === project.id) workspaceError = normalized;
+      else error = normalized;
     }
+  }
+
+  async function editActiveProject() {
+    if (activeProject) await editProject(activeProject);
   }
 
   function formatDate(value: string) {
@@ -390,51 +405,48 @@
       <button class="settings-button" onclick={() => showSettings = true}><Settings size={14} />Settings</button>
     </header>
 
-    <section class="hero">
-      <div class="hero-copy">
-        <span class="overline"><GitBranch size={13} />Local code intelligence</span>
-        <h1>Read the code.<br /><em>See what changed.</em></h1>
-        <p>Review committed and uncommitted changes, then ask focused questions about any local repository—without changing a single file.</p>
-        <button class="open-button" onclick={addRepository}><FolderOpen size={17} />Open repository</button>
-      </div>
-      <div class="hero-visual" aria-hidden="true">
-        <div class="visual-header"><i></i><i></i><i></i><span>src/services/review.ts</span></div>
-        <div class="visual-body"><aside><b></b><b></b><b></b><b></b></aside><pre><span class="dim">12</span>  <span class="blue">export async function</span> review(diff) &#123;
-<span class="minus">13  - return summarize(diff);</span>
-<span class="plus">13  + const context = await inspect(diff);</span>
-<span class="plus">14  + return explain(context);</span>
-<span class="dim">15</span>  &#125;</pre></div>
-        <div class="visual-ai"><Bot size={14} /><span><strong>Likely intent</strong>Adds repository context before generating the explanation.</span></div>
-      </div>
-    </section>
-
     <section class="projects-section">
-      <div class="section-heading"><div><span>Your repositories</span><h2>Continue reviewing</h2></div><button onclick={addRepository}><CirclePlus size={14} />Add repository</button></div>
       {#if error}<ErrorBanner {error} onDismiss={() => error = null} />{/if}
       {#if loading}
         <div class="loading-state"><LoaderCircle class="spin" size={20} />Loading projects…</div>
       {:else if projects.length}
+        <div class="section-heading"><h1>Continue reviewing</h1><button onclick={addRepository}><CirclePlus size={14} />Add Project</button></div>
         <div class="project-grid">
           {#each projects as project (project.id)}
             <article>
               <button class="project-main" onclick={() => openProject(project)}>
                 <div class="project-icon"><FolderGit2 size={19} /></div>
-                <div class="project-info"><h3>{project.name}</h3><p>{project.repoPath}</p><div><span><GitBranch size={11} />{project.baseRef}</span><time>{formatDate(project.lastOpenedAt)}</time></div></div>
-                <ChevronRight class="chevron" size={17} />
+                <div class="project-info"><h3>{project.name}</h3><p>{project.repoPath}</p><span><GitBranch size={11} />{project.baseRef}</span></div>
               </button>
-              <button class="remove" onclick={() => removeProject(project)} title="Remove from ReaDiff"><Trash2 size={13} /></button>
+              <div class="project-meta">
+                <button class="edit-project" onclick={() => editProject(project)} title={`Edit ${project.name}`} aria-label={`Edit ${project.name}`}><Pencil size={14} /></button>
+                <time>{formatDate(project.lastOpenedAt)}</time>
+              </div>
             </article>
           {/each}
         </div>
       {:else}
-        <div class="empty-projects"><FolderGit2 size={28} strokeWidth={1.4} /><h3>No repositories yet</h3><p>Open a local Git repository to start understanding its current changes.</p><button onclick={addRepository}>Open your first repository</button></div>
+        <div class="empty-projects">
+          <div class="empty-project-icon"><FolderGit2 size={28} strokeWidth={1.5} /></div>
+          <h1>Add your first project</h1>
+          <p>Choose a local Git repository to start reviewing its changes.</p>
+          <button onclick={addRepository}><CirclePlus size={16} />Add Project</button>
+        </div>
       {/if}
     </section>
   </main>
 {/if}
 
 {#if showProjectDialog}
-  <ProjectDialog repository={repositoryDraft} project={editingProject} {saving} onSave={saveProject} onClose={() => showProjectDialog = false} />
+  <ProjectDialog
+    repository={repositoryDraft}
+    project={editingProject}
+    {saving}
+    {deleting}
+    onSave={saveProject}
+    onDelete={editingProject ? () => removeProject(editingProject!) : undefined}
+    onClose={() => showProjectDialog = false}
+  />
 {/if}
 
 {#if showSettings}
@@ -477,44 +489,34 @@
   :global(button) { font-family: inherit; }
   :global(::selection) { background: rgba(87, 184, 142, .3); }
 
-  .home { min-height: 100vh; background: radial-gradient(circle at 75% 11%, rgba(48, 120, 93, .13), transparent 27%), var(--bg); }
-  .home-header { display:flex; align-items:center; justify-content:space-between; max-width:1180px; height:72px; margin:auto; padding:0 28px; }
+  .home { min-height: 100vh; background:var(--bg); }
+  .home-header { display:flex; align-items:center; justify-content:space-between; max-width:900px; height:72px; margin:auto; padding:0 28px; border-bottom:1px solid var(--border); }
   .brand { display:flex; align-items:center; gap:11px; }
   .brand.compact { padding:0; color:var(--text); background:none; border:0; cursor:pointer; }
   .brand-mark { display:grid; place-items:center; width:34px; height:34px; color:#07120e; background:var(--accent-bright); border-radius:8px; box-shadow:0 0 24px rgba(87,184,142,.14); }
   .brand strong { display:block; font-size:15px; letter-spacing:-.01em; }
   .brand small { display:block; margin-top:2px; color:var(--muted); font-size:9px; letter-spacing:.06em; }
   .settings-button, .section-heading button { display:flex; align-items:center; gap:7px; padding:7px 10px; color:#aab4be; background:rgba(16,24,33,.7); border:1px solid var(--border); border-radius:6px; font-size:11px; cursor:pointer; }
-  .hero { display:grid; grid-template-columns:1fr 1.05fr; gap:70px; align-items:center; max-width:1110px; min-height:475px; margin:auto; padding:38px 36px 65px; }
-  .overline { display:flex; align-items:center; gap:6px; color:var(--accent-bright); font-size:10px; font-weight:650; letter-spacing:.11em; text-transform:uppercase; }
-  h1 { margin:16px 0 18px; color:#eef3f6; font-size:48px; line-height:1.06; letter-spacing:-.045em; }
-  h1 em { color:#84bca4; font-style:normal; font-weight:520; }
-  .hero-copy > p { max-width:480px; margin:0; color:#909ba6; font-size:14px; line-height:1.75; }
-  .open-button { display:flex; align-items:center; gap:8px; margin-top:25px; padding:10px 14px; color:#06110d; background:var(--accent-bright); border:0; border-radius:7px; box-shadow:0 8px 30px rgba(63,148,113,.15); font-size:12px; font-weight:650; cursor:pointer; }
-  .hero-visual { overflow:hidden; transform:perspective(1100px) rotateY(-3deg) rotateX(1deg); background:#0a1016; border:1px solid #25313d; border-radius:11px; box-shadow:0 28px 80px rgba(0,0,0,.36); }
-  .visual-header { display:flex; align-items:center; gap:5px; height:37px; padding:0 11px; background:#111923; border-bottom:1px solid var(--border); }
-  .visual-header i { width:7px; height:7px; background:#394450; border-radius:50%; } .visual-header span { margin-left:9px; color:#71808d; font:9px var(--mono); }
-  .visual-body { display:grid; grid-template-columns:90px 1fr; min-height:205px; }
-  .visual-body aside { display:grid; align-content:start; gap:12px; padding:19px 13px; background:#0c131b; border-right:1px solid var(--border); }
-  .visual-body aside b { height:5px; background:#252f39; border-radius:3px; } .visual-body aside b:nth-child(2) { width:70%; background:#315a49; }
-  pre { margin:0; padding:24px 16px; color:#b9c4ce; font:10px/2.15 var(--mono); white-space:pre-wrap; }
-  pre .dim { color:#46515d; } pre .blue { color:#8aaad1; } pre .minus { display:block; color:#ce827b; background:rgba(191,74,67,.08); } pre .plus { display:block; color:#7ac096; background:rgba(67,161,107,.08); }
-  .visual-ai { display:flex; gap:9px; align-items:flex-start; margin:0 12px 12px 105px; padding:10px; color:var(--accent-bright); background:rgba(63,148,113,.08); border:1px solid rgba(87,184,142,.16); border-radius:7px; }
-  .visual-ai span { color:#93a19d; font-size:9px; line-height:1.5; } .visual-ai strong { display:block; color:#bcd6cb; font-size:9px; }
-  .projects-section { max-width:1110px; margin:auto; padding:24px 36px 70px; border-top:1px solid rgba(32,43,54,.7); }
-  .section-heading { display:flex; align-items:end; justify-content:space-between; margin-bottom:18px; }
-  .section-heading span { color:var(--accent-bright); font-size:9px; font-weight:650; letter-spacing:.1em; text-transform:uppercase; }
-  .section-heading h2 { margin:5px 0 0; font-size:19px; letter-spacing:-.02em; }
-  .project-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-  article { position:relative; overflow:hidden; background:#0d141c; border:1px solid var(--border); border-radius:8px; }
+  .section-heading button { color:#07120e; background:var(--accent-bright); border-color:var(--accent-bright); font-weight:650; }
+  .projects-section { max-width:900px; margin:auto; padding:36px 28px 72px; }
+  .section-heading { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+  .section-heading h1 { margin:0; color:#eef3f6; font-size:22px; letter-spacing:-.025em; }
+  .project-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
+  article { display:grid; grid-template-columns:minmax(0,1fr) auto; overflow:hidden; background:#0d141c; border:1px solid var(--border); border-radius:8px; }
   article:hover { border-color:#2c3b48; background:#101821; }
-  .project-main { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:center; width:100%; padding:14px 40px 14px 14px; color:var(--text); text-align:left; background:none; border:0; cursor:pointer; }
+  .project-main { display:grid; grid-template-columns:auto minmax(0,1fr); gap:12px; align-items:center; width:100%; padding:14px; color:var(--text); text-align:left; background:none; border:0; cursor:pointer; }
   .project-icon { display:grid; place-items:center; width:36px; height:36px; color:var(--accent-bright); background:rgba(87,184,142,.08); border-radius:7px; }
   .project-info { min-width:0; } .project-info h3 { margin:0; font-size:12px; } .project-info p { overflow:hidden; margin:4px 0 8px; color:#687581; font:9px var(--mono); text-overflow:ellipsis; white-space:nowrap; }
-  .project-info div { display:flex; justify-content:space-between; gap:8px; color:#697681; font-size:9px; } .project-info span { display:flex; align-items:center; gap:4px; color:#8b9a95; }
-  .remove { position:absolute; right:8px; top:8px; display:grid; padding:5px; color:#58646f; background:none; border:0; cursor:pointer; opacity:0; } article:hover .remove { opacity:1; } .remove:hover { color:var(--red); }
-  .empty-projects { display:grid; place-items:center; padding:46px; color:#596570; background:#0c1219; border:1px dashed var(--border-strong); border-radius:9px; text-align:center; }
-  .empty-projects h3 { margin:12px 0 5px; color:var(--text); font-size:13px; } .empty-projects p { margin:0; color:var(--muted); font-size:11px; } .empty-projects button { margin-top:15px; padding:7px 10px; color:var(--accent-bright); background:rgba(87,184,142,.08); border:1px solid rgba(87,184,142,.2); border-radius:6px; font-size:10px; cursor:pointer; }
+  .project-info span { display:flex; align-items:center; gap:4px; color:#8b9a95; font-size:9px; }
+  .project-meta { display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:7px; padding:10px 12px 10px 6px; }
+  .project-meta time { color:#697681; font-size:9px; white-space:nowrap; }
+  .edit-project { display:grid; place-items:center; width:28px; height:28px; padding:0; color:#687581; background:transparent; border:1px solid transparent; border-radius:6px; cursor:pointer; }
+  .edit-project:hover { color:var(--text); background:var(--hover); border-color:var(--border-strong); }
+  .empty-projects { display:grid; place-items:center; min-height:420px; padding:64px 40px; color:#596570; text-align:center; }
+  .empty-project-icon { display:grid; place-items:center; width:56px; height:56px; color:var(--accent-bright); background:rgba(87,184,142,.08); border:1px solid rgba(87,184,142,.14); border-radius:14px; }
+  .empty-projects h1 { margin:18px 0 7px; color:#eef3f6; font-size:22px; letter-spacing:-.025em; }
+  .empty-projects p { margin:0; color:var(--muted); font-size:12px; }
+  .empty-projects button { display:flex; align-items:center; gap:7px; margin-top:22px; padding:10px 14px; color:#07120e; background:var(--accent-bright); border:1px solid var(--accent-bright); border-radius:7px; font-size:12px; font-weight:650; cursor:pointer; }
 
   .app-shell { height:100vh; display:grid; grid-template-rows:48px minmax(0,1fr); overflow:hidden; }
   .topbar { display:grid; grid-template-columns:auto minmax(220px,1fr) auto auto; align-items:center; gap:17px; padding:0 11px; background:#0c1219; border-bottom:1px solid var(--border); }
@@ -542,7 +544,6 @@
   :global(.spin) { animation:spin 1s linear infinite; } @keyframes spin { to { transform:rotate(360deg); } }
 
   @media (max-width: 1100px) {
-    .hero { grid-template-columns:1fr; min-height:auto; gap:40px; } .hero-visual { display:none; }
     .workspace { grid-template-columns:200px minmax(500px,1fr) 260px; }
   }
 </style>
