@@ -357,7 +357,12 @@
           <div class="viewer-scroll">
             {#if contentLoading}<div class="loading-state"><LoaderCircle class="spin" size={20} />Loading diff…</div>
             {:else if selectedDiff}<DiffViewer diff={selectedDiff} mode={diffMode} wrap={wrapLines} />
-            {:else if summary && summary.files.length === 0}<EmptyState icon={GitBranch} title="No changes" message={`The working tree has no changes relative to the merge base with ${activeProject.baseRef}.`} />
+            {:else if summary && summary.files.length === 0}<EmptyState
+                icon={GitBranch}
+                title="No changes"
+                message={`The working tree has no changes relative to the merge base with ${activeProject.baseRef}.`}
+                fill
+              />
             {:else}<EmptyState icon={FileCode2} title="Choose a changed file" message="Select a file to inspect its working-tree diff." />{/if}
           </div>
         {:else}
@@ -511,7 +516,7 @@
   .empty-projects { display:grid; place-items:center; padding:46px; color:#596570; background:#0c1219; border:1px dashed var(--border-strong); border-radius:9px; text-align:center; }
   .empty-projects h3 { margin:12px 0 5px; color:var(--text); font-size:13px; } .empty-projects p { margin:0; color:var(--muted); font-size:11px; } .empty-projects button { margin-top:15px; padding:7px 10px; color:var(--accent-bright); background:rgba(87,184,142,.08); border:1px solid rgba(87,184,142,.2); border-radius:6px; font-size:10px; cursor:pointer; }
 
-  .app-shell { height:100vh; display:grid; grid-template-rows:48px auto minmax(0,1fr); overflow:hidden; }
+  .app-shell { height:100vh; display:grid; grid-template-rows:48px minmax(0,1fr); overflow:hidden; }
   .topbar { display:grid; grid-template-columns:auto minmax(220px,1fr) auto auto; align-items:center; gap:17px; padding:0 11px; background:#0c1219; border-bottom:1px solid var(--border); }
   .topbar .brand-mark { width:27px; height:27px; border-radius:6px; } .topbar .brand { gap:7px; }
   .crumb { display:flex; align-items:center; min-width:0; gap:7px; color:#5b6772; font-size:10px; } .crumb strong { overflow:hidden; color:#aeb8c1; font-size:11px; text-overflow:ellipsis; white-space:nowrap; } .crumb span { color:#647079; font:9px var(--mono); }

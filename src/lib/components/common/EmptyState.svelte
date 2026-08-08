@@ -5,12 +5,19 @@
     icon,
     title,
     message,
-    compact = false
-  }: { icon: Component; title: string; message: string; compact?: boolean } = $props();
+    compact = false,
+    fill = false
+  }: {
+    icon: Component;
+    title: string;
+    message: string;
+    compact?: boolean;
+    fill?: boolean;
+  } = $props();
   const Icon = $derived(icon);
 </script>
 
-<div class:compact class="empty-state">
+<div class:compact class:fill class="empty-state">
   <Icon size={compact ? 24 : 32} strokeWidth={1.6} />
   <h3>{title}</h3>
   <p>{message}</p>
@@ -31,6 +38,10 @@
   .empty-state.compact {
     min-height: 160px;
     padding: 20px;
+  }
+
+  .empty-state.fill {
+    height: 100%;
   }
 
   h3 {
