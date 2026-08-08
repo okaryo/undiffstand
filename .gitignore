@@ -1,0 +1,7 @@
+node_modules/
+.pnpm-store/
+.svelte-kit/
+build/
+src-tauri/target/
+.DS_Store
+*.log
