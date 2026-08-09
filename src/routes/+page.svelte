@@ -56,21 +56,166 @@
   let contentLoading = $state(false);
   let sidebarOpen = $state(true);
   let aiPanelOpen = $state(true);
+  let sidebarWidth = $state(225);
+  let aiPanelWidth = $state(290);
   let pendingDiffPaths = new Set<string>();
   let diffBatchTimer: ReturnType<typeof setTimeout> | undefined;
   let diffLoadGeneration = 0;
   let autoRefreshInProgress = false;
   let lastAutoRefreshAt = 0;
   const AUTO_REFRESH_COOLDOWN_MS = 1_000;
+  const PANEL_HANDLE_WIDTH = 5;
+  const CONTENT_MIN_WIDTH = 500;
+  const SIDEBAR_MIN_WIDTH = 160;
+  const SIDEBAR_MAX_WIDTH = 420;
+  const AI_PANEL_MIN_WIDTH = 240;
+  const AI_PANEL_MAX_WIDTH = 520;
+  const PANEL_RESIZE_STEP = 10;
+  type ResizablePanel = 'sidebar' | 'ai';
+  let activeResize = $state<
+    | {
+        panel: ResizablePanel;
+        startX: number;
+        startWidth: number;
+        currentWidth: number;
+        workspaceWidth: number;
+        workspace: HTMLElement;
+      }
+    | undefined
+  >(undefined);
+  let pendingResizeClientX: number | undefined;
+  let resizeAnimationFrame: number | undefined;
+  let previousCursor = '';
+  let previousUserSelect = '';
 
   onMount(() => {
+    if (window.innerWidth <= 1100) {
+      sidebarWidth = 200;
+      aiPanelWidth = 260;
+    }
     window.addEventListener('focus', refreshWorkspaceOnFocus);
     void initialize();
 
     return () => {
       window.removeEventListener('focus', refreshWorkspaceOnFocus);
+      stopPanelResize();
     };
   });
+
+  function panelWidthLimits(panel: ResizablePanel, workspaceWidth: number) {
+    const min = panel === 'sidebar' ? SIDEBAR_MIN_WIDTH : AI_PANEL_MIN_WIDTH;
+    const configuredMax = panel === 'sidebar' ? SIDEBAR_MAX_WIDTH : AI_PANEL_MAX_WIDTH;
+    const otherPanelWidth =
+      panel === 'sidebar' ? (aiPanelOpen ? aiPanelWidth : 0) : sidebarOpen ? sidebarWidth : 0;
+    const visibleHandleCount = Number(sidebarOpen) + Number(aiPanelOpen);
+    const availableMax =
+      workspaceWidth -
+      otherPanelWidth -
+      CONTENT_MIN_WIDTH -
+      visibleHandleCount * PANEL_HANDLE_WIDTH;
+
+    return { min, max: Math.max(min, Math.min(configuredMax, availableMax)) };
+  }
+
+  function setPanelWidth(panel: ResizablePanel, width: number, workspaceWidth: number) {
+    const nextWidth = constrainedPanelWidth(panel, width, workspaceWidth);
+    if (panel === 'sidebar') sidebarWidth = nextWidth;
+    else aiPanelWidth = nextWidth;
+  }
+
+  function constrainedPanelWidth(panel: ResizablePanel, width: number, workspaceWidth: number) {
+    const { min, max } = panelWidthLimits(panel, workspaceWidth);
+    return Math.round(Math.min(max, Math.max(min, width)));
+  }
+
+  function startPanelResize(event: PointerEvent, panel: ResizablePanel) {
+    if (event.button !== 0) return;
+    const handle = event.currentTarget as HTMLElement;
+    const workspace = handle.parentElement;
+    if (!workspace) return;
+
+    event.preventDefault();
+    activeResize = {
+      panel,
+      startX: event.clientX,
+      startWidth: panel === 'sidebar' ? sidebarWidth : aiPanelWidth,
+      currentWidth: panel === 'sidebar' ? sidebarWidth : aiPanelWidth,
+      workspaceWidth: workspace.getBoundingClientRect().width,
+      workspace
+    };
+    previousCursor = document.body.style.cursor;
+    previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', resizePanel);
+    window.addEventListener('pointerup', stopPanelResize);
+    window.addEventListener('pointercancel', stopPanelResize);
+  }
+
+  function resizePanel(event: PointerEvent) {
+    if (!activeResize) return;
+    pendingResizeClientX = event.clientX;
+    if (resizeAnimationFrame !== undefined) return;
+    resizeAnimationFrame = requestAnimationFrame(flushPanelResize);
+  }
+
+  function flushPanelResize() {
+    resizeAnimationFrame = undefined;
+    if (!activeResize || pendingResizeClientX === undefined) return;
+    const direction = activeResize.panel === 'sidebar' ? 1 : -1;
+    const requestedWidth =
+      activeResize.startWidth + (pendingResizeClientX - activeResize.startX) * direction;
+    pendingResizeClientX = undefined;
+    activeResize.currentWidth = constrainedPanelWidth(
+      activeResize.panel,
+      requestedWidth,
+      activeResize.workspaceWidth
+    );
+    const property = activeResize.panel === 'sidebar' ? '--sidebar-width' : '--ai-panel-width';
+    activeResize.workspace.style.setProperty(property, `${activeResize.currentWidth}px`);
+  }
+
+  function stopPanelResize() {
+    if (!activeResize) return;
+    if (resizeAnimationFrame !== undefined) {
+      cancelAnimationFrame(resizeAnimationFrame);
+      resizeAnimationFrame = undefined;
+    }
+    flushPanelResize();
+    const { panel, currentWidth } = activeResize;
+    if (panel === 'sidebar') sidebarWidth = currentWidth;
+    else aiPanelWidth = currentWidth;
+    activeResize = undefined;
+    pendingResizeClientX = undefined;
+    document.body.style.cursor = previousCursor;
+    document.body.style.userSelect = previousUserSelect;
+    window.removeEventListener('pointermove', resizePanel);
+    window.removeEventListener('pointerup', stopPanelResize);
+    window.removeEventListener('pointercancel', stopPanelResize);
+  }
+
+  function resizePanelWithKeyboard(event: KeyboardEvent, panel: ResizablePanel) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const workspace = (event.currentTarget as HTMLElement).parentElement;
+    if (!workspace) return;
+
+    event.preventDefault();
+    const workspaceWidth = workspace.getBoundingClientRect().width;
+    const currentWidth = panel === 'sidebar' ? sidebarWidth : aiPanelWidth;
+    const direction = panel === 'sidebar' ? 1 : -1;
+    const { min, max } = panelWidthLimits(panel, workspaceWidth);
+    if (event.key === 'Home') setPanelWidth(panel, min, workspaceWidth);
+    else if (event.key === 'End') setPanelWidth(panel, max, workspaceWidth);
+    else {
+      const movement = event.key === 'ArrowRight' ? PANEL_RESIZE_STEP : -PANEL_RESIZE_STEP;
+      setPanelWidth(panel, currentWidth + movement * direction, workspaceWidth);
+    }
+  }
+
+  function resetPanelWidth(panel: ResizablePanel) {
+    if (panel === 'sidebar') sidebarWidth = window.innerWidth <= 1100 ? 200 : 225;
+    else aiPanelWidth = window.innerWidth <= 1100 ? 260 : 290;
+  }
 
   async function initialize() {
     try {
@@ -420,7 +565,13 @@
       </div>
     {/if}
 
-    <div class:withoutAi={!aiPanelOpen} class:withoutSidebar={!sidebarOpen} class="workspace">
+    <div
+      class:withoutAi={!aiPanelOpen}
+      class:withoutSidebar={!sidebarOpen}
+      class="workspace"
+      style:--sidebar-width={`${sidebarWidth}px`}
+      style:--ai-panel-width={`${aiPanelWidth}px`}
+    >
       {#if sidebarOpen}
         <aside id="changed-files-sidebar" class="sidebar">
           <div class="pane-title">
@@ -432,6 +583,21 @@
               onSelect={selectDiff}
             />{/if}
         </aside>
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions, a11y_no_noninteractive_tabindex (separator is an interactive window splitter) -->
+        <div
+          class="resize-handle"
+          class:resizing={activeResize?.panel === 'sidebar'}
+          role="separator"
+          aria-label="Resize changed files sidebar"
+          aria-orientation="vertical"
+          aria-valuemin={SIDEBAR_MIN_WIDTH}
+          aria-valuemax={SIDEBAR_MAX_WIDTH}
+          aria-valuenow={sidebarWidth}
+          tabindex="0"
+          onpointerdown={(event) => startPanelResize(event, 'sidebar')}
+          onkeydown={(event) => resizePanelWithKeyboard(event, 'sidebar')}
+          ondblclick={() => resetPanelWidth('sidebar')}
+        ></div>
       {/if}
 
       <section class="content-pane">
@@ -487,6 +653,21 @@
       </section>
 
       {#if aiPanelOpen}
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions, a11y_no_noninteractive_tabindex (separator is an interactive window splitter) -->
+        <div
+          class="resize-handle"
+          class:resizing={activeResize?.panel === 'ai'}
+          role="separator"
+          aria-label="Resize AI panel"
+          aria-orientation="vertical"
+          aria-valuemin={AI_PANEL_MIN_WIDTH}
+          aria-valuemax={AI_PANEL_MAX_WIDTH}
+          aria-valuenow={aiPanelWidth}
+          tabindex="0"
+          onpointerdown={(event) => startPanelResize(event, 'ai')}
+          onkeydown={(event) => resizePanelWithKeyboard(event, 'ai')}
+          ondblclick={() => resetPanelWidth('ai')}
+        ></div>
         <AiPanel explanation={diffExplanation} loading={aiLoading} onExplain={explainDiff} />
       {/if}
     </div>
@@ -923,14 +1104,17 @@
   }
   .workspace {
     display: grid;
-    grid-template-columns: 225px minmax(500px, 1fr) 290px;
+    grid-template-columns:
+      var(--sidebar-width) var(--panel-handle-width) minmax(500px, 1fr)
+      var(--panel-handle-width) var(--ai-panel-width);
     min-height: 0;
+    --panel-handle-width: 5px;
   }
   .workspace.withoutAi {
-    grid-template-columns: 225px minmax(500px, 1fr);
+    grid-template-columns: var(--sidebar-width) var(--panel-handle-width) minmax(500px, 1fr);
   }
   .workspace.withoutSidebar {
-    grid-template-columns: minmax(500px, 1fr) 290px;
+    grid-template-columns: minmax(500px, 1fr) var(--panel-handle-width) var(--ai-panel-width);
   }
   .workspace.withoutSidebar.withoutAi {
     grid-template-columns: minmax(500px, 1fr);
@@ -940,6 +1124,37 @@
     overflow: auto;
     background: #0c1219;
     border-right: 1px solid var(--border);
+  }
+  .resize-handle {
+    position: relative;
+    z-index: 2;
+    min-width: var(--panel-handle-width);
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    cursor: col-resize;
+    touch-action: none;
+  }
+  .resize-handle::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    background: transparent;
+    content: '';
+    transform: translateX(-50%);
+    transition: background 120ms ease;
+  }
+  .resize-handle:hover::after,
+  .resize-handle:focus-visible::after,
+  .resize-handle.resizing::after {
+    background: var(--accent-bright);
+  }
+  .resize-handle:focus-visible {
+    outline: 1px solid var(--accent-bright);
+    outline-offset: -1px;
   }
   .pane-title {
     display: flex;
@@ -1138,20 +1353,6 @@
   @keyframes spin {
     to {
       transform: rotate(360deg);
-    }
-  }
-  @media (max-width: 1100px) {
-    .workspace {
-      grid-template-columns: 200px minmax(500px, 1fr) 260px;
-    }
-    .workspace.withoutAi {
-      grid-template-columns: 200px minmax(500px, 1fr);
-    }
-    .workspace.withoutSidebar {
-      grid-template-columns: minmax(500px, 1fr) 260px;
-    }
-    .workspace.withoutSidebar.withoutAi {
-      grid-template-columns: minmax(500px, 1fr);
     }
   }
 </style>

@@ -137,4 +137,57 @@ describe('change details auto-refresh', () => {
 
     expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(2);
   });
+
+  it('resizes both side panels from their drag handles', async () => {
+    history.replaceState(null, '', '/?project=alpha');
+    render(Page);
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+
+    const sidebarHandle = screen.getByRole('separator', {
+      name: 'Resize changed files sidebar'
+    });
+    const aiPanelHandle = screen.getByRole('separator', { name: 'Resize AI panel' });
+    const workspace = sidebarHandle.parentElement;
+    expect(workspace).not.toBeNull();
+    vi.spyOn(workspace as HTMLElement, 'getBoundingClientRect').mockReturnValue({
+      width: 1200
+    } as DOMRect);
+
+    const initialSidebarWidth = Number(sidebarHandle.getAttribute('aria-valuenow'));
+    await fireEvent.pointerDown(sidebarHandle, { button: 0, clientX: 200 });
+    await fireEvent.pointerMove(window, { clientX: 250 });
+    await fireEvent.pointerUp(window);
+    expect(sidebarHandle).toHaveAttribute('aria-valuenow', String(initialSidebarWidth + 50));
+
+    const initialAiPanelWidth = Number(aiPanelHandle.getAttribute('aria-valuenow'));
+    await fireEvent.pointerDown(aiPanelHandle, { button: 0, clientX: 800 });
+    await fireEvent.pointerMove(window, { clientX: 750 });
+    await fireEvent.pointerUp(window);
+    expect(aiPanelHandle).toHaveAttribute('aria-valuenow', String(initialAiPanelWidth + 50));
+  });
+
+  it('supports keyboard resizing and hides handles with their panels', async () => {
+    history.replaceState(null, '', '/?project=alpha');
+    render(Page);
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+
+    const sidebarHandle = screen.getByRole('separator', {
+      name: 'Resize changed files sidebar'
+    });
+    const workspace = sidebarHandle.parentElement;
+    expect(workspace).not.toBeNull();
+    vi.spyOn(workspace as HTMLElement, 'getBoundingClientRect').mockReturnValue({
+      width: 1200
+    } as DOMRect);
+
+    const initialWidth = Number(sidebarHandle.getAttribute('aria-valuenow'));
+    await fireEvent.keyDown(sidebarHandle, { key: 'ArrowRight' });
+    expect(sidebarHandle).toHaveAttribute('aria-valuenow', String(initialWidth + 10));
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Hide changed files sidebar' }));
+    expect(
+      screen.queryByRole('separator', { name: 'Resize changed files sidebar' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('separator', { name: 'Resize AI panel' })).toBeInTheDocument();
+  });
 });

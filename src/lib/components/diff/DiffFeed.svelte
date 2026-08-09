@@ -29,87 +29,194 @@
 
   let feedElement = $state<HTMLElement>();
   let scroller: HTMLElement | null = null;
-  let loadObserver: IntersectionObserver | undefined;
-  let activeFrame: number | undefined;
+  let renderObserver: IntersectionObserver | undefined;
+  let activeObserver: IntersectionObserver | undefined;
+  let renderedPaths = $state<Record<string, boolean | undefined>>({});
+  let requestedPathsVersion = $state(0);
+  let lastFilesKey = $state('');
   let collapsed = $state<Record<string, boolean>>({});
   let copiedPath = $state<string>();
   let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
+  let renderTimer: ReturnType<typeof setTimeout> | undefined;
   const sectionElements = new Map<string, HTMLElement>();
+  const requestedPaths = new Set<string>();
+  const pendingRenderPaths: string[] = [];
+  const pendingRenderPathSet = new Set<string>();
+  const activeSectionPaths = new Set<string>();
+  const INITIAL_RENDERED_FILE_COUNT = 8;
+  const LAZY_RENDER_ROOT_MARGIN = '1200px 0px';
+  const ACTIVE_FILE_OFFSET = 52;
+  const RENDER_INTERVAL_MS = 32;
 
   onDestroy(() => {
     if (copyResetTimer !== undefined) clearTimeout(copyResetTimer);
+    if (renderTimer !== undefined) clearTimeout(renderTimer);
   });
 
   onMount(() => {
-    scroller = feedElement?.closest('.viewer-scroll') as HTMLElement | null;
-    loadObserver = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const path = (entry.target as HTMLElement).dataset.diffPath;
-          if (entry.isIntersecting && path) onLoad(path);
-        }
-      },
-      { root: scroller, rootMargin: '900px 0px' }
-    );
-    for (const section of sectionElements.values()) loadObserver.observe(section);
-    scroller?.addEventListener('scroll', scheduleActiveSync, { passive: true });
-    window.addEventListener('resize', scheduleActiveSync);
-    scheduleActiveSync();
+    scroller =
+      (feedElement?.closest('.viewer-scroll') as HTMLElement | null) ?? feedElement ?? null;
+    setupRenderObserver();
+    setupActiveObserver();
+    window.addEventListener('resize', setupActiveObserver);
 
     return () => {
-      scroller?.removeEventListener('scroll', scheduleActiveSync);
-      window.removeEventListener('resize', scheduleActiveSync);
-      loadObserver?.disconnect();
-      if (activeFrame !== undefined) cancelAnimationFrame(activeFrame);
+      window.removeEventListener('resize', setupActiveObserver);
+      renderObserver?.disconnect();
+      activeObserver?.disconnect();
     };
   });
 
+  $effect(() => {
+    const filesKey = files.map(displayPath).join('\0');
+    if (filesKey === lastFilesKey) return;
+    lastFilesKey = filesKey;
+    resetDeferredRendering();
+    for (const file of files.slice(0, INITIAL_RENDERED_FILE_COUNT)) {
+      requestFileRender(displayPath(file));
+    }
+    if (activePath) requestFileRender(activePath, true);
+    observeDeferredSections();
+  });
+
+  $effect(() => {
+    const path = activePath;
+    if (path) requestFileRender(path, true);
+  });
+
+  $effect(() => {
+    void requestedPathsVersion;
+    scheduleReadyRenders();
+  });
+
+  function setupRenderObserver() {
+    renderObserver?.disconnect();
+    if (!scroller) return;
+    renderObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const path = (entry.target as HTMLElement).dataset.diffPath;
+          if (!entry.isIntersecting || !path) continue;
+          renderObserver?.unobserve(entry.target);
+          requestFileRender(path);
+        }
+      },
+      { root: scroller, rootMargin: LAZY_RENDER_ROOT_MARGIN }
+    );
+    observeDeferredSections();
+  }
+
+  function setupActiveObserver() {
+    activeObserver?.disconnect();
+    activeSectionPaths.clear();
+    if (!scroller) return;
+    const offset = Math.min(ACTIVE_FILE_OFFSET, Math.max(0, scroller.clientHeight - 1));
+    const bottomMargin = Math.max(0, scroller.clientHeight - offset - 1);
+    activeObserver = new IntersectionObserver(updateActiveSections, {
+      root: scroller,
+      rootMargin: `-${offset}px 0px -${bottomMargin}px 0px`
+    });
+    for (const section of sectionElements.values()) activeObserver.observe(section);
+  }
+
+  function updateActiveSections(entries: IntersectionObserverEntry[]) {
+    for (const entry of entries) {
+      const path = (entry.target as HTMLElement).dataset.diffPath;
+      if (!path) continue;
+      if (entry.isIntersecting) activeSectionPaths.add(path);
+      else activeSectionPaths.delete(path);
+    }
+    const nextActivePath = files.map(displayPath).find((path) => activeSectionPaths.has(path));
+    if (nextActivePath && nextActivePath !== activePath) onActive(nextActivePath);
+  }
+
+  function observeDeferredSections() {
+    if (!renderObserver) return;
+    for (const [path, section] of sectionElements) {
+      if (!requestedPaths.has(path)) renderObserver.observe(section);
+    }
+  }
+
   function observeSection(node: HTMLElement, path: string) {
     sectionElements.set(path, node);
-    loadObserver?.observe(node);
+    if (!requestedPaths.has(path)) renderObserver?.observe(node);
+    activeObserver?.observe(node);
 
     return {
       destroy() {
-        loadObserver?.unobserve(node);
+        renderObserver?.unobserve(node);
+        activeObserver?.unobserve(node);
         sectionElements.delete(path);
+        activeSectionPaths.delete(path);
       }
     };
   }
 
-  function scheduleActiveSync() {
-    if (activeFrame !== undefined) cancelAnimationFrame(activeFrame);
-    activeFrame = requestAnimationFrame(() => {
-      activeFrame = undefined;
-      syncActivePath();
-    });
+  function resetDeferredRendering() {
+    if (renderTimer !== undefined) clearTimeout(renderTimer);
+    renderTimer = undefined;
+    requestedPaths.clear();
+    pendingRenderPaths.length = 0;
+    pendingRenderPathSet.clear();
+    renderedPaths = {};
+    requestedPathsVersion += 1;
   }
 
-  function syncActivePath() {
-    if (!scroller || files.length === 0) return;
-    if (scroller.scrollHeight <= scroller.clientHeight + 2) return;
-    const anchor = scroller.getBoundingClientRect().top + 52;
-    let candidate = displayPath(files[0]);
+  function requestFileRender(path: string, priority = false) {
+    if (!requestedPaths.has(path)) {
+      requestedPaths.add(path);
+      requestedPathsVersion += 1;
+      const section = sectionElements.get(path);
+      if (section) renderObserver?.unobserve(section);
+    }
+    onLoad(path);
+    if (diffs[path]) queueReadyRender(path, priority);
+  }
 
-    if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2) {
-      candidate = displayPath(files.at(-1) ?? files[0]);
-      if (candidate !== activePath) onActive(candidate);
+  function scheduleReadyRenders() {
+    if (activePath && requestedPaths.has(activePath) && diffs[activePath]) {
+      queueReadyRender(activePath, true);
+    }
+    for (const path of requestedPaths) {
+      if (diffs[path]) queueReadyRender(path);
+    }
+  }
+
+  function queueReadyRender(path: string, priority = false) {
+    if (renderedPaths[path] || collapsed[path]) return;
+    if (pendingRenderPathSet.has(path)) {
+      if (priority) {
+        const index = pendingRenderPaths.indexOf(path);
+        if (index > 0) {
+          pendingRenderPaths.splice(index, 1);
+          pendingRenderPaths.unshift(path);
+        }
+      }
       return;
     }
+    pendingRenderPathSet.add(path);
+    if (priority) pendingRenderPaths.unshift(path);
+    else pendingRenderPaths.push(path);
+    scheduleNextRender();
+  }
 
-    for (const file of files) {
-      const path = displayPath(file);
-      const section = sectionElements.get(path);
-      if (!section) continue;
-      if (section.getBoundingClientRect().top <= anchor) candidate = path;
-      else break;
-    }
+  function scheduleNextRender() {
+    if (renderTimer !== undefined || pendingRenderPaths.length === 0) return;
+    renderTimer = setTimeout(renderNextFile, RENDER_INTERVAL_MS);
+  }
 
-    if (candidate !== activePath) onActive(candidate);
+  function renderNextFile() {
+    renderTimer = undefined;
+    const path = pendingRenderPaths.shift();
+    if (!path) return;
+    pendingRenderPathSet.delete(path);
+    if (requestedPaths.has(path) && diffs[path] && !collapsed[path]) renderedPaths[path] = true;
+    scheduleNextRender();
   }
 
   function toggleCollapsed(path: string) {
     collapsed[path] = !collapsed[path];
-    scheduleActiveSync();
+    if (!collapsed[path] && diffs[path]) queueReadyRender(path, true);
   }
 
   async function copyPath(path: string) {
@@ -185,7 +292,7 @@
 
       {#if !collapsed[path]}
         <div class="diff-body">
-          {#if diffs[path]}
+          {#if renderedPaths[path] && diffs[path]}
             <DiffViewer diff={diffs[path]} {mode} {wrap} />
           {:else if errors[path]}
             <div class="file-error">
@@ -194,8 +301,10 @@
             </div>
           {:else}
             <div class="file-loading">
-              {#if loadingPaths[path]}<LoaderCircle class="spin" size={16} />Loading diff…{:else}Waiting
-                to load…{/if}
+              {#if loadingPaths[path]}<LoaderCircle class="spin" size={16} />Loading diff…{:else if diffs[path]}<LoaderCircle
+                  class="spin"
+                  size={16}
+                />Preparing diff…{:else}Waiting to load…{/if}
             </div>
           {/if}
         </div>
