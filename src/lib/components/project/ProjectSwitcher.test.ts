@@ -75,8 +75,25 @@ describe('ProjectSwitcher', () => {
     expect(screen.queryByRole('menu', { name: 'Projects' })).not.toBeInTheDocument();
   });
 
-  it('closes the project list when clicking another part of the header', async () => {
+  it('opens the comparison editor from the comparison label and closes the project list', async () => {
+    const onEditComparison = vi.fn();
     render(ProjectSwitcher, {
+      projects,
+      activeProject: projects[0],
+      comparisonLabel: 'main → working tree',
+      onEditComparison,
+      onSelect: vi.fn()
+    });
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Switch project. Current: Alpha' }));
+    await fireEvent.click(screen.getByText('main → working tree'));
+
+    expect(onEditComparison).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('menu', { name: 'Projects' })).not.toBeInTheDocument();
+  });
+
+  it('uses the Git comparison icon for the comparison trigger', () => {
+    const { container } = render(ProjectSwitcher, {
       projects,
       activeProject: projects[0],
       comparisonLabel: 'main → working tree',
@@ -84,9 +101,12 @@ describe('ProjectSwitcher', () => {
       onSelect: vi.fn()
     });
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Switch project. Current: Alpha' }));
-    await fireEvent.click(screen.getByText('main → working tree'));
+    const comparisonTrigger = screen.getByRole('button', {
+      name: 'Change comparison. Current: main → working tree'
+    });
 
-    expect(screen.queryByRole('menu', { name: 'Projects' })).not.toBeInTheDocument();
+    expect(comparisonTrigger).toContainElement(
+      container.querySelector('.lucide-git-compare-arrows')
+    );
   });
 });

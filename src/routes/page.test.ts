@@ -198,7 +198,9 @@ describe('change details auto-refresh', () => {
     await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
 
     expect(screen.queryByRole('combobox', { name: 'From' })).not.toBeInTheDocument();
-    await fireEvent.click(screen.getByRole('button', { name: 'Edit comparison' }));
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Change comparison. Current: feature → working tree' })
+    );
     expect(screen.getByRole('dialog', { name: 'Change comparison' })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole('combobox', { name: 'From' }));
     let menu = screen.getByRole('listbox', { name: 'From revisions' });

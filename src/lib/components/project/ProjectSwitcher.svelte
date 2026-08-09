@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Check, ChevronDown, ChevronRight, FolderGit2, Pencil } from '@lucide/svelte';
+  import { Check, ChevronDown, ChevronRight, FolderGit2, GitCompareArrows } from '@lucide/svelte';
   import type { ProjectConfig } from '$lib/domain/project';
 
   let {
@@ -59,15 +59,15 @@
     <strong>{activeProject.name}</strong>
     <span class="chevron"><ChevronDown size={13} /></span>
   </button>
-  <span class="comparison">{comparisonLabel}</span>
   <button
-    class="edit-comparison"
+    class="comparison-trigger"
     type="button"
-    aria-label="Edit comparison"
-    title="Edit comparison"
+    aria-label={`Change comparison. Current: ${comparisonLabel}`}
+    title="Change comparison"
     onclick={onEditComparison}
   >
-    <Pencil size={12} />
+    <span class="comparison">{comparisonLabel}</span>
+    <GitCompareArrows size={13} />
   </button>
 
   {#if open}
@@ -151,19 +151,18 @@
 
   .comparison {
     overflow: hidden;
-    color: #647079;
     font: 11px var(--mono);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .edit-comparison {
-    display: grid;
-    flex: 0 0 auto;
-    place-items: center;
-    width: 24px;
+  .comparison-trigger {
+    display: flex;
+    align-items: center;
+    min-width: 0;
     height: 24px;
-    padding: 0;
+    gap: 5px;
+    padding: 0 5px;
     color: #647079;
     background: transparent;
     border: 0;
@@ -171,7 +170,11 @@
     cursor: pointer;
   }
 
-  .edit-comparison:hover {
+  .comparison-trigger :global(svg) {
+    flex: 0 0 auto;
+  }
+
+  .comparison-trigger:hover {
     color: var(--text);
     background: var(--hover);
   }
