@@ -508,7 +508,7 @@
       if (path) {
         queueDiff(path);
         await tick();
-        if (activeProject?.id === projectId) scrollToDiff(path, false);
+        if (!silent && activeProject?.id === projectId) scrollToDiff(path, false);
       }
     } catch (caught) {
       if (activeProject?.id === projectId) workspaceError = normalizeError(caught);

@@ -112,12 +112,16 @@ describe('change details auto-refresh', () => {
     render(Page);
 
     await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(2));
     expect(screen.getByText('feature → working tree')).toBeInTheDocument();
     expect(screen.queryByText('HEAD → working tree')).not.toBeInTheDocument();
+    vi.mocked(Element.prototype.scrollIntoView).mockClear();
     await fireEvent.focus(window);
     await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(tauriApi.getFileDiffs).toHaveBeenCalledTimes(2));
 
     expect(new URLSearchParams(location.search).get('file')).toBe('src/example.ts');
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
 
   it('does not reload from the project list', async () => {
