@@ -360,6 +360,44 @@ describe('change details auto-refresh', () => {
     );
   });
 
+  it('refreshes the change details with Cmd+R', async () => {
+    history.replaceState(null, '', '/?project=alpha&file=src%2Fexample.ts');
+    render(Page);
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'r',
+      code: 'KeyR',
+      metaKey: true,
+      cancelable: true
+    });
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(2));
+    expect(tauriApi.getDiffSummary).toHaveBeenLastCalledWith('alpha', {
+      base: 'HEAD',
+      target: '.'
+    });
+    expect(new URLSearchParams(location.search).get('file')).toBe('src/example.ts');
+  });
+
+  it('leaves Cmd+R to the browser from the project list', async () => {
+    render(Page);
+    await waitFor(() => expect(tauriApi.listProjects).toHaveBeenCalledOnce());
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'r',
+      code: 'KeyR',
+      metaKey: true,
+      cancelable: true
+    });
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(tauriApi.getDiffSummary).not.toHaveBeenCalled();
+  });
+
   it('opens AI settings from the project list and closes it with Escape', async () => {
     render(Page);
     await waitFor(() => expect(tauriApi.listProjects).toHaveBeenCalledOnce());

@@ -44,6 +44,7 @@
   import type { DiffViewMode, UserPreferences } from '$lib/domain/preferences';
   import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
   import { tauriApi } from '$lib/services/tauri';
+  import { resolveApplicationShortcut } from '$lib/shortcuts';
 
   let projects = $state<ProjectConfig[]>([]);
   let activeProject = $state<ProjectConfig | null>(null);
@@ -533,31 +534,27 @@
   }
 
   function handleWindowKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
+    const shortcut = resolveApplicationShortcut(event);
+
+    if (shortcut === 'dismiss-dialogs') {
       if (showProjectDialog || showSettings || showComparisonDialog) event.preventDefault();
       showProjectDialog = false;
       showSettings = false;
       if (!contentLoading) showComparisonDialog = false;
-      return;
-    }
-
-    if (event.repeat || !event.metaKey || event.ctrlKey || event.shiftKey) return;
-
-    const isSettingsShortcut = !event.altKey && (event.code === 'Comma' || event.key === ',');
-    if (isSettingsShortcut) {
+    } else if (shortcut === 'open-settings') {
       event.preventDefault();
       if (activeProject) void editActiveProject();
       else showSettings = true;
-      return;
+    } else if (shortcut === 'refresh-change-detail' && activeProject) {
+      event.preventDefault();
+      void loadWorkspace(selectedDiffPath);
+    } else if (shortcut === 'toggle-changed-files' && activeProject) {
+      event.preventDefault();
+      toggleSidebar();
+    } else if (shortcut === 'toggle-ai-panel' && activeProject) {
+      event.preventDefault();
+      toggleAiPanel();
     }
-
-    const isSidebarShortcut =
-      activeProject && (event.code === 'KeyB' || event.key.toLowerCase() === 'b');
-    if (!isSidebarShortcut) return;
-
-    event.preventDefault();
-    if (event.altKey) toggleAiPanel();
-    else toggleSidebar();
   }
 
   function selectDiff(path: string) {
