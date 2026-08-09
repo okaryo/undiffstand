@@ -84,7 +84,7 @@ describe('change details auto-refresh', () => {
       suggestedName: project.name,
       detectedBaseRef: 'main',
       currentBranch: 'feature',
-      recentBranches: ['feature', 'main'],
+      recentBranches: ['main'],
       localBranches: ['feature', 'main'],
       remoteBranches: ['origin/main'],
       recentCommits: [{ sha: '1234567890abcdef', shortSha: '1234567', subject: 'Example change' }]
@@ -112,6 +112,8 @@ describe('change details auto-refresh', () => {
     render(Page);
 
     await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('feature → working tree')).toBeInTheDocument();
+    expect(screen.queryByText('HEAD → working tree')).not.toBeInTheDocument();
     await fireEvent.focus(window);
     await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(2));
 
@@ -196,7 +198,9 @@ describe('change details auto-refresh', () => {
     await fireEvent.click(within(menu).getByRole('option', { name: 'main' }));
     await fireEvent.click(screen.getByRole('combobox', { name: 'To' }));
     menu = screen.getByRole('listbox', { name: 'To revisions' });
-    await fireEvent.click(within(menu).getByRole('option', { name: 'feature' }));
+    const localBranches = within(menu).getByRole('region', { name: 'Local branches' });
+    await fireEvent.click(within(localBranches).getByRole('button', { name: /Local branches/ }));
+    await fireEvent.click(within(localBranches).getByRole('option', { name: 'feature' }));
     await fireEvent.click(screen.getByRole('button', { name: 'Review' }));
 
     await waitFor(() =>

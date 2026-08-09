@@ -31,9 +31,30 @@ export type DiffSummary = {
 
 export const defaultDiffSelection = (): DiffSelection => ({ base: 'HEAD', target: '.' });
 
-export function diffSelectionLabel(selection: DiffSelection): string {
-  const target = selection.target === '.' ? 'working tree' : selection.target;
-  return `${selection.base} → ${target}`;
+export function revisionDisplayLabel(revision: string, currentBranch?: string | null): string {
+  if (revision === 'HEAD') return currentBranch ?? 'HEAD';
+  if (revision === '.') return 'working tree';
+  return revision;
+}
+
+export function diffSelectionLabel(
+  selection: DiffSelection,
+  currentBranch?: string | null
+): string {
+  return `${revisionDisplayLabel(selection.base, currentBranch)} → ${revisionDisplayLabel(
+    selection.target,
+    currentBranch
+  )}`;
+}
+
+export function diffComparisonLabel(
+  comparison: DiffComparison,
+  currentBranch?: string | null
+): string {
+  return `${revisionDisplayLabel(comparison.fromLabel, currentBranch)} → ${revisionDisplayLabel(
+    comparison.toLabel,
+    currentBranch
+  )}`;
 }
 
 export type FileDiff = {

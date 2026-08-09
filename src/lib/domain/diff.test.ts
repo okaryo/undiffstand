@@ -1,5 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { displayPath, sortDiffFilesByTreeOrder, type DiffFileSummary } from './diff';
+import {
+  diffComparisonLabel,
+  diffSelectionLabel,
+  displayPath,
+  revisionDisplayLabel,
+  sortDiffFilesByTreeOrder,
+  type DiffFileSummary
+} from './diff';
+
+describe('diff display labels', () => {
+  it('shows the current branch name instead of HEAD', () => {
+    expect(revisionDisplayLabel('HEAD', 'feature/readiff')).toBe('feature/readiff');
+    expect(diffSelectionLabel({ base: 'HEAD', target: '.' }, 'feature/readiff')).toBe(
+      'feature/readiff → working tree'
+    );
+    expect(diffComparisonLabel({ fromLabel: 'HEAD', toLabel: 'main' }, 'feature/readiff')).toBe(
+      'feature/readiff → main'
+    );
+  });
+
+  it('keeps HEAD as the detached-head fallback', () => {
+    expect(revisionDisplayLabel('HEAD', null)).toBe('HEAD');
+  });
+});
 
 describe('sortDiffFilesByTreeOrder', () => {
   it('orders directory contents before files at the same level', () => {

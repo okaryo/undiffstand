@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Check, ChevronDown, ChevronRight } from '@lucide/svelte';
+  import { revisionDisplayLabel } from '$lib/domain/diff';
   import type { GitCommitSummary } from '$lib/domain/project';
 
   let {
@@ -33,7 +34,9 @@
   let menu = $state<HTMLDivElement>();
 
   let menuId = $derived(`revision-select-${label.toLowerCase()}-options`);
-  let visibleRecentBranches = $derived(recentBranches.slice(0, 5));
+  let visibleRecentBranches = $derived(
+    recentBranches.filter((branch) => branch !== currentBranch).slice(0, 5)
+  );
   let visibleRecentCommits = $derived(recentCommits.slice(0, 10));
 
   function isKnownRevision(candidate: string) {
@@ -48,7 +51,7 @@
 
   function displayValue(candidate: string) {
     if (candidate === '.') return 'Working tree';
-    if (candidate === 'HEAD') return `HEAD${currentBranch ? ` — ${currentBranch}` : ''}`;
+    if (candidate === 'HEAD') return revisionDisplayLabel(candidate, currentBranch);
     const commit = visibleRecentCommits.find((item) => item.sha === candidate);
     return commit ? `${commit.shortSha} — ${commit.subject}` : candidate;
   }

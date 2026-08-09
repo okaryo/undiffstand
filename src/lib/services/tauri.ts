@@ -137,7 +137,7 @@ const mockApi: typeof nativeApi = {
     suggestedName: path.split('/').at(-1) ?? 'repository',
     detectedBaseRef: 'main',
     currentBranch: 'feature/readiff',
-    recentBranches: ['feature/readiff', 'main'],
+    recentBranches: ['main'],
     localBranches: ['feature/readiff', 'main'],
     remoteBranches: ['origin/main'],
     recentCommits: [

@@ -154,7 +154,7 @@ fn list_refs(repo: &Path, namespace: &str) -> AppResult<Vec<String>> {
     Ok(refs)
 }
 
-fn recent_branches(repo: &Path) -> AppResult<Vec<String>> {
+fn recent_branches(repo: &Path, current_branch: Option<&str>) -> AppResult<Vec<String>> {
     let output = git_output(
         repo,
         [
@@ -171,6 +171,7 @@ fn recent_branches(repo: &Path) -> AppResult<Vec<String>> {
     )?
     .lines()
     .filter(|reference| !reference.ends_with("/HEAD"))
+    .filter(|reference| current_branch != Some(*reference))
     .take(5)
     .map(ToOwned::to_owned)
     .collect())
@@ -206,6 +207,8 @@ fn recent_commits(repo: &Path) -> AppResult<Vec<GitCommitSummary>> {
 pub fn inspect_repository(path: &Path) -> AppResult<RepositoryInfo> {
     let repo = canonical_repository(path)?;
     let (detected_base_ref, local_branches) = detect_base_ref(&repo)?;
+    let current_branch = current_branch(&repo)?;
+    let recent_branches = recent_branches(&repo, current_branch.as_deref())?;
     let suggested_name = repo
         .file_name()
         .and_then(|name| name.to_str())
@@ -215,8 +218,8 @@ pub fn inspect_repository(path: &Path) -> AppResult<RepositoryInfo> {
         repo_path: repo.to_string_lossy().into_owned(),
         suggested_name,
         detected_base_ref,
-        current_branch: current_branch(&repo)?,
-        recent_branches: recent_branches(&repo)?,
+        current_branch,
+        recent_branches,
         local_branches,
         remote_branches: list_refs(&repo, "refs/remotes")?,
         recent_commits: recent_commits(&repo)?,
@@ -727,10 +730,10 @@ mod tests {
         }
         git(repo, &["update-ref", "refs/remotes/origin/recent", "HEAD"]);
 
-        let branches = recent_branches(repo).unwrap();
+        let branches = recent_branches(repo, Some("main")).unwrap();
         assert_eq!(
             branches,
-            ["main", "branch-6", "branch-5", "branch-4", "branch-3"]
+            ["branch-6", "branch-5", "branch-4", "branch-3", "branch-2"]
         );
         assert!(branches.iter().all(|branch| !branch.starts_with("origin/")));
 

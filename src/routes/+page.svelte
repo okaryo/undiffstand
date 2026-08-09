@@ -31,8 +31,10 @@
   import {
     defaultDiffSelection,
     diffAnchorId,
+    diffComparisonLabel,
     diffSelectionLabel,
     displayPath,
+    revisionDisplayLabel,
     sortDiffFilesByTreeOrder,
     type DiffSelection,
     type DiffSummary,
@@ -685,8 +687,8 @@
         {projects}
         {activeProject}
         comparisonLabel={summary
-          ? `${summary.comparison.fromLabel} → ${summary.comparison.toLabel}`
-          : diffSelectionLabel(diffSelection)}
+          ? diffComparisonLabel(summary.comparison, activeRepository?.currentBranch)
+          : diffSelectionLabel(diffSelection, activeRepository?.currentBranch)}
         onSelect={openProject}
       />
       <div class="top-actions">
@@ -799,7 +801,7 @@
           {:else if summary}<EmptyState
               icon={GitBranch}
               title="No changes"
-              message={`No changes found from ${summary.comparison.fromLabel} to ${summary.comparison.toLabel}.`}
+              message={`No changes found from ${revisionDisplayLabel(summary.comparison.fromLabel, activeRepository?.currentBranch)} to ${revisionDisplayLabel(summary.comparison.toLabel, activeRepository?.currentBranch)}.`}
               fill
             />
           {/if}
@@ -857,7 +859,7 @@
                 <div class="project-info">
                   <h3>{project.name}</h3>
                   <p>{project.repoPath}</p>
-                  <span><GitBranch size={11} />HEAD → working tree</span>
+                  <span><GitBranch size={11} />Current branch → working tree</span>
                 </div>
               </button>
               <div class="project-meta">

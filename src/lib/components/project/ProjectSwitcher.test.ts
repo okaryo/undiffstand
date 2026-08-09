@@ -26,7 +26,7 @@ describe('ProjectSwitcher', () => {
     render(ProjectSwitcher, {
       projects,
       activeProject: projects[0],
-      comparisonLabel: 'HEAD → working tree',
+      comparisonLabel: 'main → working tree',
       onSelect
     });
 
@@ -48,7 +48,7 @@ describe('ProjectSwitcher', () => {
     render(ProjectSwitcher, {
       projects,
       activeProject: projects[0],
-      comparisonLabel: 'HEAD → working tree',
+      comparisonLabel: 'main → working tree',
       onSelect: vi.fn()
     });
 
@@ -62,7 +62,7 @@ describe('ProjectSwitcher', () => {
     render(ProjectSwitcher, {
       projects,
       activeProject: projects[0],
-      comparisonLabel: 'HEAD → working tree',
+      comparisonLabel: 'main → working tree',
       onSelect: vi.fn()
     });
 
@@ -76,12 +76,12 @@ describe('ProjectSwitcher', () => {
     render(ProjectSwitcher, {
       projects,
       activeProject: projects[0],
-      comparisonLabel: 'HEAD → working tree',
+      comparisonLabel: 'main → working tree',
       onSelect: vi.fn()
     });
 
     await fireEvent.click(screen.getByRole('button', { name: 'Switch project. Current: Alpha' }));
-    await fireEvent.click(screen.getByText('HEAD → working tree'));
+    await fireEvent.click(screen.getByText('main → working tree'));
 
     expect(screen.queryByRole('menu', { name: 'Projects' })).not.toBeInTheDocument();
   });

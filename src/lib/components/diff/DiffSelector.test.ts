@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import DiffSelector from './DiffSelector.svelte';
 
 const repositoryOptions = {
-  recentBranches: ['feature', 'hotfix', 'topic', 'release', 'maintenance', 'not-shown'],
+  recentBranches: ['hotfix', 'topic', 'release', 'maintenance', 'develop', 'not-shown'],
   localBranches: ['feature', 'main', 'hotfix', 'topic', 'release', 'maintenance'],
   remoteBranches: ['origin/main', 'origin/release'],
   recentCommits: Array.from({ length: 11 }, (_, index) => ({
@@ -15,7 +15,7 @@ const repositoryOptions = {
 };
 
 describe('DiffSelector', () => {
-  it('uses HEAD to working tree as the default review', async () => {
+  it('shows the current branch name for the default review', async () => {
     const onApply = vi.fn();
     render(DiffSelector, {
       selection: { base: 'HEAD', target: '.' },
@@ -23,7 +23,8 @@ describe('DiffSelector', () => {
       onApply
     });
 
-    expect(screen.getByRole('combobox', { name: 'From' })).toHaveTextContent('HEAD — feature');
+    expect(screen.getByRole('combobox', { name: 'From' })).toHaveTextContent('feature');
+    expect(screen.getByRole('combobox', { name: 'From' })).not.toHaveTextContent('HEAD');
     expect(screen.getByRole('combobox', { name: 'To' })).toHaveTextContent('Working tree');
     await fireEvent.click(screen.getByRole('button', { name: 'Review' }));
 
@@ -71,7 +72,9 @@ describe('DiffSelector', () => {
 
     await fireEvent.click(screen.getByRole('combobox', { name: 'To' }));
     menu = screen.getByRole('listbox', { name: 'To revisions' });
-    await fireEvent.click(within(menu).getByRole('option', { name: 'feature' }));
+    const localBranches = within(menu).getByRole('region', { name: 'Local branches' });
+    await fireEvent.click(within(localBranches).getByRole('button', { name: /Local branches/ }));
+    await fireEvent.click(within(localBranches).getByRole('option', { name: 'feature' }));
     await fireEvent.click(screen.getByRole('button', { name: 'Review' }));
 
     expect(onApply).toHaveBeenCalledWith({ base: 'main', target: 'feature' });
