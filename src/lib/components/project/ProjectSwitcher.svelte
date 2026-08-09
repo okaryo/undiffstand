@@ -1,16 +1,18 @@
 <script lang="ts">
-  import { Check, ChevronDown, ChevronRight, FolderGit2 } from '@lucide/svelte';
+  import { Check, ChevronDown, ChevronRight, FolderGit2, Pencil } from '@lucide/svelte';
   import type { ProjectConfig } from '$lib/domain/project';
 
   let {
     projects,
     activeProject,
     comparisonLabel,
+    onEditComparison,
     onSelect
   }: {
     projects: ProjectConfig[];
     activeProject: ProjectConfig;
     comparisonLabel: string;
+    onEditComparison: () => void;
     onSelect: (project: ProjectConfig) => void | Promise<void>;
   } = $props();
 
@@ -58,6 +60,15 @@
     <span class="chevron"><ChevronDown size={13} /></span>
   </button>
   <span class="comparison">{comparisonLabel}</span>
+  <button
+    class="edit-comparison"
+    type="button"
+    aria-label="Edit comparison"
+    title="Edit comparison"
+    onclick={onEditComparison}
+  >
+    <Pencil size={12} />
+  </button>
 
   {#if open}
     <div class="menu" role="menu" aria-label="Projects" bind:this={menu}>
@@ -144,6 +155,25 @@
     font: 11px var(--mono);
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .edit-comparison {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    color: #647079;
+    background: transparent;
+    border: 0;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .edit-comparison:hover {
+    color: var(--text);
+    background: var(--hover);
   }
 
   .menu {

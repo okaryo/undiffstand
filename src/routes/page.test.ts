@@ -193,6 +193,9 @@ describe('change details auto-refresh', () => {
     render(Page);
     await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
 
+    expect(screen.queryByRole('combobox', { name: 'From' })).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: 'Edit comparison' }));
+    expect(screen.getByRole('dialog', { name: 'Change comparison' })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole('combobox', { name: 'From' }));
     let menu = screen.getByRole('listbox', { name: 'From revisions' });
     await fireEvent.click(within(menu).getByRole('option', { name: 'main' }));
@@ -201,7 +204,7 @@ describe('change details auto-refresh', () => {
     const localBranches = within(menu).getByRole('region', { name: 'Local branches' });
     await fireEvent.click(within(localBranches).getByRole('button', { name: /Local branches/ }));
     await fireEvent.click(within(localBranches).getByRole('option', { name: 'feature' }));
-    await fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 
     await waitFor(() =>
       expect(tauriApi.getDiffSummary).toHaveBeenLastCalledWith('alpha', {
@@ -211,6 +214,9 @@ describe('change details auto-refresh', () => {
     );
     expect(new URLSearchParams(location.search).get('base')).toBe('main');
     expect(new URLSearchParams(location.search).get('target')).toBe('feature');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Change comparison' })).not.toBeInTheDocument()
+    );
   });
 
   it('resizes both side panels from their drag handles', async () => {

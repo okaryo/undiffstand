@@ -26,7 +26,7 @@ describe('DiffSelector', () => {
     expect(screen.getByRole('combobox', { name: 'From' })).toHaveTextContent('feature');
     expect(screen.getByRole('combobox', { name: 'From' })).not.toHaveTextContent('HEAD');
     expect(screen.getByRole('combobox', { name: 'To' })).toHaveTextContent('Working tree');
-    await fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 
     expect(onApply).toHaveBeenCalledWith({ base: 'HEAD', target: '.' });
   });
@@ -75,7 +75,7 @@ describe('DiffSelector', () => {
     const localBranches = within(menu).getByRole('region', { name: 'Local branches' });
     await fireEvent.click(within(localBranches).getByRole('button', { name: /Local branches/ }));
     await fireEvent.click(within(localBranches).getByRole('option', { name: 'feature' }));
-    await fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 
     expect(onApply).toHaveBeenCalledWith({ base: 'main', target: 'feature' });
   });

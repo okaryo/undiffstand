@@ -72,7 +72,7 @@
     onChange={(value) => (target = value)}
   />
   <button type="submit" disabled={loading || !base || !target}
-    >{loading ? 'Loading…' : 'Review'}</button
+    >{loading ? 'Applying…' : 'Apply'}</button
   >
 </form>
 
@@ -93,6 +93,7 @@
     white-space: nowrap;
   }
   button {
+    flex: 0 0 auto;
     height: 29px;
     padding: 0 10px;
     color: #07120e;

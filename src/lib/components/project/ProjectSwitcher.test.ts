@@ -27,6 +27,7 @@ describe('ProjectSwitcher', () => {
       projects,
       activeProject: projects[0],
       comparisonLabel: 'main → working tree',
+      onEditComparison: vi.fn(),
       onSelect
     });
 
@@ -49,6 +50,7 @@ describe('ProjectSwitcher', () => {
       projects,
       activeProject: projects[0],
       comparisonLabel: 'main → working tree',
+      onEditComparison: vi.fn(),
       onSelect: vi.fn()
     });
 
@@ -63,6 +65,7 @@ describe('ProjectSwitcher', () => {
       projects,
       activeProject: projects[0],
       comparisonLabel: 'main → working tree',
+      onEditComparison: vi.fn(),
       onSelect: vi.fn()
     });
 
@@ -77,6 +80,7 @@ describe('ProjectSwitcher', () => {
       projects,
       activeProject: projects[0],
       comparisonLabel: 'main → working tree',
+      onEditComparison: vi.fn(),
       onSelect: vi.fn()
     });
 

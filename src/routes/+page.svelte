@@ -52,6 +52,7 @@
   let editingProject = $state<ProjectConfig | undefined>();
   let showProjectDialog = $state(false);
   let showSettings = $state(false);
+  let showComparisonDialog = $state(false);
   let loading = $state(true);
   let saving = $state(false);
   let deleting = $state(false);
@@ -528,6 +529,11 @@
     diffSelection = selection;
     selectedDiffPath = undefined;
     await loadWorkspace();
+    showComparisonDialog = false;
+  }
+
+  function handleWindowKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && !contentLoading) showComparisonDialog = false;
   }
 
   function selectDiff(path: string) {
@@ -666,6 +672,8 @@
   <meta name="description" content="AI-assisted diff understanding for human reviewers." />
 </svelte:head>
 
+<svelte:window onkeydown={handleWindowKeydown} />
+
 {#if activeProject}
   <main class="app-shell">
     <header class="topbar">
@@ -689,6 +697,7 @@
         comparisonLabel={summary
           ? diffComparisonLabel(summary.comparison, activeRepository?.currentBranch)
           : diffSelectionLabel(diffSelection, activeRepository?.currentBranch)}
+        onEditComparison={() => (showComparisonDialog = true)}
         onSelect={openProject}
       />
       <div class="top-actions">
@@ -707,19 +716,6 @@
         <ErrorBanner error={workspaceError} onDismiss={() => (workspaceError = null)} />
       </div>
     {/if}
-
-    <div class="comparison-bar">
-      <DiffSelector
-        selection={diffSelection}
-        recentBranches={activeRepository?.recentBranches ?? []}
-        localBranches={activeRepository?.localBranches ?? []}
-        remoteBranches={activeRepository?.remoteBranches ?? []}
-        recentCommits={activeRepository?.recentCommits ?? []}
-        currentBranch={activeRepository?.currentBranch}
-        loading={contentLoading}
-        onApply={applyDiffSelection}
-      />
-    </div>
 
     <div
       class:withoutAi={!aiPanelOpen}
@@ -896,6 +892,46 @@
     onDelete={editingProject ? () => removeProject(editingProject!) : undefined}
     onClose={() => (showProjectDialog = false)}
   />
+{/if}
+
+{#if activeProject && showComparisonDialog}
+  <div
+    class="dialog-backdrop"
+    role="presentation"
+    onclick={(event) =>
+      event.target === event.currentTarget && !contentLoading && (showComparisonDialog = false)}
+  >
+    <div
+      class="comparison-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="comparison-dialog-title"
+    >
+      <header>
+        <div>
+          <GitBranch size={17} />
+          <h2 id="comparison-dialog-title">Change comparison</h2>
+        </div>
+        <button
+          aria-label="Close comparison dialog"
+          disabled={contentLoading}
+          onclick={() => (showComparisonDialog = false)}><X size={17} /></button
+        >
+      </header>
+      <div class="comparison-dialog-content">
+        <DiffSelector
+          selection={diffSelection}
+          recentBranches={activeRepository?.recentBranches ?? []}
+          localBranches={activeRepository?.localBranches ?? []}
+          remoteBranches={activeRepository?.remoteBranches ?? []}
+          recentCommits={activeRepository?.recentCommits ?? []}
+          currentBranch={activeRepository?.currentBranch}
+          loading={contentLoading}
+          onApply={applyDiffSelection}
+        />
+      </div>
+    </div>
+  </div>
 {/if}
 
 {#if showSettings}
@@ -1207,7 +1243,7 @@
   .app-shell {
     height: 100vh;
     display: grid;
-    grid-template-rows: 48px 43px minmax(0, 1fr);
+    grid-template-rows: 48px minmax(0, 1fr);
     overflow: hidden;
   }
   .topbar {
@@ -1253,22 +1289,10 @@
   .workspace-error {
     position: fixed;
     z-index: 20;
-    top: 100px;
+    top: 57px;
     left: 50%;
     width: min(520px, calc(100% - 40px));
     transform: translateX(-50%);
-  }
-  .comparison-bar {
-    position: relative;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    min-width: 0;
-    padding: 0 12px;
-    background: #0e151d;
-    border-bottom: 1px solid var(--border);
   }
   .workspace {
     display: grid;
@@ -1430,6 +1454,7 @@
     font-size: 11px;
   }
 
+  .dialog-backdrop,
   .settings-backdrop {
     position: fixed;
     z-index: 50;
@@ -1440,6 +1465,10 @@
     background: rgba(4, 7, 11, 0.72);
     backdrop-filter: blur(6px);
   }
+  .dialog-backdrop {
+    z-index: 60;
+  }
+  .comparison-dialog,
   .settings-dialog {
     width: min(490px, 100%);
     background: #111821;
@@ -1447,6 +1476,10 @@
     border-radius: 12px;
     box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
   }
+  .comparison-dialog {
+    width: min(760px, 100%);
+  }
+  .comparison-dialog header,
   .settings-dialog header {
     display: flex;
     align-items: center;
@@ -1454,15 +1487,18 @@
     padding: 15px 17px;
     border-bottom: 1px solid var(--border);
   }
+  .comparison-dialog header div,
   .settings-dialog header div {
     display: flex;
     align-items: center;
     gap: 8px;
   }
+  .comparison-dialog h2,
   .settings-dialog h2 {
     margin: 0;
     font-size: 14px;
   }
+  .comparison-dialog header button,
   .settings-dialog header button {
     display: grid;
     padding: 3px;
@@ -1470,6 +1506,16 @@
     background: none;
     border: 0;
     cursor: pointer;
+  }
+  .comparison-dialog header button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .comparison-dialog-content {
+    padding: 20px;
+  }
+  .comparison-dialog-content :global(.selector) {
+    justify-content: center;
   }
   .settings-content {
     display: grid;
