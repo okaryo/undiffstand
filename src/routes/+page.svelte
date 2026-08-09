@@ -33,6 +33,7 @@
     diffAnchorId,
     diffSelectionLabel,
     displayPath,
+    sortDiffFilesByTreeOrder,
     type DiffSelection,
     type DiffSummary,
     type FileDiff
@@ -452,15 +453,19 @@
         diffSelection.target !== selection.target
       )
         return;
+      const orderedSummary = {
+        ...loadedSummary,
+        files: sortDiffFilesByTreeOrder(loadedSummary.files)
+      };
       const path =
-        requestedFile && loadedSummary.files.some((file) => displayPath(file) === requestedFile)
+        requestedFile && orderedSummary.files.some((file) => displayPath(file) === requestedFile)
           ? requestedFile
-          : loadedSummary.files[0]
-            ? displayPath(loadedSummary.files[0])
+          : orderedSummary.files[0]
+            ? displayPath(orderedSummary.files[0])
             : undefined;
 
       if (silent) {
-        const availablePaths = new Set(loadedSummary.files.map(displayPath));
+        const availablePaths = new Set(orderedSummary.files.map(displayPath));
         const refreshPaths = new Set([
           ...Object.keys(diffsByPath),
           ...Object.keys(diffErrors),
@@ -493,7 +498,7 @@
         diffExplanation = undefined;
       }
 
-      summary = loadedSummary;
+      summary = orderedSummary;
       if (!silent) contentLoading = false;
       selectedDiffPath = path;
       setUrl(path);

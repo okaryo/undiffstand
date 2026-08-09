@@ -149,6 +149,31 @@ describe('change details auto-refresh', () => {
     await waitFor(() => expect(screen.queryByText(/Loading diff/)).not.toBeInTheDocument());
   });
 
+  it('orders the diff feed to match the changed-files tree', async () => {
+    tauriApi.getDiffSummary.mockResolvedValue({
+      ...summary,
+      files: [
+        { newPath: 'CHANGELOG.md', status: 'added', additions: 1, deletions: 0 },
+        { newPath: 'docs/overview.md', status: 'modified', additions: 1, deletions: 1 }
+      ]
+    });
+    tauriApi.getFileDiffs.mockResolvedValue([]);
+    history.replaceState(null, '', '/?project=alpha');
+
+    const { container } = render(Page);
+
+    await waitFor(() => expect(container.querySelectorAll('.file-diff')).toHaveLength(2));
+    const treePaths = [...container.querySelectorAll<HTMLElement>('.file-row')].map(
+      (row) => row.title
+    );
+    const feedPaths = [...container.querySelectorAll<HTMLElement>('.file-diff')].map(
+      (section) => section.dataset.diffPath
+    );
+
+    expect(treePaths).toEqual(['docs/overview.md', 'CHANGELOG.md']);
+    expect(feedPaths).toEqual(treePaths);
+  });
+
   it('coalesces repeated focus events', async () => {
     history.replaceState(null, '', '/?project=alpha');
     render(Page);

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ChevronDown, ChevronRight, Folder, FolderOpen, Search } from '@lucide/svelte';
-  import { displayPath, type DiffFileSummary } from '$lib/domain/diff';
+  import { displayPath, sortDiffFilesByTreeOrder, type DiffFileSummary } from '$lib/domain/diff';
   import DiffFileStatusIcon from './DiffFileStatusIcon.svelte';
 
   let {
@@ -25,7 +25,9 @@
   let expandedDirectories = $state<Record<string, boolean>>({});
 
   const filteredFiles = $derived(
-    files.filter((file) => displayPath(file).toLowerCase().includes(query.trim().toLowerCase()))
+    sortDiffFilesByTreeOrder(
+      files.filter((file) => displayPath(file).toLowerCase().includes(query.trim().toLowerCase()))
+    )
   );
   const rows = $derived(buildRows(filteredFiles, expandedDirectories, query.trim().length > 0));
 
@@ -63,14 +65,7 @@
     const result: TreeRow[] = [];
 
     function visit(directory: DirectoryNode, depth: number) {
-      const directories = [...directory.directories.values()].sort((a, b) =>
-        a.name.localeCompare(b.name)
-      );
-      const directoryFiles = [...directory.files].sort((a, b) =>
-        displayPath(a).localeCompare(displayPath(b))
-      );
-
-      for (const child of directories) {
+      for (const child of directory.directories.values()) {
         const isExpanded = expandAll || (expanded[child.path] ?? true);
         result.push({
           kind: 'directory',
@@ -82,7 +77,7 @@
         if (isExpanded) visit(child, depth + 1);
       }
 
-      for (const file of directoryFiles) {
+      for (const file of directory.files) {
         const path = displayPath(file);
         result.push({
           kind: 'file',
