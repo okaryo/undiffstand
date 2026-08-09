@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { DiffExplanation } from '$lib/domain/ai';
 import type { DiffSummary, FileDiff } from '$lib/domain/diff';
+import { defaultUserPreferences, type UserPreferences } from '$lib/domain/preferences';
 import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
 
 const nativeApi = {
@@ -14,6 +15,9 @@ const nativeApi = {
   saveProject: (input: SaveProjectInput) => invoke<ProjectConfig>('save_project', { input }),
   touchProject: (projectId: string) => invoke<ProjectConfig>('touch_project', { projectId }),
   removeProject: (projectId: string) => invoke<void>('remove_project', { projectId }),
+  getUserPreferences: () => invoke<UserPreferences>('get_user_preferences'),
+  saveUserPreferences: (preferences: UserPreferences) =>
+    invoke<UserPreferences>('save_user_preferences', { preferences }),
   getDiffSummary: (projectId: string) => invoke<DiffSummary>('get_diff_summary', { projectId }),
   getFileDiff: (projectId: string, path: string) =>
     invoke<FileDiff>('get_file_diff', { projectId, path }),
@@ -32,6 +36,7 @@ const demoProject: ProjectConfig = {
 };
 
 let mockProjects = [demoProject];
+let mockUserPreferences = defaultUserPreferences();
 const mockContents: Record<string, string> = {
   'src/services/review.ts': `import { buildContext } from '../lib/context';
 
@@ -135,6 +140,11 @@ const mockApi: typeof nativeApi = {
   },
   removeProject: async (projectId) => {
     mockProjects = mockProjects.filter((item) => item.id !== projectId);
+  },
+  getUserPreferences: async () => structuredClone(mockUserPreferences),
+  saveUserPreferences: async (preferences) => {
+    mockUserPreferences = structuredClone(preferences);
+    return structuredClone(mockUserPreferences);
   },
   getDiffSummary: async () => mockSummary,
   getFileDiff: async (_projectId, path) => mockDiff(path),

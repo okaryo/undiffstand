@@ -29,6 +29,7 @@
   import type { DiffExplanation } from '$lib/domain/ai';
   import { diffAnchorId, displayPath, type DiffSummary, type FileDiff } from '$lib/domain/diff';
   import { normalizeError, type AppError } from '$lib/domain/error';
+  import type { DiffViewMode, UserPreferences } from '$lib/domain/preferences';
   import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
   import { tauriApi } from '$lib/services/tauri';
 
@@ -44,7 +45,7 @@
   let error = $state<AppError | null>(null);
   let workspaceError = $state<AppError | null>(null);
 
-  let diffMode = $state<'split' | 'unified'>('split');
+  let diffMode = $state<DiffViewMode>('split');
   let wrapLines = $state(false);
   let summary = $state<DiffSummary | null>(null);
   let selectedDiffPath = $state<string | undefined>();
@@ -58,6 +59,9 @@
   let aiPanelOpen = $state(true);
   let sidebarWidth = $state(225);
   let aiPanelWidth = $state(290);
+  let preferencesLoaded = false;
+  let preferencesSaving = false;
+  let preferencesSaveRequested = false;
   let pendingDiffPaths = new Set<string>();
   let diffBatchTimer: ReturnType<typeof setTimeout> | undefined;
   let diffLoadGeneration = 0;
@@ -185,6 +189,7 @@
     const { panel, currentWidth } = activeResize;
     if (panel === 'sidebar') sidebarWidth = currentWidth;
     else aiPanelWidth = currentWidth;
+    queuePreferencesSave();
     activeResize = undefined;
     pendingResizeClientX = undefined;
     document.body.style.cursor = previousCursor;
@@ -210,16 +215,85 @@
       const movement = event.key === 'ArrowRight' ? PANEL_RESIZE_STEP : -PANEL_RESIZE_STEP;
       setPanelWidth(panel, currentWidth + movement * direction, workspaceWidth);
     }
+    queuePreferencesSave();
   }
 
   function resetPanelWidth(panel: ResizablePanel) {
     if (panel === 'sidebar') sidebarWidth = window.innerWidth <= 1100 ? 200 : 225;
     else aiPanelWidth = window.innerWidth <= 1100 ? 260 : 290;
+    queuePreferencesSave();
+  }
+
+  function applyPreferences(preferences: UserPreferences) {
+    const detail = preferences.changeDetail;
+    sidebarOpen = detail.changedFilesPanel.open;
+    sidebarWidth = detail.changedFilesPanel.width;
+    aiPanelOpen = detail.aiPanel.open;
+    aiPanelWidth = detail.aiPanel.width;
+    diffMode = detail.diff.mode;
+    wrapLines = detail.diff.wrapLongLines;
+  }
+
+  function currentPreferences(): UserPreferences {
+    return {
+      changeDetail: {
+        changedFilesPanel: { open: sidebarOpen, width: sidebarWidth },
+        aiPanel: { open: aiPanelOpen, width: aiPanelWidth },
+        diff: { mode: diffMode, wrapLongLines: wrapLines }
+      }
+    };
+  }
+
+  function queuePreferencesSave() {
+    if (!preferencesLoaded) return;
+    preferencesSaveRequested = true;
+    if (!preferencesSaving) void flushPreferencesSave();
+  }
+
+  async function flushPreferencesSave() {
+    preferencesSaving = true;
+    while (preferencesSaveRequested) {
+      preferencesSaveRequested = false;
+      try {
+        await tauriApi.saveUserPreferences(currentPreferences());
+      } catch (caught) {
+        workspaceError = normalizeError(caught);
+        preferencesSaveRequested = false;
+      }
+    }
+    preferencesSaving = false;
+  }
+
+  function toggleSidebar() {
+    sidebarOpen = !sidebarOpen;
+    queuePreferencesSave();
+  }
+
+  function toggleAiPanel() {
+    aiPanelOpen = !aiPanelOpen;
+    queuePreferencesSave();
+  }
+
+  function setDiffMode(mode: DiffViewMode) {
+    if (diffMode === mode) return;
+    diffMode = mode;
+    queuePreferencesSave();
+  }
+
+  function toggleLineWrapping() {
+    wrapLines = !wrapLines;
+    queuePreferencesSave();
   }
 
   async function initialize() {
     try {
-      projects = await tauriApi.listProjects();
+      const [loadedProjects, preferences] = await Promise.all([
+        tauriApi.listProjects(),
+        tauriApi.getUserPreferences()
+      ]);
+      projects = loadedProjects;
+      applyPreferences(preferences);
+      preferencesLoaded = true;
       const params = new URLSearchParams(window.location.search);
       const projectId = params.get('project');
       if (projectId) {
@@ -541,7 +615,7 @@
         aria-expanded={sidebarOpen}
         aria-label={sidebarOpen ? 'Hide changed files sidebar' : 'Show changed files sidebar'}
         title={sidebarOpen ? 'Hide changed files' : 'Show changed files'}
-        onclick={() => (sidebarOpen = !sidebarOpen)}
+        onclick={toggleSidebar}
       >
         {#if sidebarOpen}<PanelLeftClose size={15} />{:else}<PanelLeftOpen size={15} />{/if}
       </button>
@@ -550,10 +624,8 @@
         <button onclick={() => loadWorkspace(selectedDiffPath)} title="Refresh"
           ><RefreshCw size={14} /></button
         >
-        <button
-          onclick={() => (aiPanelOpen = !aiPanelOpen)}
-          class:active={aiPanelOpen}
-          title="Toggle AI panel"><PanelRight size={14} /></button
+        <button onclick={toggleAiPanel} class:active={aiPanelOpen} title="Toggle AI panel"
+          ><PanelRight size={14} /></button
         >
         <button onclick={editActiveProject} title="Project settings"><Settings size={14} /></button>
       </div>
@@ -608,13 +680,13 @@
               <button
                 class:active={diffMode === 'split'}
                 aria-pressed={diffMode === 'split'}
-                onclick={() => (diffMode = 'split')}
+                onclick={() => setDiffMode('split')}
                 title="Split diff"><Columns2 size={13} />Split</button
               >
               <button
                 class:active={diffMode === 'unified'}
                 aria-pressed={diffMode === 'unified'}
-                onclick={() => (diffMode = 'unified')}
+                onclick={() => setDiffMode('unified')}
                 title="Unified diff"><Rows3 size={13} />Unified</button
               >
             </div>
@@ -622,7 +694,7 @@
               class="wrap-control"
               class:active={wrapLines}
               aria-pressed={wrapLines}
-              onclick={() => (wrapLines = !wrapLines)}
+              onclick={toggleLineWrapping}
               title="Wrap long lines"><WrapText size={13} /></button
             >
           </div>

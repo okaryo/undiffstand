@@ -14,6 +14,8 @@ pub fn run() {
             commands::project::save_project,
             commands::project::touch_project,
             commands::project::remove_project,
+            commands::preferences::get_user_preferences,
+            commands::preferences::save_user_preferences,
             commands::git::get_diff_summary,
             commands::git::get_file_diff,
             commands::git::get_file_diffs,

@@ -13,6 +13,8 @@ const tauriApi = vi.hoisted(() => ({
   selectRepository: vi.fn(),
   saveProject: vi.fn(),
   removeProject: vi.fn(),
+  getUserPreferences: vi.fn(),
+  saveUserPreferences: vi.fn(),
   explainFileDiff: vi.fn()
 }));
 
@@ -74,6 +76,14 @@ describe('change details auto-refresh', () => {
     history.replaceState(null, '', '/');
     tauriApi.listProjects.mockResolvedValue([project]);
     tauriApi.touchProject.mockResolvedValue(project);
+    tauriApi.getUserPreferences.mockResolvedValue({
+      changeDetail: {
+        changedFilesPanel: { open: true, width: 225 },
+        aiPanel: { open: true, width: 290 },
+        diff: { mode: 'split', wrapLongLines: false }
+      }
+    });
+    tauriApi.saveUserPreferences.mockImplementation(async (preferences) => preferences);
     tauriApi.getDiffSummary.mockResolvedValue(summary);
     tauriApi.getFileDiffs.mockResolvedValue([fileDiff]);
   });
@@ -189,5 +199,52 @@ describe('change details auto-refresh', () => {
       screen.queryByRole('separator', { name: 'Resize changed files sidebar' })
     ).not.toBeInTheDocument();
     expect(screen.getByRole('separator', { name: 'Resize AI panel' })).toBeInTheDocument();
+  });
+
+  it('restores change detail preferences', async () => {
+    tauriApi.getUserPreferences.mockResolvedValue({
+      changeDetail: {
+        changedFilesPanel: { open: false, width: 310 },
+        aiPanel: { open: true, width: 360 },
+        diff: { mode: 'unified', wrapLongLines: true }
+      }
+    });
+    history.replaceState(null, '', '/?project=alpha');
+
+    render(Page);
+
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: 'Show changed files sidebar' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('separator', { name: 'Resize changed files sidebar' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('separator', { name: 'Resize AI panel' })).toHaveAttribute(
+      'aria-valuenow',
+      '360'
+    );
+    expect(screen.getByTitle('Unified diff')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTitle('Wrap long lines')).toHaveAttribute('aria-pressed', 'true');
+    expect(tauriApi.saveUserPreferences).not.toHaveBeenCalled();
+  });
+
+  it('saves change detail preferences after controls change', async () => {
+    history.replaceState(null, '', '/?project=alpha');
+    render(Page);
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+
+    await fireEvent.click(screen.getByTitle('Unified diff'));
+    await fireEvent.click(screen.getByTitle('Wrap long lines'));
+    await fireEvent.click(screen.getByRole('button', { name: 'Hide changed files sidebar' }));
+    await fireEvent.click(screen.getByTitle('Toggle AI panel'));
+
+    await waitFor(() =>
+      expect(tauriApi.saveUserPreferences).toHaveBeenLastCalledWith({
+        changeDetail: {
+          changedFilesPanel: { open: false, width: 225 },
+          aiPanel: { open: false, width: 290 },
+          diff: { mode: 'unified', wrapLongLines: true }
+        }
+      })
+    );
   });
 });
