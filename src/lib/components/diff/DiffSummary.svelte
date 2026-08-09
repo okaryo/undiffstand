@@ -7,8 +7,8 @@
 
 <div class="summary">
   <div class="metric"><Files size={14} /><strong>{summary.files.length}</strong><span>files</span></div>
-  <div class="metric"><strong class="addition">+{summary.totalAdditions}</strong><span>added</span></div>
-  <div class="metric"><strong class="deletion">−{summary.totalDeletions}</strong><span>deleted</span></div>
+  <div class="metric"><strong class="addition">+{summary.totalAdditions}</strong></div>
+  <div class="metric"><strong class="deletion">−{summary.totalDeletions}</strong></div>
   <div class="commit" title={summary.headSha}>
     <GitCommitHorizontal size={14} />
     <code>{summary.headSha.slice(0, 8)}</code>
