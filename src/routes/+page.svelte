@@ -59,8 +59,20 @@
   let pendingDiffPaths = new Set<string>();
   let diffBatchTimer: ReturnType<typeof setTimeout> | undefined;
   let diffLoadGeneration = 0;
+  let autoRefreshInProgress = false;
+  let lastAutoRefreshAt = 0;
+  const AUTO_REFRESH_COOLDOWN_MS = 1_000;
 
-  onMount(async () => {
+  onMount(() => {
+    window.addEventListener('focus', refreshWorkspaceOnFocus);
+    void initialize();
+
+    return () => {
+      window.removeEventListener('focus', refreshWorkspaceOnFocus);
+    };
+  });
+
+  async function initialize() {
     try {
       projects = await tauriApi.listProjects();
       const params = new URLSearchParams(window.location.search);
@@ -76,7 +88,27 @@
     } finally {
       loading = false;
     }
-  });
+  }
+
+  function refreshWorkspaceOnFocus() {
+    const now = Date.now();
+    if (
+      !activeProject ||
+      showProjectDialog ||
+      showSettings ||
+      contentLoading ||
+      aiLoading ||
+      autoRefreshInProgress ||
+      now - lastAutoRefreshAt < AUTO_REFRESH_COOLDOWN_MS
+    )
+      return;
+
+    lastAutoRefreshAt = now;
+    autoRefreshInProgress = true;
+    void loadWorkspace(selectedDiffPath, { silent: true }).finally(() => {
+      autoRefreshInProgress = false;
+    });
+  }
 
   function setUrl(file?: string) {
     if (!activeProject) return;
@@ -154,38 +186,75 @@
     }
   }
 
-  async function loadWorkspace(requestedFile?: string) {
+  async function loadWorkspace(requestedFile?: string, options: { silent?: boolean } = {}) {
     if (!activeProject) return;
+    const projectId = activeProject.id;
+    const silent = options.silent ?? false;
     workspaceError = null;
-    summary = null;
-    contentLoading = true;
-    clearPendingDiffs();
-    diffsByPath = {};
-    diffLoadingPaths = {};
-    diffErrors = {};
-    diffExplanation = undefined;
+    if (!silent) {
+      summary = null;
+      contentLoading = true;
+      clearWorkspaceDiffs();
+    }
     try {
-      const loadedSummary = await tauriApi.getDiffSummary(activeProject.id);
-      summary = loadedSummary;
-      contentLoading = false;
+      const loadedSummary = await tauriApi.getDiffSummary(projectId);
+      if (activeProject?.id !== projectId) return;
       const path =
         requestedFile && loadedSummary.files.some((file) => displayPath(file) === requestedFile)
           ? requestedFile
           : loadedSummary.files[0]
             ? displayPath(loadedSummary.files[0])
             : undefined;
+
+      if (silent) {
+        const availablePaths = new Set(loadedSummary.files.map(displayPath));
+        const refreshPaths = new Set([
+          ...Object.keys(diffsByPath),
+          ...Object.keys(diffErrors),
+          ...Object.entries(diffLoadingPaths)
+            .filter(([, isLoading]) => isLoading)
+            .map(([loadingPath]) => loadingPath)
+        ]);
+        if (path) refreshPaths.add(path);
+
+        const pathsToRefresh = [...refreshPaths].filter((refreshPath) =>
+          availablePaths.has(refreshPath)
+        );
+        const refreshedDiffs =
+          pathsToRefresh.length > 0 ? await tauriApi.getFileDiffs(projectId, pathsToRefresh) : [];
+        if (activeProject?.id !== projectId) return;
+
+        clearPendingDiffs();
+        diffsByPath = Object.fromEntries(
+          refreshedDiffs.map((diff) => [displayPath(diff.file), diff])
+        );
+        diffLoadingPaths = {};
+        diffErrors = {};
+        diffExplanation = undefined;
+      }
+
+      summary = loadedSummary;
+      if (!silent) contentLoading = false;
       selectedDiffPath = path;
       setUrl(path);
       if (path) {
         queueDiff(path);
         await tick();
-        scrollToDiff(path, false);
+        if (activeProject?.id === projectId) scrollToDiff(path, false);
       }
     } catch (caught) {
-      workspaceError = normalizeError(caught);
+      if (activeProject?.id === projectId) workspaceError = normalizeError(caught);
     } finally {
-      contentLoading = false;
+      if (!silent && activeProject?.id === projectId) contentLoading = false;
     }
+  }
+
+  function clearWorkspaceDiffs() {
+    clearPendingDiffs();
+    diffsByPath = {};
+    diffLoadingPaths = {};
+    diffErrors = {};
+    diffExplanation = undefined;
   }
 
   function selectDiff(path: string) {
