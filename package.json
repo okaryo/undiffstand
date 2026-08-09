@@ -15,6 +15,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@git-diff-view/shiki": "^0.1.7",
     "@git-diff-view/svelte": "^0.1.7",
     "@lucide/svelte": "^1.30.0",
     "@tauri-apps/api": "^2.11.1",
