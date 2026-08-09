@@ -145,12 +145,23 @@ pub struct SaveProjectInput {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct GitCommitSummary {
+    pub sha: String,
+    pub short_sha: String,
+    pub subject: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RepositoryInfo {
     pub repo_path: String,
     pub suggested_name: String,
     pub detected_base_ref: Option<String>,
     pub current_branch: Option<String>,
+    pub recent_branches: Vec<String>,
     pub local_branches: Vec<String>,
+    pub remote_branches: Vec<String>,
+    pub recent_commits: Vec<GitCommitSummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -163,6 +174,33 @@ pub enum DiffStatus {
     Copied,
     Binary,
     Submodule,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffSelection {
+    pub base: String,
+    pub target: String,
+}
+
+impl Default for DiffSelection {
+    fn default() -> Self {
+        Self {
+            base: "HEAD".to_owned(),
+            target: ".".to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffComparison {
+    pub from_label: String,
+    pub to_label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_sha: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_sha: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -182,9 +220,8 @@ pub struct DiffFileSummary {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiffSummary {
-    pub base_ref: String,
-    pub head_sha: String,
-    pub merge_base_sha: String,
+    pub selection: DiffSelection,
+    pub comparison: DiffComparison,
     pub files: Vec<DiffFileSummary>,
     pub total_additions: u64,
     pub total_deletions: u64,

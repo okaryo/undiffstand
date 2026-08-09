@@ -145,8 +145,8 @@ fn analysis_instructions() -> &'static str {
 impl AiProvider for CodexProvider {
     async fn explain_file_diff(
         &self,
-        base_ref: &str,
-        head_sha: &str,
+        from_label: &str,
+        to_label: &str,
         diff: &FileDiff,
     ) -> AppResult<DiffExplanation> {
         let schema = json!({
@@ -163,7 +163,7 @@ impl AiProvider for CodexProvider {
             "required": ["summary", "inferredIntent", "risk", "concerns", "references", "caveats"]
         });
         let prompt = format!(
-            "{}\n\nExplain this file diff from the merge base with {base_ref} through the current working tree. Current HEAD is {head_sha}. Old path: {:?}. New path: {:?}.\nUnified diff:\n```diff\n{}\n```\nDescribe intent only as an inference from the diff.",
+            "{}\n\nExplain this file diff from {from_label} to {to_label}. Old path: {:?}. New path: {:?}.\nUnified diff:\n```diff\n{}\n```\nDescribe intent only as an inference from the diff.",
             analysis_instructions(),
             diff.file.old_path,
             diff.file.new_path,

@@ -23,7 +23,12 @@ const projects: ProjectConfig[] = [
 describe('ProjectSwitcher', () => {
   it('shows registered projects and selects a different project', async () => {
     const onSelect = vi.fn();
-    render(ProjectSwitcher, { projects, activeProject: projects[0], onSelect });
+    render(ProjectSwitcher, {
+      projects,
+      activeProject: projects[0],
+      comparisonLabel: 'HEAD → working tree',
+      onSelect
+    });
 
     await fireEvent.click(screen.getByRole('button', { name: 'Switch project. Current: Alpha' }));
 
@@ -40,7 +45,12 @@ describe('ProjectSwitcher', () => {
   });
 
   it('closes the project list with Escape', async () => {
-    render(ProjectSwitcher, { projects, activeProject: projects[0], onSelect: vi.fn() });
+    render(ProjectSwitcher, {
+      projects,
+      activeProject: projects[0],
+      comparisonLabel: 'HEAD → working tree',
+      onSelect: vi.fn()
+    });
 
     await fireEvent.click(screen.getByRole('button', { name: 'Switch project. Current: Alpha' }));
     await fireEvent.keyDown(window, { key: 'Escape' });
@@ -49,7 +59,12 @@ describe('ProjectSwitcher', () => {
   });
 
   it('closes the project list when clicking outside', async () => {
-    render(ProjectSwitcher, { projects, activeProject: projects[0], onSelect: vi.fn() });
+    render(ProjectSwitcher, {
+      projects,
+      activeProject: projects[0],
+      comparisonLabel: 'HEAD → working tree',
+      onSelect: vi.fn()
+    });
 
     await fireEvent.click(screen.getByRole('button', { name: 'Switch project. Current: Alpha' }));
     await fireEvent.click(document.body);
@@ -58,10 +73,15 @@ describe('ProjectSwitcher', () => {
   });
 
   it('closes the project list when clicking another part of the header', async () => {
-    render(ProjectSwitcher, { projects, activeProject: projects[0], onSelect: vi.fn() });
+    render(ProjectSwitcher, {
+      projects,
+      activeProject: projects[0],
+      comparisonLabel: 'HEAD → working tree',
+      onSelect: vi.fn()
+    });
 
     await fireEvent.click(screen.getByRole('button', { name: 'Switch project. Current: Alpha' }));
-    await fireEvent.click(screen.getByText('main → working tree'));
+    await fireEvent.click(screen.getByText('HEAD → working tree'));
 
     expect(screen.queryByRole('menu', { name: 'Projects' })).not.toBeInTheDocument();
   });

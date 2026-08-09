@@ -7,8 +7,9 @@ ReaDiff is a read-only desktop app that helps human reviewers understand local G
 ## Features
 
 - Register and reopen local Git repositories
-- Select a local base branch and review from its merge base through the current working tree
-- Include committed, staged, unstaged, and untracked changes in one review
+- Review the current working tree against `HEAD` by default
+- Choose the comparison base and target from recent branches, recent commits, and the working tree
+- Compare local branches, remote branches, and commit SHAs directly
 - Inspect file statistics and Split/Unified diffs
 - Explain a changed file's likely intent, risk, concerns, and evidence with the local Codex CLI
 - Persist project metadata with Tauri Store
@@ -61,3 +62,14 @@ pnpm tauri build
 - Git commands run without a shell.
 
 ReaDiff does not apply patches, modify repository files, or change Git state.
+
+## Diff selection
+
+The review toolbar uses two endpoints: **From** and **To**.
+
+- `HEAD → working tree` is the default and reviews all uncommitted changes
+- `main → working tree` includes committed and uncommitted changes since `main`
+- `main → feature` compares the tips of two branches directly
+- Any two listed commits can be compared directly
+
+The current selection is stored in the page URL so a review can be reopened with the same range.

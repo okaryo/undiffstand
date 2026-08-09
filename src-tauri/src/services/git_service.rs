@@ -1,5 +1,8 @@
 use crate::{
-    domain::{DiffFileSummary, DiffStatus, DiffSummary, FileDiff, RepositoryInfo},
+    domain::{
+        DiffComparison, DiffFileSummary, DiffSelection, DiffStatus, DiffSummary, FileDiff,
+        GitCommitSummary, RepositoryInfo,
+    },
     error::{AppError, AppResult},
     services::file_service,
 };
@@ -136,6 +139,70 @@ fn list_local_branches(repo: &Path) -> AppResult<Vec<String>> {
     Ok(refs)
 }
 
+fn list_refs(repo: &Path, namespace: &str) -> AppResult<Vec<String>> {
+    let output = git_output(
+        repo,
+        ["for-each-ref", "--format=%(refname:short)", namespace],
+    )?;
+    let mut refs: Vec<String> = output_text(output, "UNKNOWN", "Git refs could not be listed.")?
+        .lines()
+        .filter(|reference| !reference.ends_with("/HEAD"))
+        .map(ToOwned::to_owned)
+        .collect();
+    refs.sort();
+    refs.dedup();
+    Ok(refs)
+}
+
+fn recent_branches(repo: &Path) -> AppResult<Vec<String>> {
+    let output = git_output(
+        repo,
+        [
+            "for-each-ref",
+            "--sort=-committerdate",
+            "--format=%(refname:short)",
+            "refs/heads",
+        ],
+    )?;
+    Ok(output_text(
+        output,
+        "UNKNOWN",
+        "Recent Git branches could not be listed.",
+    )?
+    .lines()
+    .filter(|reference| !reference.ends_with("/HEAD"))
+    .take(5)
+    .map(ToOwned::to_owned)
+    .collect())
+}
+
+fn recent_commits(repo: &Path) -> AppResult<Vec<GitCommitSummary>> {
+    let output = git_output(
+        repo,
+        [
+            "log",
+            "--all",
+            "--date-order",
+            "-n",
+            "10",
+            "--format=%H%x09%h%x09%s",
+        ],
+    )?;
+    Ok(
+        output_text(output, "UNKNOWN", "Recent commits could not be listed.")?
+            .lines()
+            .filter_map(|line| {
+                let mut fields = line.splitn(3, '\t');
+                Some(GitCommitSummary {
+                    sha: fields.next()?.to_owned(),
+                    short_sha: fields.next()?.to_owned(),
+                    subject: fields.next()?.to_owned(),
+                })
+            })
+            .collect(),
+    )
+}
+
 pub fn inspect_repository(path: &Path) -> AppResult<RepositoryInfo> {
     let repo = canonical_repository(path)?;
     let (detected_base_ref, local_branches) = detect_base_ref(&repo)?;
@@ -149,7 +216,10 @@ pub fn inspect_repository(path: &Path) -> AppResult<RepositoryInfo> {
         suggested_name,
         detected_base_ref,
         current_branch: current_branch(&repo)?,
+        recent_branches: recent_branches(&repo)?,
         local_branches,
+        remote_branches: list_refs(&repo, "refs/remotes")?,
+        recent_commits: recent_commits(&repo)?,
     })
 }
 
@@ -163,24 +233,84 @@ pub fn validate_base_ref(repo: &Path, base_ref: &str) -> AppResult<()> {
     Ok(())
 }
 
-fn revision_info(repo: &Path, base_ref: &str) -> AppResult<(String, String)> {
-    validate_base_ref(repo, base_ref)?;
-    let head = output_text(
-        git_output(repo, ["rev-parse", "HEAD"])?,
-        "UNKNOWN",
-        "HEAD could not be resolved.",
-    )?;
-    let merge_base_output = git_output(repo, ["merge-base", base_ref, "HEAD"])?;
-    if !merge_base_output.status.success() {
+#[derive(Debug, Clone)]
+enum DiffRange {
+    Revisions { from: String, to: String },
+    RevisionToWorkingTree { from: String },
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedDiff {
+    selection: DiffSelection,
+    comparison: DiffComparison,
+    range: DiffRange,
+}
+
+fn normalized_ref(reference: &str) -> &str {
+    if reference == "@" {
+        "HEAD"
+    } else {
+        reference
+    }
+}
+
+fn resolve_commit(repo: &Path, reference: &str) -> AppResult<String> {
+    let reference = normalized_ref(reference.trim());
+    if reference.is_empty() || reference.starts_with('-') {
         return Err(AppError::new(
-            "NO_MERGE_BASE",
-            "The comparison ref and HEAD do not have a common ancestor.",
+            "INVALID_DIFF_TARGET",
+            "The comparison ref is empty or invalid.",
         ));
     }
-    let merge_base = String::from_utf8_lossy(&merge_base_output.stdout)
-        .trim()
-        .to_owned();
-    Ok((head.trim().to_owned(), merge_base))
+    let revision = format!("{reference}^{{commit}}");
+    let output = git_output(
+        repo,
+        ["rev-parse", "--verify", "--end-of-options", &revision],
+    )?;
+    output_text(
+        output,
+        "INVALID_DIFF_TARGET",
+        "The requested commit or branch could not be resolved.",
+    )
+    .map(|sha| sha.trim().to_owned())
+}
+
+fn resolve_diff(repo: &Path, selection: &DiffSelection) -> AppResult<ResolvedDiff> {
+    let base = selection.base.trim();
+    let target = selection.target.trim();
+
+    if base.is_empty() || target.is_empty() {
+        return Err(AppError::new(
+            "INVALID_DIFF_TARGET",
+            "Choose both a base and a target to review.",
+        ));
+    }
+
+    let from = resolve_commit(repo, base)?;
+    if target == "." {
+        Ok(ResolvedDiff {
+            selection: selection.clone(),
+            comparison: DiffComparison {
+                from_label: normalized_ref(base).to_owned(),
+                to_label: "working tree".to_owned(),
+                from_sha: Some(from.clone()),
+                to_sha: None,
+            },
+            range: DiffRange::RevisionToWorkingTree { from },
+        })
+    } else {
+        let to = resolve_commit(repo, target)?;
+        Ok(ResolvedDiff {
+            selection: selection.clone(),
+            comparison: DiffComparison {
+                from_label: normalized_ref(base).to_owned(),
+                to_label: normalized_ref(target).to_owned(),
+                from_sha: Some(from.clone()),
+                to_sha: Some(to.clone()),
+            },
+            range: DiffRange::Revisions { from, to },
+        })
+    }
 }
 
 fn parse_name_status(bytes: &[u8]) -> Vec<DiffFileSummary> {
@@ -252,38 +382,63 @@ fn parse_numstat(bytes: &[u8]) -> Vec<(Option<u64>, Option<u64>)> {
     stats
 }
 
-pub fn diff_summary(repo: &Path, base_ref: &str) -> AppResult<DiffSummary> {
-    let (head_sha, merge_base_sha) = revision_info(repo, base_ref)?;
+fn range_output(
+    repo: &Path,
+    resolved: &ResolvedDiff,
+    flags: &[&str],
+    path: Option<&str>,
+) -> AppResult<Output> {
+    let mut args: Vec<String> = Vec::new();
+    match &resolved.range {
+        DiffRange::Revisions { from, to } => {
+            args.push("diff".to_owned());
+            args.extend(flags.iter().map(|value| (*value).to_owned()));
+            args.push(from.clone());
+            args.push(to.clone());
+        }
+        DiffRange::RevisionToWorkingTree { from } => {
+            args.push("diff".to_owned());
+            args.extend(flags.iter().map(|value| (*value).to_owned()));
+            args.push(from.clone());
+        }
+    }
+    args.push("--".to_owned());
+    if let Some(path) = path {
+        args.push(path.to_owned());
+    }
+    git_output(repo, args)
+}
+
+pub fn diff_summary(repo: &Path, selection: &DiffSelection) -> AppResult<DiffSummary> {
+    let resolved = resolve_diff(repo, selection)?;
     let name_bytes = successful(
-        git_output(
+        range_output(
             repo,
-            [
-                "diff",
+            &resolved,
+            &[
                 "--no-color",
                 "--name-status",
                 "-z",
                 "--find-renames",
                 "--find-copies",
-                &merge_base_sha,
-                "--",
             ],
+            None,
         )?,
         "UNKNOWN",
         "The changed file list could not be read.",
     )?;
     let stats_bytes = successful(
-        git_output(
+        range_output(
             repo,
-            [
-                "diff",
+            &resolved,
+            &[
                 "--no-color",
                 "--numstat",
                 "-z",
                 "--find-renames",
                 "--find-copies",
-                &merge_base_sha,
-                "--",
             ],
+            None,
         )?,
         "UNKNOWN",
         "Diff statistics could not be read.",
@@ -297,7 +452,9 @@ pub fn diff_summary(repo: &Path, base_ref: &str) -> AppResult<DiffSummary> {
             file.status = DiffStatus::Binary;
         }
     }
-    files.extend(untracked_files(repo)?);
+    if matches!(resolved.range, DiffRange::RevisionToWorkingTree { .. }) {
+        files.extend(untracked_files(repo)?);
+    }
     files.sort_by(|left, right| {
         let left_path = left
             .new_path
@@ -314,9 +471,8 @@ pub fn diff_summary(repo: &Path, base_ref: &str) -> AppResult<DiffSummary> {
     let total_additions = files.iter().filter_map(|file| file.additions).sum();
     let total_deletions = files.iter().filter_map(|file| file.deletions).sum();
     Ok(DiffSummary {
-        base_ref: base_ref.to_owned(),
-        head_sha,
-        merge_base_sha,
+        selection: resolved.selection,
+        comparison: resolved.comparison,
         files,
         total_additions,
         total_deletions,
@@ -366,6 +522,22 @@ fn git_show(repo: &Path, revision: &str, path: &str) -> AppResult<Option<String>
     ))
 }
 
+enum ContentSource<'a> {
+    Commit(&'a str),
+    WorkingTree,
+}
+
+fn content_from_source(
+    repo: &Path,
+    source: ContentSource<'_>,
+    path: &str,
+) -> AppResult<Option<String>> {
+    match source {
+        ContentSource::Commit(revision) => git_show(repo, revision, path),
+        ContentSource::WorkingTree => Ok(file_service::read_file(repo, path).ok()),
+    }
+}
+
 fn split_hunks(diff: &str) -> Vec<String> {
     let mut hunks = Vec::new();
     let mut current = String::new();
@@ -387,20 +559,31 @@ fn split_hunks(diff: &str) -> Vec<String> {
     hunks
 }
 
-pub fn file_diff(repo: &Path, base_ref: &str, path: &str) -> AppResult<FileDiff> {
-    let summary = diff_summary(repo, base_ref)?;
-    file_diff_from_summary(repo, &summary, path)
+pub fn file_diff(repo: &Path, selection: &DiffSelection, path: &str) -> AppResult<FileDiff> {
+    let summary = diff_summary(repo, selection)?;
+    let resolved = resolve_diff(repo, selection)?;
+    file_diff_from_summary(repo, &summary, &resolved, path)
 }
 
-pub fn file_diffs(repo: &Path, base_ref: &str, paths: &[String]) -> AppResult<Vec<FileDiff>> {
-    let summary = diff_summary(repo, base_ref)?;
+pub fn file_diffs(
+    repo: &Path,
+    selection: &DiffSelection,
+    paths: &[String],
+) -> AppResult<Vec<FileDiff>> {
+    let summary = diff_summary(repo, selection)?;
+    let resolved = resolve_diff(repo, selection)?;
     paths
         .iter()
-        .map(|path| file_diff_from_summary(repo, &summary, path))
+        .map(|path| file_diff_from_summary(repo, &summary, &resolved, path))
         .collect()
 }
 
-fn file_diff_from_summary(repo: &Path, summary: &DiffSummary, path: &str) -> AppResult<FileDiff> {
+fn file_diff_from_summary(
+    repo: &Path,
+    summary: &DiffSummary,
+    resolved: &ResolvedDiff,
+    path: &str,
+) -> AppResult<FileDiff> {
     let file = summary
         .files
         .iter()
@@ -414,23 +597,23 @@ fn file_diff_from_summary(repo: &Path, summary: &DiffSummary, path: &str) -> App
                 "The selected file is not part of this diff.",
             )
         })?;
-    let tracked = git_output(repo, ["ls-files", "--error-unmatch", "--", path])?
-        .status
-        .success();
-    let bytes = if tracked {
+    let untracked_working_tree_file =
+        matches!(resolved.range, DiffRange::RevisionToWorkingTree { .. })
+            && !git_output(repo, ["ls-files", "--error-unmatch", "--", path])?
+                .status
+                .success();
+    let bytes = if !untracked_working_tree_file {
         successful(
-            git_output(
+            range_output(
                 repo,
-                [
-                    "diff",
+                resolved,
+                &[
                     "--no-color",
                     "--no-ext-diff",
                     "--find-renames",
                     "--find-copies",
-                    &summary.merge_base_sha,
-                    "--",
-                    path,
                 ],
+                Some(path),
             )?,
             "UNKNOWN",
             "The selected diff could not be read.",
@@ -464,14 +647,22 @@ fn file_diff_from_summary(repo: &Path, summary: &DiffSummary, path: &str) -> App
         &bytes
     };
     let unified_diff = String::from_utf8_lossy(visible).into_owned();
+    let (old_source, new_source) = match &resolved.range {
+        DiffRange::Revisions { from, to } => {
+            (ContentSource::Commit(from), ContentSource::Commit(to))
+        }
+        DiffRange::RevisionToWorkingTree { from } => {
+            (ContentSource::Commit(from), ContentSource::WorkingTree)
+        }
+    };
     let old_content = match (&file.old_path, &file.status) {
         (Some(_), DiffStatus::Binary) => None,
-        (Some(old_path), _) => git_show(repo, &summary.merge_base_sha, old_path)?,
+        (Some(old_path), _) => content_from_source(repo, old_source, old_path)?,
         _ => None,
     };
     let new_content = match (&file.new_path, &file.status) {
         (Some(_), DiffStatus::Binary) => None,
-        (Some(new_path), _) => file_service::read_file(repo, new_path).ok(),
+        (Some(new_path), _) => content_from_source(repo, new_source, new_path)?,
         _ => None,
     };
     let hunks = split_hunks(&unified_diff);
@@ -500,8 +691,57 @@ mod tests {
         assert!(status.success(), "git command failed: {args:?}");
     }
 
+    fn git_with_date(repo: &Path, args: &[&str], date: &str) {
+        let status = Command::new("git")
+            .arg("-C")
+            .arg(repo)
+            .args(args)
+            .env("GIT_AUTHOR_DATE", date)
+            .env("GIT_COMMITTER_DATE", date)
+            .status()
+            .unwrap();
+        assert!(status.success(), "git command failed: {args:?}");
+    }
+
     #[test]
-    fn working_tree_diff_excludes_changes_made_only_on_base() {
+    fn recent_repository_lists_are_sorted_and_capped() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        git(repo, &["init", "-b", "main"]);
+        git(repo, &["config", "user.email", "test@example.com"]);
+        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        fs::write(repo.join("history.txt"), "base\n").unwrap();
+        git(repo, &["add", "history.txt"]);
+        git_with_date(repo, &["commit", "-m", "base"], "2026-01-01T00:00:00Z");
+
+        for index in 1..=11 {
+            fs::write(repo.join("history.txt"), format!("commit {index}\n")).unwrap();
+            git(repo, &["add", "history.txt"]);
+            let subject = format!("commit-{index}");
+            let date = format!("2026-01-01T00:00:{index:02}Z");
+            git_with_date(repo, &["commit", "-m", &subject], &date);
+            if index <= 6 {
+                let branch = format!("branch-{index}");
+                git(repo, &["branch", &branch]);
+            }
+        }
+        git(repo, &["update-ref", "refs/remotes/origin/recent", "HEAD"]);
+
+        let branches = recent_branches(repo).unwrap();
+        assert_eq!(
+            branches,
+            ["main", "branch-6", "branch-5", "branch-4", "branch-3"]
+        );
+        assert!(branches.iter().all(|branch| !branch.starts_with("origin/")));
+
+        let commits = recent_commits(repo).unwrap();
+        assert_eq!(commits.len(), 10);
+        assert_eq!(commits.first().unwrap().subject, "commit-11");
+        assert_eq!(commits.last().unwrap().subject, "commit-2");
+    }
+
+    #[test]
+    fn default_working_tree_diff_uses_head_as_its_base() {
         let temp = tempfile::tempdir().unwrap();
         let repo = temp.path();
         git(repo, &["init", "-b", "main"]);
@@ -520,10 +760,10 @@ mod tests {
         git(repo, &["commit", "-m", "base only"]);
         git(repo, &["switch", "feature"]);
 
-        let summary = diff_summary(repo, "main").unwrap();
-        assert_eq!(summary.files.len(), 1);
-        assert_eq!(summary.files[0].new_path.as_deref(), Some("feature.txt"));
-        assert_eq!(summary.total_additions, 1);
+        let summary = diff_summary(repo, &DiffSelection::default()).unwrap();
+        assert!(summary.files.is_empty());
+        assert_eq!(summary.comparison.from_label, "HEAD");
+        assert_eq!(summary.comparison.to_label, "working tree");
     }
 
     #[test]
@@ -546,32 +786,93 @@ mod tests {
         git(repo, &["add", "staged.txt"]);
         fs::write(repo.join("untracked.txt"), "untracked\n").unwrap();
 
-        let summary = diff_summary(repo, "main").unwrap();
+        let selection = DiffSelection::default();
+        let summary = diff_summary(repo, &selection).unwrap();
         let paths: Vec<&str> = summary
             .files
             .iter()
             .filter_map(|file| file.new_path.as_deref())
             .collect();
         assert_eq!(paths, ["committed.txt", "staged.txt", "untracked.txt"]);
-        assert_eq!(summary.total_additions, 4);
+        assert_eq!(summary.total_additions, 3);
 
-        let diff = file_diff(repo, "main", "committed.txt").unwrap();
+        let diff = file_diff(repo, &selection, "committed.txt").unwrap();
         assert_eq!(diff.new_content.as_deref(), Some("committed\nunstaged\n"));
         assert!(diff.unified_diff.contains("+unstaged"));
 
-        let untracked = file_diff(repo, "main", "untracked.txt").unwrap();
+        let untracked = file_diff(repo, &selection, "untracked.txt").unwrap();
         assert_eq!(untracked.new_content.as_deref(), Some("untracked\n"));
         assert!(untracked.unified_diff.contains("+untracked"));
 
         let diffs = file_diffs(
             repo,
-            "main",
+            &selection,
             &["committed.txt".to_owned(), "untracked.txt".to_owned()],
         )
         .unwrap();
         assert_eq!(diffs.len(), 2);
         assert_eq!(diffs[0].file.new_path.as_deref(), Some("committed.txt"));
         assert_eq!(diffs[1].file.new_path.as_deref(), Some("untracked.txt"));
+    }
+
+    #[test]
+    fn explicit_commits_are_compared_as_two_endpoints() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        git(repo, &["init", "-b", "main"]);
+        git(repo, &["config", "user.email", "test@example.com"]);
+        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        fs::write(repo.join("base.txt"), "base\n").unwrap();
+        git(repo, &["add", "base.txt"]);
+        git(repo, &["commit", "-m", "base"]);
+        fs::write(repo.join("latest.txt"), "latest\n").unwrap();
+        git(repo, &["add", "latest.txt"]);
+        git(repo, &["commit", "-m", "latest"]);
+
+        let selection = DiffSelection {
+            base: "HEAD~1".to_owned(),
+            target: "HEAD".to_owned(),
+        };
+        let summary = diff_summary(repo, &selection).unwrap();
+        assert_eq!(summary.files.len(), 1);
+        assert_eq!(summary.files[0].new_path.as_deref(), Some("latest.txt"));
+        let diff = file_diff(repo, &selection, "latest.txt").unwrap();
+        assert!(diff.unified_diff.contains("+latest"));
+    }
+
+    #[test]
+    fn explicit_refs_are_compared_directly() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        git(repo, &["init", "-b", "main"]);
+        git(repo, &["config", "user.email", "test@example.com"]);
+        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        fs::write(repo.join("base.txt"), "base\n").unwrap();
+        git(repo, &["add", "base.txt"]);
+        git(repo, &["commit", "-m", "base"]);
+        git(repo, &["switch", "-c", "feature"]);
+        fs::write(repo.join("feature.txt"), "feature\n").unwrap();
+        git(repo, &["add", "feature.txt"]);
+        git(repo, &["commit", "-m", "feature"]);
+        git(repo, &["switch", "main"]);
+        fs::write(repo.join("main.txt"), "main\n").unwrap();
+        git(repo, &["add", "main.txt"]);
+        git(repo, &["commit", "-m", "main"]);
+
+        let selection = DiffSelection {
+            base: "main".to_owned(),
+            target: "feature".to_owned(),
+        };
+        let summary = diff_summary(repo, &selection).unwrap();
+        let paths: Vec<&str> = summary
+            .files
+            .iter()
+            .filter_map(|file| file.new_path.as_deref().or(file.old_path.as_deref()))
+            .collect();
+        assert_eq!(paths, ["feature.txt", "main.txt"]);
+
+        let feature = file_diff(repo, &selection, "feature.txt").unwrap();
+        assert_eq!(feature.new_content.as_deref(), Some("feature\n"));
     }
 
     #[test]

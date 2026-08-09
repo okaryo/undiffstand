@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { DiffExplanation } from '$lib/domain/ai';
-import type { DiffSummary, FileDiff } from '$lib/domain/diff';
+import type { DiffSelection, DiffSummary, FileDiff } from '$lib/domain/diff';
 import { defaultUserPreferences, type UserPreferences } from '$lib/domain/preferences';
 import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
 
@@ -18,13 +18,14 @@ const nativeApi = {
   getUserPreferences: () => invoke<UserPreferences>('get_user_preferences'),
   saveUserPreferences: (preferences: UserPreferences) =>
     invoke<UserPreferences>('save_user_preferences', { preferences }),
-  getDiffSummary: (projectId: string) => invoke<DiffSummary>('get_diff_summary', { projectId }),
-  getFileDiff: (projectId: string, path: string) =>
-    invoke<FileDiff>('get_file_diff', { projectId, path }),
-  getFileDiffs: (projectId: string, paths: string[]) =>
-    invoke<FileDiff[]>('get_file_diffs', { projectId, paths }),
-  explainFileDiff: (projectId: string, path: string) =>
-    invoke<DiffExplanation>('explain_file_diff', { projectId, path })
+  getDiffSummary: (projectId: string, selection: DiffSelection) =>
+    invoke<DiffSummary>('get_diff_summary', { projectId, selection }),
+  getFileDiff: (projectId: string, selection: DiffSelection, path: string) =>
+    invoke<FileDiff>('get_file_diff', { projectId, selection, path }),
+  getFileDiffs: (projectId: string, selection: DiffSelection, paths: string[]) =>
+    invoke<FileDiff[]>('get_file_diffs', { projectId, selection, paths }),
+  explainFileDiff: (projectId: string, selection: DiffSelection, path: string) =>
+    invoke<DiffExplanation>('explain_file_diff', { projectId, selection, path })
 };
 
 const demoProject: ProjectConfig = {
@@ -61,9 +62,12 @@ export async function review(diff: string): Promise<Review> {
 };
 
 const mockSummary: DiffSummary = {
-  baseRef: 'main',
-  headSha: '8f31dc290c98f3ebd149ebf4e9cdb594d7356cb7',
-  mergeBaseSha: '2cde30b476ecb745ea84ee1fcbd13a51ea4f3a13',
+  selection: { base: 'HEAD', target: '.' },
+  comparison: {
+    fromLabel: 'HEAD',
+    toLabel: 'working tree',
+    fromSha: '8f31dc290c98f3ebd149ebf4e9cdb594d7356cb7'
+  },
   totalAdditions: 8,
   totalDeletions: 2,
   files: [
@@ -82,6 +86,19 @@ const mockSummary: DiffSummary = {
     }
   ]
 };
+
+function mockSummaryFor(selection: DiffSelection): DiffSummary {
+  return {
+    ...mockSummary,
+    selection,
+    comparison: {
+      fromLabel: selection.base,
+      toLabel: selection.target === '.' ? 'working tree' : selection.target,
+      fromSha: mockSummary.comparison.fromSha,
+      toSha: selection.target === '.' ? undefined : mockSummary.comparison.fromSha
+    }
+  };
+}
 
 function mockDiff(path: string): FileDiff {
   if (path === 'src/lib/context.ts') {
@@ -120,7 +137,16 @@ const mockApi: typeof nativeApi = {
     suggestedName: path.split('/').at(-1) ?? 'repository',
     detectedBaseRef: 'main',
     currentBranch: 'feature/readiff',
-    localBranches: ['feature/readiff', 'main']
+    recentBranches: ['feature/readiff', 'main'],
+    localBranches: ['feature/readiff', 'main'],
+    remoteBranches: ['origin/main'],
+    recentCommits: [
+      {
+        sha: '8f31dc290c98f3ebd149ebf4e9cdb594d7356cb7',
+        shortSha: '8f31dc2',
+        subject: 'Improve review context'
+      }
+    ]
   }),
   listProjects: async () => mockProjects,
   saveProject: async (input) => {
@@ -146,10 +172,10 @@ const mockApi: typeof nativeApi = {
     mockUserPreferences = structuredClone(preferences);
     return structuredClone(mockUserPreferences);
   },
-  getDiffSummary: async () => mockSummary,
-  getFileDiff: async (_projectId, path) => mockDiff(path),
-  getFileDiffs: async (_projectId, paths) => paths.map(mockDiff),
-  explainFileDiff: async (_projectId, path) => ({
+  getDiffSummary: async (_projectId, selection) => mockSummaryFor(selection),
+  getFileDiff: async (_projectId, _selection, path) => mockDiff(path),
+  getFileDiffs: async (_projectId, _selection, paths) => paths.map(mockDiff),
+  explainFileDiff: async (_projectId, _selection, path) => ({
     summary:
       'The change introduces a context-building step before producing a structured review result.',
     inferredIntent:

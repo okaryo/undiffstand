@@ -23,11 +23,20 @@
   import ErrorBanner from '$lib/components/common/ErrorBanner.svelte';
   import DiffFeed from '$lib/components/diff/DiffFeed.svelte';
   import DiffFileList from '$lib/components/diff/DiffFileList.svelte';
+  import DiffSelector from '$lib/components/diff/DiffSelector.svelte';
   import DiffSummaryView from '$lib/components/diff/DiffSummary.svelte';
   import ProjectDialog from '$lib/components/project/ProjectDialog.svelte';
   import ProjectSwitcher from '$lib/components/project/ProjectSwitcher.svelte';
   import type { DiffExplanation } from '$lib/domain/ai';
-  import { diffAnchorId, displayPath, type DiffSummary, type FileDiff } from '$lib/domain/diff';
+  import {
+    defaultDiffSelection,
+    diffAnchorId,
+    diffSelectionLabel,
+    displayPath,
+    type DiffSelection,
+    type DiffSummary,
+    type FileDiff
+  } from '$lib/domain/diff';
   import { normalizeError, type AppError } from '$lib/domain/error';
   import type { DiffViewMode, UserPreferences } from '$lib/domain/preferences';
   import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
@@ -36,6 +45,7 @@
   let projects = $state<ProjectConfig[]>([]);
   let activeProject = $state<ProjectConfig | null>(null);
   let repositoryDraft = $state<RepositoryInfo | undefined>();
+  let activeRepository = $state<RepositoryInfo | undefined>();
   let editingProject = $state<ProjectConfig | undefined>();
   let showProjectDialog = $state(false);
   let showSettings = $state(false);
@@ -48,6 +58,7 @@
   let diffMode = $state<DiffViewMode>('split');
   let wrapLines = $state(false);
   let summary = $state<DiffSummary | null>(null);
+  let diffSelection = $state<DiffSelection>(defaultDiffSelection());
   let selectedDiffPath = $state<string | undefined>();
   let diffsByPath = $state<Record<string, FileDiff | undefined>>({});
   let diffLoadingPaths = $state<Record<string, boolean | undefined>>({});
@@ -299,7 +310,9 @@
       if (projectId) {
         const project = projects.find((item) => item.id === projectId);
         if (project) {
-          await openProject(project, params.get('file') ?? undefined);
+          const target = params.get('target') ?? '.';
+          const base = params.get('base') ?? params.get('compare') ?? 'HEAD';
+          await openProject(project, params.get('file') ?? undefined, { base, target });
         }
       }
     } catch (caught) {
@@ -333,6 +346,8 @@
     if (!activeProject) return;
     const params = new URLSearchParams({ project: activeProject.id });
     if (file) params.set('file', file);
+    if (diffSelection.base !== 'HEAD') params.set('base', diffSelection.base);
+    if (diffSelection.target !== '.') params.set('target', diffSelection.target);
     history.replaceState(null, '', `?${params.toString()}`);
   }
 
@@ -391,11 +406,21 @@
     }
   }
 
-  async function openProject(project: ProjectConfig, requestedFile?: string) {
+  async function openProject(
+    project: ProjectConfig,
+    requestedFile?: string,
+    requestedSelection: DiffSelection = defaultDiffSelection()
+  ) {
     loading = true;
     workspaceError = null;
     try {
-      activeProject = await tauriApi.touchProject(project.id);
+      const [openedProject, repository] = await Promise.all([
+        tauriApi.touchProject(project.id),
+        tauriApi.validateRepository(project.repoPath)
+      ]);
+      activeProject = openedProject;
+      activeRepository = repository;
+      diffSelection = requestedSelection;
       projects = [activeProject, ...projects.filter((item) => item.id !== activeProject?.id)];
       await loadWorkspace(requestedFile);
     } catch (caught) {
@@ -408,6 +433,10 @@
   async function loadWorkspace(requestedFile?: string, options: { silent?: boolean } = {}) {
     if (!activeProject) return;
     const projectId = activeProject.id;
+    const selection: DiffSelection = {
+      base: diffSelection.base,
+      target: diffSelection.target
+    };
     const silent = options.silent ?? false;
     workspaceError = null;
     if (!silent) {
@@ -416,8 +445,13 @@
       clearWorkspaceDiffs();
     }
     try {
-      const loadedSummary = await tauriApi.getDiffSummary(projectId);
-      if (activeProject?.id !== projectId) return;
+      const loadedSummary = await tauriApi.getDiffSummary(projectId, selection);
+      if (
+        activeProject?.id !== projectId ||
+        diffSelection.base !== selection.base ||
+        diffSelection.target !== selection.target
+      )
+        return;
       const path =
         requestedFile && loadedSummary.files.some((file) => displayPath(file) === requestedFile)
           ? requestedFile
@@ -440,8 +474,15 @@
           availablePaths.has(refreshPath)
         );
         const refreshedDiffs =
-          pathsToRefresh.length > 0 ? await tauriApi.getFileDiffs(projectId, pathsToRefresh) : [];
-        if (activeProject?.id !== projectId) return;
+          pathsToRefresh.length > 0
+            ? await tauriApi.getFileDiffs(projectId, selection, pathsToRefresh)
+            : [];
+        if (
+          activeProject?.id !== projectId ||
+          diffSelection.base !== selection.base ||
+          diffSelection.target !== selection.target
+        )
+          return;
 
         clearPendingDiffs();
         diffsByPath = Object.fromEntries(
@@ -474,6 +515,12 @@
     diffLoadingPaths = {};
     diffErrors = {};
     diffExplanation = undefined;
+  }
+
+  async function applyDiffSelection(selection: DiffSelection) {
+    diffSelection = selection;
+    selectedDiffPath = undefined;
+    await loadWorkspace();
   }
 
   function selectDiff(path: string) {
@@ -515,7 +562,11 @@
     pendingDiffPaths.clear();
 
     try {
-      const loadedDiffs = await tauriApi.getFileDiffs(projectId, paths);
+      const selection: DiffSelection = {
+        base: diffSelection.base,
+        target: diffSelection.target
+      };
+      const loadedDiffs = await tauriApi.getFileDiffs(projectId, selection, paths);
       if (activeProject?.id !== projectId || diffLoadGeneration !== generation) return;
       for (const diff of loadedDiffs) {
         diffsByPath[displayPath(diff.file)] = diff;
@@ -549,7 +600,11 @@
     diffExplanation = undefined;
     workspaceError = null;
     try {
-      diffExplanation = await tauriApi.explainFileDiff(activeProject.id, selectedDiffPath);
+      diffExplanation = await tauriApi.explainFileDiff(
+        activeProject.id,
+        diffSelection,
+        selectedDiffPath
+      );
     } catch (caught) {
       workspaceError = normalizeError(caught);
     } finally {
@@ -559,7 +614,9 @@
 
   function goHome() {
     activeProject = null;
+    activeRepository = undefined;
     summary = null;
+    diffSelection = defaultDiffSelection();
     selectedDiffPath = undefined;
     clearPendingDiffs();
     diffsByPath = {};
@@ -619,7 +676,14 @@
       >
         {#if sidebarOpen}<PanelLeftClose size={15} />{:else}<PanelLeftOpen size={15} />{/if}
       </button>
-      <ProjectSwitcher {projects} {activeProject} onSelect={openProject} />
+      <ProjectSwitcher
+        {projects}
+        {activeProject}
+        comparisonLabel={summary
+          ? `${summary.comparison.fromLabel} → ${summary.comparison.toLabel}`
+          : diffSelectionLabel(diffSelection)}
+        onSelect={openProject}
+      />
       <div class="top-actions">
         <button onclick={() => loadWorkspace(selectedDiffPath)} title="Refresh"
           ><RefreshCw size={14} /></button
@@ -636,6 +700,19 @@
         <ErrorBanner error={workspaceError} onDismiss={() => (workspaceError = null)} />
       </div>
     {/if}
+
+    <div class="comparison-bar">
+      <DiffSelector
+        selection={diffSelection}
+        recentBranches={activeRepository?.recentBranches ?? []}
+        localBranches={activeRepository?.localBranches ?? []}
+        remoteBranches={activeRepository?.remoteBranches ?? []}
+        recentCommits={activeRepository?.recentCommits ?? []}
+        currentBranch={activeRepository?.currentBranch}
+        loading={contentLoading}
+        onApply={applyDiffSelection}
+      />
+    </div>
 
     <div
       class:withoutAi={!aiPanelOpen}
@@ -717,7 +794,7 @@
           {:else if summary}<EmptyState
               icon={GitBranch}
               title="No changes"
-              message={`The working tree has no changes relative to the merge base with ${activeProject.baseRef}.`}
+              message={`No changes found from ${summary.comparison.fromLabel} to ${summary.comparison.toLabel}.`}
               fill
             />
           {/if}
@@ -775,7 +852,7 @@
                 <div class="project-info">
                   <h3>{project.name}</h3>
                   <p>{project.repoPath}</p>
-                  <span><GitBranch size={11} />{project.baseRef}</span>
+                  <span><GitBranch size={11} />HEAD → working tree</span>
                 </div>
               </button>
               <div class="project-meta">
@@ -1123,7 +1200,7 @@
   .app-shell {
     height: 100vh;
     display: grid;
-    grid-template-rows: 48px minmax(0, 1fr);
+    grid-template-rows: 48px 43px minmax(0, 1fr);
     overflow: hidden;
   }
   .topbar {
@@ -1169,10 +1246,22 @@
   .workspace-error {
     position: fixed;
     z-index: 20;
-    top: 57px;
+    top: 100px;
     left: 50%;
     width: min(520px, calc(100% - 40px));
     transform: translateX(-50%);
+  }
+  .comparison-bar {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
+    padding: 0 12px;
+    background: #0e151d;
+    border-bottom: 1px solid var(--border);
   }
   .workspace {
     display: grid;

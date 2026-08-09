@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffSummary, FileDiff } from '$lib/domain/diff';
 import type { ProjectConfig } from '$lib/domain/project';
@@ -29,9 +29,12 @@ const project: ProjectConfig = {
 };
 
 const summary: DiffSummary = {
-  baseRef: 'main',
-  headSha: '1234567890abcdef',
-  mergeBaseSha: 'abcdef1234567890',
+  selection: { base: 'HEAD', target: '.' },
+  comparison: {
+    fromLabel: 'HEAD',
+    toLabel: 'working tree',
+    fromSha: '1234567890abcdef'
+  },
   totalAdditions: 2,
   totalDeletions: 1,
   files: [
@@ -76,6 +79,16 @@ describe('change details auto-refresh', () => {
     history.replaceState(null, '', '/');
     tauriApi.listProjects.mockResolvedValue([project]);
     tauriApi.touchProject.mockResolvedValue(project);
+    tauriApi.validateRepository.mockResolvedValue({
+      repoPath: project.repoPath,
+      suggestedName: project.name,
+      detectedBaseRef: 'main',
+      currentBranch: 'feature',
+      recentBranches: ['feature', 'main'],
+      localBranches: ['feature', 'main'],
+      remoteBranches: ['origin/main'],
+      recentCommits: [{ sha: '1234567890abcdef', shortSha: '1234567', subject: 'Example change' }]
+    });
     tauriApi.getUserPreferences.mockResolvedValue({
       changeDetail: {
         changedFilesPanel: { open: true, width: 225 },
@@ -146,6 +159,29 @@ describe('change details auto-refresh', () => {
     await fireEvent.focus(window);
 
     expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(2);
+  });
+
+  it('applies a branch comparison and stores it in the URL', async () => {
+    history.replaceState(null, '', '/?project=alpha');
+    render(Page);
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+
+    await fireEvent.click(screen.getByRole('combobox', { name: 'From' }));
+    let menu = screen.getByRole('listbox', { name: 'From revisions' });
+    await fireEvent.click(within(menu).getByRole('option', { name: 'main' }));
+    await fireEvent.click(screen.getByRole('combobox', { name: 'To' }));
+    menu = screen.getByRole('listbox', { name: 'To revisions' });
+    await fireEvent.click(within(menu).getByRole('option', { name: 'feature' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenLastCalledWith('alpha', {
+        base: 'main',
+        target: 'feature'
+      })
+    );
+    expect(new URLSearchParams(location.search).get('base')).toBe('main');
+    expect(new URLSearchParams(location.search).get('target')).toBe('feature');
   });
 
   it('resizes both side panels from their drag handles', async () => {

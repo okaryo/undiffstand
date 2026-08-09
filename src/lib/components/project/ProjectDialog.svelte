@@ -21,36 +21,37 @@
   } = $props();
 
   let name = $state('');
-  let baseRef = $state('');
   let initialized = false;
   const repoPath = $derived(project?.repoPath ?? repository?.repoPath ?? '');
-  const refs = $derived(repository?.localBranches ?? []);
 
   $effect(() => {
     if (!initialized) {
       name = project?.name ?? repository?.suggestedName ?? '';
-      const configuredRef = project?.baseRef;
-      const configuredLocalBranch = configuredRef
-        ? refs.find((ref) => ref === configuredRef || configuredRef.endsWith(`/${ref}`))
-        : undefined;
-      baseRef = configuredLocalBranch ?? repository?.detectedBaseRef ?? refs[0] ?? '';
       initialized = true;
     }
   });
 
   function submit(event: SubmitEvent) {
     event.preventDefault();
-    onSave({ id: project?.id, name: name.trim(), repoPath, baseRef: baseRef.trim() });
+    onSave({ id: project?.id, name: name.trim(), repoPath, baseRef: 'HEAD' });
   }
 </script>
 
-<div class="backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && onClose()}>
+<div
+  class="backdrop"
+  role="presentation"
+  onclick={(event) => event.target === event.currentTarget && onClose()}
+>
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="project-dialog-title">
     <header>
       <div class="icon"><FolderGit2 size={20} /></div>
       <div>
         <h2 id="project-dialog-title">{project ? 'Project settings' : 'Add repository'}</h2>
-        <p>{project ? 'Update the display name or comparison ref.' : 'Confirm how ReaDiff should open this repository.'}</p>
+        <p>
+          {project
+            ? 'Update the project display name.'
+            : 'Confirm the repository to add to ReaDiff.'}
+        </p>
       </div>
       <button class="icon-button" aria-label="Close" onclick={onClose}><X size={18} /></button>
     </header>
@@ -64,13 +65,6 @@
         <span>Repository</span>
         <input value={repoPath} readonly />
       </label>
-      <label>
-        <span>Compare against</span>
-        <select bind:value={baseRef} required>
-          {#each refs as ref}<option value={ref}>{ref}{ref === repository?.currentBranch ? ' (current)' : ''}</option>{/each}
-        </select>
-        <small>Local branches only. ReaDiff reviews the merge base through the current working tree.</small>
-      </label>
       <footer>
         {#if project && onDelete}
           <button class="danger" type="button" disabled={saving || deleting} onclick={onDelete}>
@@ -78,7 +72,7 @@
           </button>
         {/if}
         <button class="secondary" type="button" onclick={onClose}>Cancel</button>
-        <button class="primary" type="submit" disabled={saving || deleting || !name.trim() || !baseRef.trim()}>
+        <button class="primary" type="submit" disabled={saving || deleting || !name.trim()}>
           {saving ? 'Saving…' : project ? 'Save settings' : 'Add project'}
         </button>
       </footer>
@@ -125,8 +119,15 @@
     border-radius: 9px;
   }
 
-  h2 { margin: 0; font-size: 16px; }
-  p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+  h2 {
+    margin: 0;
+    font-size: 16px;
+  }
+  p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
 
   .icon-button {
     display: grid;
@@ -137,10 +138,21 @@
     cursor: pointer;
   }
 
-  form { display: grid; gap: 17px; padding: 20px; }
-  label { display: grid; gap: 7px; }
-  label > span { color: #c9d2dc; font-size: 12px; font-weight: 550; }
-  input, select {
+  form {
+    display: grid;
+    gap: 17px;
+    padding: 20px;
+  }
+  label {
+    display: grid;
+    gap: 7px;
+  }
+  label > span {
+    color: #c9d2dc;
+    font-size: 12px;
+    font-weight: 550;
+  }
+  input {
     width: 100%;
     height: 38px;
     box-sizing: border-box;
@@ -153,11 +165,22 @@
     font: inherit;
     font-size: 13px;
   }
-  input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(87, 184, 142, 0.1); }
-  input[readonly] { color: var(--muted); }
-  small { color: var(--muted); font-size: 11px; }
-  footer { display: flex; justify-content: flex-end; gap: 9px; padding-top: 3px; }
-  button.danger, button.secondary, button.primary {
+  input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(87, 184, 142, 0.1);
+  }
+  input[readonly] {
+    color: var(--muted);
+  }
+  footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 9px;
+    padding-top: 3px;
+  }
+  button.danger,
+  button.secondary,
+  button.primary {
     padding: 8px 13px;
     border-radius: 7px;
     font: inherit;
@@ -166,9 +189,28 @@
     cursor: pointer;
     white-space: nowrap;
   }
-  .danger { margin-right: auto; color: var(--red); background: transparent; border: 1px solid rgba(224, 108, 100, 0.28); }
-  .danger:hover { background: rgba(224, 108, 100, 0.08); border-color: rgba(224, 108, 100, 0.45); }
-  .secondary { color: var(--text); background: transparent; border: 1px solid var(--border-strong); }
-  .primary { color: #06110d; background: var(--accent-bright); border: 1px solid var(--accent-bright); }
-  button:disabled { opacity: 0.45; cursor: default; }
+  .danger {
+    margin-right: auto;
+    color: var(--red);
+    background: transparent;
+    border: 1px solid rgba(224, 108, 100, 0.28);
+  }
+  .danger:hover {
+    background: rgba(224, 108, 100, 0.08);
+    border-color: rgba(224, 108, 100, 0.45);
+  }
+  .secondary {
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--border-strong);
+  }
+  .primary {
+    color: #06110d;
+    background: var(--accent-bright);
+    border: 1px solid var(--accent-bright);
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
 </style>

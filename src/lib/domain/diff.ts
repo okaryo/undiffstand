@@ -9,14 +9,32 @@ export type DiffFileSummary = {
   deletions?: number;
 };
 
+export type DiffSelection = {
+  base: string;
+  target: string;
+};
+
+export type DiffComparison = {
+  fromLabel: string;
+  toLabel: string;
+  fromSha?: string;
+  toSha?: string;
+};
+
 export type DiffSummary = {
-  baseRef: string;
-  headSha: string;
-  mergeBaseSha: string;
+  selection: DiffSelection;
+  comparison: DiffComparison;
   files: DiffFileSummary[];
   totalAdditions: number;
   totalDeletions: number;
 };
+
+export const defaultDiffSelection = (): DiffSelection => ({ base: 'HEAD', target: '.' });
+
+export function diffSelectionLabel(selection: DiffSelection): string {
+  const target = selection.target === '.' ? 'working tree' : selection.target;
+  return `${selection.base} → ${target}`;
+}
 
 export type FileDiff = {
   file: DiffFileSummary;

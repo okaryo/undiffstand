@@ -18,5 +18,14 @@ export type RepositoryInfo = {
   suggestedName: string;
   detectedBaseRef: string | null;
   currentBranch: string | null;
+  recentBranches: string[];
   localBranches: string[];
+  remoteBranches: string[];
+  recentCommits: GitCommitSummary[];
+};
+
+export type GitCommitSummary = {
+  sha: string;
+  shortSha: string;
+  subject: string;
 };

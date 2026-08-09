@@ -5,10 +5,12 @@
   let {
     projects,
     activeProject,
+    comparisonLabel,
     onSelect
   }: {
     projects: ProjectConfig[];
     activeProject: ProjectConfig;
+    comparisonLabel: string;
     onSelect: (project: ProjectConfig) => void | Promise<void>;
   } = $props();
 
@@ -55,7 +57,7 @@
     <strong>{activeProject.name}</strong>
     <span class="chevron"><ChevronDown size={13} /></span>
   </button>
-  <span class="comparison">{activeProject.baseRef} → working tree</span>
+  <span class="comparison">{comparisonLabel}</span>
 
   {#if open}
     <div class="menu" role="menu" aria-label="Projects" bind:this={menu}>

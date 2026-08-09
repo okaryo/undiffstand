@@ -1,5 +1,5 @@
 use crate::{
-    domain::DiffExplanation,
+    domain::{DiffExplanation, DiffSelection},
     error::{AppError, AppResult},
     services::{
         ai::{AiProvider, CodexProvider},
@@ -13,12 +13,13 @@ use tauri::{AppHandle, Runtime};
 pub async fn explain_file_diff<R: Runtime>(
     app: AppHandle<R>,
     project_id: String,
+    selection: DiffSelection,
     path: String,
 ) -> AppResult<DiffExplanation> {
     let project = config_service::find_project(&app, &project_id)?;
     let repo = Path::new(&project.repo_path);
-    let summary = git_service::diff_summary(repo, &project.base_ref)?;
-    let diff = git_service::file_diff(repo, &project.base_ref, &path)?;
+    let summary = git_service::diff_summary(repo, &selection)?;
+    let diff = git_service::file_diff(repo, &selection, &path)?;
     if diff.truncated {
         return Err(AppError::new(
             "AI_INPUT_TOO_LARGE",
@@ -26,6 +27,10 @@ pub async fn explain_file_diff<R: Runtime>(
         ));
     }
     CodexProvider::new()
-        .explain_file_diff(&project.base_ref, &summary.head_sha, &diff)
+        .explain_file_diff(
+            &summary.comparison.from_label,
+            &summary.comparison.to_label,
+            &diff,
+        )
         .await
 }
