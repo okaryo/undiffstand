@@ -533,7 +533,31 @@
   }
 
   function handleWindowKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape' && !contentLoading) showComparisonDialog = false;
+    if (event.key === 'Escape') {
+      if (showProjectDialog || showSettings || showComparisonDialog) event.preventDefault();
+      showProjectDialog = false;
+      showSettings = false;
+      if (!contentLoading) showComparisonDialog = false;
+      return;
+    }
+
+    if (event.repeat || !event.metaKey || event.ctrlKey || event.shiftKey) return;
+
+    const isSettingsShortcut = !event.altKey && (event.code === 'Comma' || event.key === ',');
+    if (isSettingsShortcut) {
+      event.preventDefault();
+      if (activeProject) void editActiveProject();
+      else showSettings = true;
+      return;
+    }
+
+    const isSidebarShortcut =
+      activeProject && (event.code === 'KeyB' || event.key.toLowerCase() === 'b');
+    if (!isSidebarShortcut) return;
+
+    event.preventDefault();
+    if (event.altKey) toggleAiPanel();
+    else toggleSidebar();
   }
 
   function selectDiff(path: string) {

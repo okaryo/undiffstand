@@ -322,4 +322,73 @@ describe('change details auto-refresh', () => {
       })
     );
   });
+
+  it('supports application keyboard shortcuts', async () => {
+    history.replaceState(null, '', '/?project=alpha');
+    render(Page);
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+
+    await fireEvent.keyDown(window, { key: 'b', code: 'KeyB', metaKey: true });
+    expect(screen.getByRole('button', { name: 'Show changed files sidebar' })).toBeInTheDocument();
+
+    await fireEvent.keyDown(window, {
+      key: '∫',
+      code: 'KeyB',
+      metaKey: true,
+      altKey: true
+    });
+    expect(screen.queryByRole('separator', { name: 'Resize AI panel' })).not.toBeInTheDocument();
+
+    await fireEvent.keyDown(window, { key: ',', code: 'Comma', metaKey: true });
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: 'Project settings' })).toBeInTheDocument()
+    );
+
+    await fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Project settings' })).not.toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(tauriApi.saveUserPreferences).toHaveBeenLastCalledWith({
+        changeDetail: {
+          changedFilesPanel: { open: false, width: 225 },
+          aiPanel: { open: false, width: 290 },
+          diff: { mode: 'split', wrapLongLines: false }
+        }
+      })
+    );
+  });
+
+  it('opens AI settings from the project list and closes it with Escape', async () => {
+    render(Page);
+    await waitFor(() => expect(tauriApi.listProjects).toHaveBeenCalledOnce());
+
+    await fireEvent.keyDown(window, { key: ',', code: 'Comma', metaKey: true });
+    expect(screen.getByRole('dialog', { name: 'AI settings' })).toBeInTheDocument();
+
+    await fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'AI settings' })).not.toBeInTheDocument();
+  });
+
+  it('ignores repeated or modified shortcut keydown events', async () => {
+    history.replaceState(null, '', '/?project=alpha');
+    render(Page);
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+
+    await fireEvent.keyDown(window, {
+      key: 'b',
+      code: 'KeyB',
+      metaKey: true,
+      repeat: true
+    });
+    await fireEvent.keyDown(window, {
+      key: 'B',
+      code: 'KeyB',
+      metaKey: true,
+      shiftKey: true
+    });
+
+    expect(screen.getByRole('button', { name: 'Hide changed files sidebar' })).toBeInTheDocument();
+    expect(screen.getByRole('separator', { name: 'Resize AI panel' })).toBeInTheDocument();
+    expect(tauriApi.saveUserPreferences).not.toHaveBeenCalled();
+  });
 });
