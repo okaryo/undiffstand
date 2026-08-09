@@ -5,7 +5,7 @@ import DiffFileList from './DiffFileList.svelte';
 describe('DiffFileList', () => {
   it('selects the requested changed file', async () => {
     const onSelect = vi.fn();
-    render(DiffFileList, {
+    const { container } = render(DiffFileList, {
       files: [
         {
           oldPath: 'src/review.ts',
@@ -20,6 +20,10 @@ describe('DiffFileList', () => {
 
     await fireEvent.click(screen.getByRole('button', { name: /review\.ts/i }));
     expect(onSelect).toHaveBeenCalledWith('src/review.ts');
+    expect(screen.queryByText('M')).not.toBeInTheDocument();
+    expect(screen.queryByText('+3')).not.toBeInTheDocument();
+    expect(screen.queryByText('−1')).not.toBeInTheDocument();
+    expect(container.querySelector('.file-row .lucide-file-diff')).toBeInTheDocument();
   });
 
   it('filters by the complete repository path', async () => {
@@ -36,5 +40,26 @@ describe('DiffFileList', () => {
     });
     expect(screen.queryByText('alpha.ts')).not.toBeInTheDocument();
     expect(screen.getByText('beta.ts')).toBeInTheDocument();
+  });
+
+  it('collapses and expands directory branches', async () => {
+    render(DiffFileList, {
+      files: [
+        { newPath: 'src/lib/context.ts', status: 'added', additions: 2, deletions: 0 },
+        { newPath: 'src/services/review.ts', status: 'modified', additions: 3, deletions: 1 }
+      ],
+      onSelect: vi.fn()
+    });
+
+    expect(screen.getByText('context.ts')).toBeInTheDocument();
+    expect(screen.getByText('review.ts')).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Collapse src' }));
+    expect(screen.queryByText('context.ts')).not.toBeInTheDocument();
+    expect(screen.queryByText('review.ts')).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Expand src' }));
+    expect(screen.getByText('context.ts')).toBeInTheDocument();
+    expect(screen.getByText('review.ts')).toBeInTheDocument();
   });
 });

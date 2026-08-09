@@ -1,14 +1,15 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import {
     Bot,
     Braces,
     CirclePlus,
     Columns2,
-    FileCode2,
     FolderGit2,
     GitBranch,
     LoaderCircle,
+    PanelLeftClose,
+    PanelLeftOpen,
     PanelRight,
     Pencil,
     RefreshCw,
@@ -20,13 +21,13 @@
   import AiPanel from '$lib/components/ai/AiPanel.svelte';
   import EmptyState from '$lib/components/common/EmptyState.svelte';
   import ErrorBanner from '$lib/components/common/ErrorBanner.svelte';
+  import DiffFeed from '$lib/components/diff/DiffFeed.svelte';
   import DiffFileList from '$lib/components/diff/DiffFileList.svelte';
   import DiffSummaryView from '$lib/components/diff/DiffSummary.svelte';
-  import DiffViewer from '$lib/components/diff/DiffViewer.svelte';
   import ProjectDialog from '$lib/components/project/ProjectDialog.svelte';
   import ProjectSwitcher from '$lib/components/project/ProjectSwitcher.svelte';
   import type { DiffExplanation } from '$lib/domain/ai';
-  import { displayPath, type DiffSummary, type FileDiff } from '$lib/domain/diff';
+  import { diffAnchorId, displayPath, type DiffSummary, type FileDiff } from '$lib/domain/diff';
   import { normalizeError, type AppError } from '$lib/domain/error';
   import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
   import { tauriApi } from '$lib/services/tauri';
@@ -47,11 +48,17 @@
   let wrapLines = $state(false);
   let summary = $state<DiffSummary | null>(null);
   let selectedDiffPath = $state<string | undefined>();
-  let selectedDiff = $state<FileDiff | null>(null);
+  let diffsByPath = $state<Record<string, FileDiff | undefined>>({});
+  let diffLoadingPaths = $state<Record<string, boolean | undefined>>({});
+  let diffErrors = $state<Record<string, string | undefined>>({});
   let diffExplanation = $state<DiffExplanation | undefined>();
   let aiLoading = $state(false);
   let contentLoading = $state(false);
+  let sidebarOpen = $state(true);
   let aiPanelOpen = $state(true);
+  let pendingDiffPaths = new Set<string>();
+  let diffBatchTimer: ReturnType<typeof setTimeout> | undefined;
+  let diffLoadGeneration = 0;
 
   onMount(async () => {
     try {
@@ -151,39 +158,101 @@
     if (!activeProject) return;
     workspaceError = null;
     summary = null;
-    selectedDiff = null;
+    contentLoading = true;
+    clearPendingDiffs();
+    diffsByPath = {};
+    diffLoadingPaths = {};
+    diffErrors = {};
     diffExplanation = undefined;
     try {
       const loadedSummary = await tauriApi.getDiffSummary(activeProject.id);
       summary = loadedSummary;
+      contentLoading = false;
       const path =
         requestedFile && loadedSummary.files.some((file) => displayPath(file) === requestedFile)
           ? requestedFile
           : loadedSummary.files[0]
             ? displayPath(loadedSummary.files[0])
             : undefined;
-      if (path) await selectDiff(path);
-      setUrl(selectedDiffPath);
-    } catch (caught) {
-      workspaceError = normalizeError(caught);
-    }
-  }
-
-  async function selectDiff(path: string) {
-    if (!activeProject) return;
-    selectedDiffPath = path;
-    selectedDiff = null;
-    diffExplanation = undefined;
-    contentLoading = true;
-    workspaceError = null;
-    setUrl(path);
-    try {
-      selectedDiff = await tauriApi.getFileDiff(activeProject.id, path);
+      selectedDiffPath = path;
+      setUrl(path);
+      if (path) {
+        queueDiff(path);
+        await tick();
+        scrollToDiff(path, false);
+      }
     } catch (caught) {
       workspaceError = normalizeError(caught);
     } finally {
       contentLoading = false;
     }
+  }
+
+  function selectDiff(path: string) {
+    if (!activeProject) return;
+    selectedDiffPath = path;
+    diffExplanation = undefined;
+    setUrl(path);
+    queueDiff(path);
+    scrollToDiff(path, true);
+  }
+
+  function scrollToDiff(path: string, smooth: boolean) {
+    document
+      .getElementById(diffAnchorId(path))
+      ?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+  }
+
+  function setActiveDiff(path: string) {
+    if (selectedDiffPath === path) return;
+    selectedDiffPath = path;
+    diffExplanation = undefined;
+    setUrl(path);
+  }
+
+  function queueDiff(path: string) {
+    if (!activeProject || diffsByPath[path] || diffLoadingPaths[path]) return;
+    diffErrors[path] = undefined;
+    diffLoadingPaths[path] = true;
+    pendingDiffPaths.add(path);
+    diffBatchTimer ??= setTimeout(loadPendingDiffs, 16);
+  }
+
+  async function loadPendingDiffs() {
+    diffBatchTimer = undefined;
+    if (!activeProject || pendingDiffPaths.size === 0) return;
+    const projectId = activeProject.id;
+    const generation = diffLoadGeneration;
+    const paths = [...pendingDiffPaths];
+    pendingDiffPaths.clear();
+
+    try {
+      const loadedDiffs = await tauriApi.getFileDiffs(projectId, paths);
+      if (activeProject?.id !== projectId || diffLoadGeneration !== generation) return;
+      for (const diff of loadedDiffs) {
+        diffsByPath[displayPath(diff.file)] = diff;
+      }
+      if (selectedDiffPath && paths.includes(selectedDiffPath)) {
+        await tick();
+        if (diffLoadGeneration === generation) scrollToDiff(selectedDiffPath, false);
+      }
+    } catch (caught) {
+      const normalized = normalizeError(caught);
+      if (activeProject?.id === projectId && diffLoadGeneration === generation) {
+        for (const path of paths) diffErrors[path] = normalized.message;
+      }
+    } finally {
+      if (activeProject?.id === projectId && diffLoadGeneration === generation) {
+        for (const path of paths) diffLoadingPaths[path] = false;
+      }
+    }
+  }
+
+  function clearPendingDiffs() {
+    if (diffBatchTimer !== undefined) clearTimeout(diffBatchTimer);
+    diffBatchTimer = undefined;
+    pendingDiffPaths.clear();
+    diffLoadGeneration += 1;
   }
 
   async function explainDiff() {
@@ -203,7 +272,11 @@
   function goHome() {
     activeProject = null;
     summary = null;
-    selectedDiff = null;
+    selectedDiffPath = undefined;
+    clearPendingDiffs();
+    diffsByPath = {};
+    diffLoadingPaths = {};
+    diffErrors = {};
     workspaceError = null;
     history.replaceState(null, '', window.location.pathname);
   }
@@ -247,6 +320,17 @@
       <button class="brand compact" onclick={goHome} title="Back to projects"
         ><span class="brand-mark"><Braces size={16} /></span><strong>ReaDiff</strong></button
       >
+      <button
+        class="sidebar-toggle"
+        type="button"
+        aria-controls="changed-files-sidebar"
+        aria-expanded={sidebarOpen}
+        aria-label={sidebarOpen ? 'Hide changed files sidebar' : 'Show changed files sidebar'}
+        title={sidebarOpen ? 'Hide changed files' : 'Show changed files'}
+        onclick={() => (sidebarOpen = !sidebarOpen)}
+      >
+        {#if sidebarOpen}<PanelLeftClose size={15} />{:else}<PanelLeftOpen size={15} />{/if}
+      </button>
       <ProjectSwitcher {projects} {activeProject} onSelect={openProject} />
       <div class="top-actions">
         <button onclick={() => loadWorkspace(selectedDiffPath)} title="Refresh"
@@ -267,32 +351,42 @@
       </div>
     {/if}
 
-    <div class:withoutAi={!aiPanelOpen} class="workspace">
-      <aside class="sidebar">
-        <div class="pane-title"><span>Changed files</span><b>{summary?.files.length ?? 0}</b></div>
-        {#if summary}<DiffFileList
-            files={summary.files}
-            selectedPath={selectedDiffPath}
-            onSelect={selectDiff}
-          />{/if}
-      </aside>
+    <div class:withoutAi={!aiPanelOpen} class:withoutSidebar={!sidebarOpen} class="workspace">
+      {#if sidebarOpen}
+        <aside id="changed-files-sidebar" class="sidebar">
+          <div class="pane-title">
+            <span>Changed files</span><b>{summary?.files.length ?? 0}</b>
+          </div>
+          {#if summary}<DiffFileList
+              files={summary.files}
+              selectedPath={selectedDiffPath}
+              onSelect={selectDiff}
+            />{/if}
+        </aside>
+      {/if}
 
       <section class="content-pane">
         <div class="content-toolbar">
           {#if summary}<DiffSummaryView {summary} />{/if}
           <div class="view-controls">
+            <div class="view-mode-switch" role="group" aria-label="Diff layout">
+              <button
+                class:active={diffMode === 'split'}
+                aria-pressed={diffMode === 'split'}
+                onclick={() => (diffMode = 'split')}
+                title="Split diff"><Columns2 size={13} />Split</button
+              >
+              <button
+                class:active={diffMode === 'unified'}
+                aria-pressed={diffMode === 'unified'}
+                onclick={() => (diffMode = 'unified')}
+                title="Unified diff"><Rows3 size={13} />Unified</button
+              >
+            </div>
             <button
-              class:active={diffMode === 'split'}
-              onclick={() => (diffMode = 'split')}
-              title="Split diff"><Columns2 size={13} />Split</button
-            >
-            <button
-              class:active={diffMode === 'unified'}
-              onclick={() => (diffMode = 'unified')}
-              title="Unified diff"><Rows3 size={13} />Unified</button
-            >
-            <button
+              class="wrap-control"
               class:active={wrapLines}
+              aria-pressed={wrapLines}
               onclick={() => (wrapLines = !wrapLines)}
               title="Wrap long lines"><WrapText size={13} /></button
             >
@@ -300,20 +394,26 @@
         </div>
         <div class="viewer-scroll">
           {#if contentLoading}<div class="loading-state">
-              <LoaderCircle class="spin" size={20} />Loading diff…
+              <LoaderCircle class="spin" size={20} />Loading changes…
             </div>
-          {:else if selectedDiff}<DiffViewer diff={selectedDiff} mode={diffMode} wrap={wrapLines} />
-          {:else if summary && summary.files.length === 0}<EmptyState
+          {:else if summary && summary.files.length > 0}<DiffFeed
+              files={summary.files}
+              diffs={diffsByPath}
+              loadingPaths={diffLoadingPaths}
+              errors={diffErrors}
+              activePath={selectedDiffPath}
+              mode={diffMode}
+              wrap={wrapLines}
+              onLoad={queueDiff}
+              onActive={setActiveDiff}
+            />
+          {:else if summary}<EmptyState
               icon={GitBranch}
               title="No changes"
               message={`The working tree has no changes relative to the merge base with ${activeProject.baseRef}.`}
               fill
             />
-          {:else}<EmptyState
-              icon={FileCode2}
-              title="Choose a changed file"
-              message="Select a file to inspect its working-tree diff."
-            />{/if}
+          {/if}
         </div>
       </section>
 
@@ -706,9 +806,9 @@
   }
   .topbar {
     display: grid;
-    grid-template-columns: auto minmax(220px, 1fr) auto;
+    grid-template-columns: auto auto minmax(220px, 1fr) auto;
     align-items: center;
-    gap: 17px;
+    gap: 8px;
     padding: 0 11px;
     background: #0c1219;
     border-bottom: 1px solid var(--border);
@@ -726,6 +826,7 @@
     align-items: center;
     gap: 2px;
   }
+  .sidebar-toggle,
   .top-actions button {
     display: grid;
     place-items: center;
@@ -737,6 +838,7 @@
     border-radius: 5px;
     cursor: pointer;
   }
+  .sidebar-toggle:hover,
   .top-actions button:hover,
   .top-actions button.active {
     color: var(--text);
@@ -757,6 +859,12 @@
   }
   .workspace.withoutAi {
     grid-template-columns: 225px minmax(500px, 1fr);
+  }
+  .workspace.withoutSidebar {
+    grid-template-columns: minmax(500px, 1fr) 290px;
+  }
+  .workspace.withoutSidebar.withoutAi {
+    grid-template-columns: minmax(500px, 1fr);
   }
   .sidebar {
     min-width: 0;
@@ -808,10 +916,21 @@
   .view-controls {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 7px;
     margin-left: 12px;
   }
-  .view-controls button {
+  .view-mode-switch {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    background: #111922;
+    border: 1px solid #293541;
+    border-radius: 7px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.015);
+  }
+  .view-mode-switch button,
+  .wrap-control {
     display: flex;
     align-items: center;
     gap: 5px;
@@ -824,8 +943,23 @@
     font-size: 11px;
     cursor: pointer;
   }
-  .view-controls button:hover,
-  .view-controls button.active {
+  .view-mode-switch button:hover {
+    color: #aeb8c1;
+    background: rgba(255, 255, 255, 0.035);
+  }
+  .view-mode-switch button.active {
+    color: #e5eaee;
+    background: #1d2731;
+    border-color: #303c48;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  }
+  .wrap-control {
+    width: 27px;
+    justify-content: center;
+    padding: 0;
+  }
+  .wrap-control:hover,
+  .wrap-control.active {
     color: #bac3cc;
     background: #16202a;
     border-color: #24313d;
@@ -937,10 +1071,18 @@
       transform: rotate(360deg);
     }
   }
-
   @media (max-width: 1100px) {
     .workspace {
       grid-template-columns: 200px minmax(500px, 1fr) 260px;
+    }
+    .workspace.withoutAi {
+      grid-template-columns: 200px minmax(500px, 1fr);
+    }
+    .workspace.withoutSidebar {
+      grid-template-columns: minmax(500px, 1fr) 260px;
+    }
+    .workspace.withoutSidebar.withoutAi {
+      grid-template-columns: minmax(500px, 1fr);
     }
   }
 </style>

@@ -389,12 +389,25 @@ fn split_hunks(diff: &str) -> Vec<String> {
 
 pub fn file_diff(repo: &Path, base_ref: &str, path: &str) -> AppResult<FileDiff> {
     let summary = diff_summary(repo, base_ref)?;
+    file_diff_from_summary(repo, &summary, path)
+}
+
+pub fn file_diffs(repo: &Path, base_ref: &str, paths: &[String]) -> AppResult<Vec<FileDiff>> {
+    let summary = diff_summary(repo, base_ref)?;
+    paths
+        .iter()
+        .map(|path| file_diff_from_summary(repo, &summary, path))
+        .collect()
+}
+
+fn file_diff_from_summary(repo: &Path, summary: &DiffSummary, path: &str) -> AppResult<FileDiff> {
     let file = summary
         .files
-        .into_iter()
+        .iter()
         .find(|file| {
             file.old_path.as_deref() == Some(path) || file.new_path.as_deref() == Some(path)
         })
+        .cloned()
         .ok_or_else(|| {
             AppError::new(
                 "FILE_NOT_IN_DIFF",
@@ -549,6 +562,16 @@ mod tests {
         let untracked = file_diff(repo, "main", "untracked.txt").unwrap();
         assert_eq!(untracked.new_content.as_deref(), Some("untracked\n"));
         assert!(untracked.unified_diff.contains("+untracked"));
+
+        let diffs = file_diffs(
+            repo,
+            "main",
+            &["committed.txt".to_owned(), "untracked.txt".to_owned()],
+        )
+        .unwrap();
+        assert_eq!(diffs.len(), 2);
+        assert_eq!(diffs[0].file.new_path.as_deref(), Some("committed.txt"));
+        assert_eq!(diffs[1].file.new_path.as_deref(), Some("untracked.txt"));
     }
 
     #[test]

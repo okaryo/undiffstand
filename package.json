@@ -16,10 +16,10 @@
   },
   "dependencies": {
     "@git-diff-view/svelte": "^0.1.7",
+    "@lucide/svelte": "^1.30.0",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/cli": "^2.11.1",
-    "@tauri-apps/plugin-dialog": "^2.7.2",
-    "@lucide/svelte": "^1.0.1"
+    "@tauri-apps/plugin-dialog": "^2.7.2"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.9",

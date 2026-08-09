@@ -26,12 +26,12 @@
       <p>Summarize intent, risk, and evidence for the selected file.</p>
     </div>
     <button onclick={onExplain} disabled={loading}
-      >{#if loading}<LoaderCircle class="spin" size={14} /> Analyzing…{:else}Explain changes{/if}</button
+      >{#if loading}<LoaderCircle class="spin" size={16} /> Analyzing…{:else}Explain changes{/if}</button
     >
   </div>
   <div class="results">
     {#if loading && !explanation}<div class="thinking">
-        <LoaderCircle class="spin" size={17} /><span>Reviewing the available evidence…</span>
+        <LoaderCircle class="spin" size={16} /><span>Reviewing the available evidence…</span>
       </div>{/if}
     <AiAnswerView {explanation} />
   </div>

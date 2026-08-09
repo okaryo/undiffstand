@@ -17,6 +17,8 @@ const nativeApi = {
   getDiffSummary: (projectId: string) => invoke<DiffSummary>('get_diff_summary', { projectId }),
   getFileDiff: (projectId: string, path: string) =>
     invoke<FileDiff>('get_file_diff', { projectId, path }),
+  getFileDiffs: (projectId: string, paths: string[]) =>
+    invoke<FileDiff[]>('get_file_diffs', { projectId, paths }),
   explainFileDiff: (projectId: string, path: string) =>
     invoke<DiffExplanation>('explain_file_diff', { projectId, path })
 };
@@ -136,6 +138,7 @@ const mockApi: typeof nativeApi = {
   },
   getDiffSummary: async () => mockSummary,
   getFileDiff: async (_projectId, path) => mockDiff(path),
+  getFileDiffs: async (_projectId, paths) => paths.map(mockDiff),
   explainFileDiff: async (_projectId, path) => ({
     summary:
       'The change introduces a context-building step before producing a structured review result.',
