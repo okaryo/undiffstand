@@ -15,7 +15,10 @@ const tauriApi = vi.hoisted(() => ({
   removeProject: vi.fn(),
   getUserPreferences: vi.fn(),
   saveUserPreferences: vi.fn(),
-  explainFileDiff: vi.fn()
+  explainFileChange: vi.fn(),
+  askInlineQuestion: vi.fn(),
+  getChangeReviewAvailability: vi.fn(),
+  runChangeReview: vi.fn()
 }));
 
 vi.mock('$lib/services/tauri', () => ({ tauriApi }));
@@ -99,6 +102,15 @@ describe('change details auto-refresh', () => {
     tauriApi.saveUserPreferences.mockImplementation(async (preferences) => preferences);
     tauriApi.getDiffSummary.mockResolvedValue(summary);
     tauriApi.getFileDiffs.mockResolvedValue([fileDiff]);
+    tauriApi.getChangeReviewAvailability.mockImplementation(
+      async (_projectId: string, selection: { base: string; target: string }) => ({
+        available:
+          (selection.base === 'HEAD' && selection.target === '.') ||
+          (selection.base === 'main' && ['HEAD', 'feature'].includes(selection.target)),
+        scopeLabel: `${selection.base === 'HEAD' ? 'feature' : selection.base} → ${selection.target === '.' ? 'working tree' : selection.target === 'HEAD' ? 'feature' : selection.target}`,
+        reason: undefined
+      })
+    );
   });
 
   afterEach(() => {
@@ -113,7 +125,7 @@ describe('change details auto-refresh', () => {
 
     await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(2));
-    expect(screen.getByText('feature → working tree')).toBeInTheDocument();
+    expect(screen.getAllByText('feature → working tree')).toHaveLength(2);
     expect(screen.queryByText('HEAD → working tree')).not.toBeInTheDocument();
     vi.mocked(Element.prototype.scrollIntoView).mockClear();
     await fireEvent.focus(window);
@@ -184,12 +196,14 @@ describe('change details auto-refresh', () => {
     history.replaceState(null, '', '/?project=alpha');
     render(Page);
     await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByText(/Loading diff/)).not.toBeInTheDocument());
+    const initialCalls = tauriApi.getDiffSummary.mock.calls.length;
 
     await fireEvent.focus(window);
-    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(initialCalls + 1));
     await fireEvent.focus(window);
 
-    expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(2);
+    expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(initialCalls + 1);
   });
 
   it('applies a branch comparison and stores it in the URL', async () => {
@@ -223,6 +237,65 @@ describe('change details auto-refresh', () => {
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Change comparison' })).not.toBeInTheDocument()
     );
+  });
+
+  it('disables Change Review and explains an unsupported comparison', async () => {
+    tauriApi.getChangeReviewAvailability.mockResolvedValue({
+      available: false,
+      scopeLabel: 'main → working tree',
+      reason: 'Change Review supports the working tree only when the comparison starts at HEAD.'
+    });
+    history.replaceState(null, '', '/?project=alpha');
+    render(Page);
+
+    const reason = await screen.findByText(
+      'Change Review supports the working tree only when the comparison starts at HEAD.'
+    );
+    expect(reason).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run review' })).toBeDisabled();
+  });
+
+  it('renders file explanations next to the file and Change Review in the side panel', async () => {
+    tauriApi.explainFileChange.mockResolvedValue({
+      summary: 'This file now builds review context before returning evidence.',
+      inferredIntent: 'Make the changed review flow easier to verify.',
+      keyChanges: ['Build context asynchronously.'],
+      references: [{ path: 'src/example.ts', startLine: 1, endLine: 1, side: 'new' }],
+      caveats: []
+    });
+    tauriApi.runChangeReview.mockResolvedValue({
+      summary: 'The comparison adds evidence-aware review output.',
+      inferredIntent: 'Improve review traceability.',
+      groups: [
+        {
+          id: 'review-output',
+          title: 'Review output',
+          summary: 'Returns evidence with the review.',
+          files: ['src/example.ts'],
+          keyPoints: ['Evidence is explicit.']
+        }
+      ],
+      findings: [],
+      caveats: []
+    });
+    history.replaceState(null, '', '/?project=alpha');
+    render(Page);
+
+    await fireEvent.click(
+      await screen.findByRole('button', { name: 'Explain changes in src/example.ts' })
+    );
+    expect(
+      await screen.findByText('This file now builds review context before returning evidence.')
+    ).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Run review' }));
+    expect(
+      await screen.findByText('The comparison adds evidence-aware review output.')
+    ).toBeInTheDocument();
+    expect(tauriApi.runChangeReview).toHaveBeenCalledWith('alpha', {
+      base: 'HEAD',
+      target: '.'
+    });
   });
 
   it('resizes both side panels from their drag handles', async () => {

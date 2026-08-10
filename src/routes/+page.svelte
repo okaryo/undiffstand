@@ -27,7 +27,12 @@
   import DiffSummaryView from '$lib/components/diff/DiffSummary.svelte';
   import ProjectDialog from '$lib/components/project/ProjectDialog.svelte';
   import ProjectSwitcher from '$lib/components/project/ProjectSwitcher.svelte';
-  import type { DiffExplanation } from '$lib/domain/ai';
+  import type {
+    ChangeReviewAvailability,
+    ChangeReviewReport,
+    DiffExplanation,
+    InlineAnswer
+  } from '$lib/domain/ai';
   import {
     defaultDiffSelection,
     diffAnchorId,
@@ -68,8 +73,15 @@
   let diffsByPath = $state<Record<string, FileDiff | undefined>>({});
   let diffLoadingPaths = $state<Record<string, boolean | undefined>>({});
   let diffErrors = $state<Record<string, string | undefined>>({});
-  let diffExplanation = $state<DiffExplanation | undefined>();
+  let fileExplanations = $state<Record<string, DiffExplanation | undefined>>({});
+  let fileAiLoading = $state<Record<string, boolean | undefined>>({});
+  let fileAiErrors = $state<Record<string, string | undefined>>({});
+  let changeReviewAvailability = $state<ChangeReviewAvailability>();
+  let changeReviewReport = $state<ChangeReviewReport>();
   let aiLoading = $state(false);
+  let aiGeneration = 0;
+  let aiPanelExpanded = $state(false);
+  let aiPanelWidthBeforeExpand = 290;
   let contentLoading = $state(false);
   let sidebarOpen = $state(true);
   let aiPanelOpen = $state(true);
@@ -174,6 +186,7 @@
 
   function resizePanel(event: PointerEvent) {
     if (!activeResize) return;
+    if (activeResize.panel === 'ai') aiPanelExpanded = false;
     pendingResizeClientX = event.clientX;
     if (resizeAnimationFrame !== undefined) return;
     resizeAnimationFrame = requestAnimationFrame(flushPanelResize);
@@ -238,6 +251,17 @@
     if (panel === 'sidebar') sidebarWidth = window.innerWidth <= 1100 ? 200 : 225;
     else aiPanelWidth = window.innerWidth <= 1100 ? 260 : 290;
     queuePreferencesSave();
+  }
+
+  function toggleAiPanelExpanded() {
+    if (aiPanelExpanded) {
+      aiPanelWidth = aiPanelWidthBeforeExpand;
+      aiPanelExpanded = false;
+    } else {
+      aiPanelWidthBeforeExpand = aiPanelWidth;
+      aiPanelWidth = AI_PANEL_MAX_WIDTH;
+      aiPanelExpanded = true;
+    }
   }
 
   function applyPreferences(preferences: UserPreferences) {
@@ -450,7 +474,10 @@
       clearWorkspaceDiffs();
     }
     try {
-      const loadedSummary = await tauriApi.getDiffSummary(projectId, selection);
+      const [loadedSummary, reviewAvailability] = await Promise.all([
+        tauriApi.getDiffSummary(projectId, selection),
+        tauriApi.getChangeReviewAvailability(projectId, selection)
+      ]);
       if (
         activeProject?.id !== projectId ||
         diffSelection.base !== selection.base ||
@@ -461,6 +488,7 @@
         ...loadedSummary,
         files: sortDiffFilesByTreeOrder(loadedSummary.files)
       };
+      changeReviewAvailability = reviewAvailability;
       const path =
         requestedFile && orderedSummary.files.some((file) => displayPath(file) === requestedFile)
           ? requestedFile
@@ -499,7 +527,7 @@
         );
         diffLoadingPaths = {};
         diffErrors = {};
-        diffExplanation = undefined;
+        clearAiResults();
       }
 
       summary = orderedSummary;
@@ -523,7 +551,17 @@
     diffsByPath = {};
     diffLoadingPaths = {};
     diffErrors = {};
-    diffExplanation = undefined;
+    changeReviewAvailability = undefined;
+    clearAiResults();
+  }
+
+  function clearAiResults() {
+    aiGeneration += 1;
+    aiLoading = false;
+    fileExplanations = {};
+    fileAiLoading = {};
+    fileAiErrors = {};
+    changeReviewReport = undefined;
   }
 
   async function applyDiffSelection(selection: DiffSelection) {
@@ -560,7 +598,6 @@
   function selectDiff(path: string) {
     if (!activeProject) return;
     selectedDiffPath = path;
-    diffExplanation = undefined;
     setUrl(path);
     queueDiff(path);
     scrollToDiff(path, true);
@@ -575,7 +612,6 @@
   function setActiveDiff(path: string) {
     if (selectedDiffPath === path) return;
     selectedDiffPath = path;
-    diffExplanation = undefined;
     setUrl(path);
   }
 
@@ -628,21 +664,71 @@
     diffLoadGeneration += 1;
   }
 
-  async function explainDiff() {
-    if (!activeProject || !selectedDiffPath) return;
+  async function explainFileChange(path: string) {
+    if (!activeProject || fileAiLoading[path]) return;
+    const generation = aiGeneration;
+    const projectId = activeProject.id;
+    const selection = { ...diffSelection };
+    fileAiLoading[path] = true;
+    fileAiErrors[path] = undefined;
+    fileExplanations[path] = undefined;
+    try {
+      const explanation = await tauriApi.explainFileChange(projectId, selection, path);
+      if (generation !== aiGeneration || activeProject?.id !== projectId) return;
+      fileExplanations[path] = explanation;
+    } catch (caught) {
+      if (generation !== aiGeneration || activeProject?.id !== projectId) return;
+      fileAiErrors[path] = normalizeError(caught).message;
+    } finally {
+      if (generation === aiGeneration && activeProject?.id === projectId) {
+        fileAiLoading[path] = false;
+      }
+    }
+  }
+
+  async function askInline(
+    path: string,
+    side: 'old' | 'new',
+    startLine: number,
+    endLine: number,
+    question: string
+  ): Promise<InlineAnswer> {
+    if (!activeProject) return Promise.reject(new Error('No project is open.'));
+    const generation = aiGeneration;
+    const projectId = activeProject.id;
+    const selection = { ...diffSelection };
+    const answer = await tauriApi.askInlineQuestion(projectId, selection, {
+      path,
+      side,
+      startLine,
+      endLine,
+      question
+    });
+    if (generation !== aiGeneration || activeProject?.id !== projectId) {
+      throw new Error('The comparison changed before Codex answered.');
+    }
+    return answer;
+  }
+
+  async function runChangeReview() {
+    if (!activeProject || !changeReviewAvailability?.available || aiLoading) return;
+    const generation = aiGeneration;
+    const projectId = activeProject.id;
+    const selection = { ...diffSelection };
     aiLoading = true;
-    diffExplanation = undefined;
+    changeReviewReport = undefined;
     workspaceError = null;
     try {
-      diffExplanation = await tauriApi.explainFileDiff(
-        activeProject.id,
-        diffSelection,
-        selectedDiffPath
-      );
+      const report = await tauriApi.runChangeReview(projectId, selection);
+      if (generation !== aiGeneration || activeProject?.id !== projectId) return;
+      changeReviewReport = report;
     } catch (caught) {
+      if (generation !== aiGeneration || activeProject?.id !== projectId) return;
       workspaceError = normalizeError(caught);
     } finally {
-      aiLoading = false;
+      if (generation === aiGeneration && activeProject?.id === projectId) {
+        aiLoading = false;
+      }
     }
   }
 
@@ -656,6 +742,8 @@
     diffsByPath = {};
     diffLoadingPaths = {};
     diffErrors = {};
+    changeReviewAvailability = undefined;
+    clearAiResults();
     workspaceError = null;
     history.replaceState(null, '', window.location.pathname);
   }
@@ -812,8 +900,14 @@
               activePath={selectedDiffPath}
               mode={diffMode}
               wrap={wrapLines}
+              {fileExplanations}
+              {fileAiLoading}
+              {fileAiErrors}
+              findings={changeReviewReport?.findings ?? []}
               onLoad={queueDiff}
               onActive={setActiveDiff}
+              onExplainFile={explainFileChange}
+              onAskInline={askInline}
             />
           {:else if summary}<EmptyState
               icon={GitBranch}
@@ -841,7 +935,14 @@
           onkeydown={(event) => resizePanelWithKeyboard(event, 'ai')}
           ondblclick={() => resetPanelWidth('ai')}
         ></div>
-        <AiPanel explanation={diffExplanation} loading={aiLoading} onExplain={explainDiff} />
+        <AiPanel
+          availability={changeReviewAvailability}
+          report={changeReviewReport}
+          loading={aiLoading}
+          expanded={aiPanelExpanded}
+          onReview={runChangeReview}
+          onToggleExpanded={toggleAiPanelExpanded}
+        />
       {/if}
     </div>
   </main>
@@ -971,10 +1072,11 @@
       </header>
       <div class="settings-content">
         <div>
-          <span>Runtime</span><strong>codex exec</strong>
+          <span>Runtime</span><strong>Codex CLI</strong>
           <p>
-            ReaDiff invokes the Codex CLI available on <code>PATH</code> in a read-only, isolated temporary
-            directory.
+            Inline and file explanations use <code>codex exec</code>. Change Review uses Codex's
+            native
+            <code>review</code> target when the selected comparison is compatible.
           </p>
         </div>
         <div>
@@ -987,8 +1089,8 @@
         <div class="privacy">
           <Bot size={15} />
           <p>
-            When you use AI, Codex receives the selected diff according to your local Codex
-            configuration. AI descriptions are inferences and may be wrong.
+            Codex receives the active comparison or selected changed lines according to your local
+            configuration. Results are kept only for this app session and may be wrong.
           </p>
         </div>
       </div>

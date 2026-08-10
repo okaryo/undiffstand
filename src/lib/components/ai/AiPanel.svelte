@@ -1,43 +1,129 @@
 <script lang="ts">
-  import { Bot, LoaderCircle, Sparkles } from '@lucide/svelte';
-  import type { DiffExplanation } from '$lib/domain/ai';
-  import AiAnswerView from './AiAnswer.svelte';
+  import {
+    AlertTriangle,
+    Bot,
+    ChevronDown,
+    ChevronRight,
+    LoaderCircle,
+    Maximize2,
+    Minimize2,
+    ShieldAlert,
+    Sparkles
+  } from '@lucide/svelte';
+  import type { ChangeReviewAvailability, ChangeReviewReport } from '$lib/domain/ai';
 
   let {
-    explanation,
+    availability,
+    report,
     loading = false,
-    onExplain
+    expanded = false,
+    onReview,
+    onToggleExpanded
   }: {
-    explanation?: DiffExplanation;
+    availability?: ChangeReviewAvailability;
+    report?: ChangeReviewReport;
     loading?: boolean;
-    onExplain: () => void;
+    expanded?: boolean;
+    onReview: () => void;
+    onToggleExpanded: () => void;
   } = $props();
+
+  let openGroups = $state<Record<string, boolean>>({});
+
+  function toggleGroup(id: string) {
+    openGroups[id] = !(openGroups[id] ?? true);
+  }
 </script>
 
 <aside class="panel">
-  <header>
-    <div><Bot size={15} /><strong>ReaDiff AI</strong></div>
-    <span>Inferences, not facts</span>
+  <header class="panel-header">
+    <div><Bot size={15} /><strong>Change Review</strong></div>
+    <button
+      aria-label={expanded ? 'Restore review panel width' : 'Expand review panel'}
+      title={expanded ? 'Restore width' : 'Expand panel'}
+      onclick={onToggleExpanded}
+      >{#if expanded}<Minimize2 size={14} />{:else}<Maximize2 size={14} />{/if}</button
+    >
   </header>
+
   <div class="action-card">
     <Sparkles size={17} />
     <div>
-      <strong>Explain this change</strong>
-      <p>Summarize intent, risk, and evidence for the selected file.</p>
+      <strong>Review changes</strong>
+      <p>{availability?.scopeLabel ?? 'Checking the selected comparison…'}</p>
+      {#if availability && !availability.available}<small>{availability.reason}</small>{/if}
     </div>
-    <button onclick={onExplain} disabled={loading}
-      >{#if loading}<LoaderCircle class="spin" size={16} /> Analyzing…{:else}Explain changes{/if}</button
-    >
+    <button onclick={onReview} disabled={loading || !availability?.available}>
+      {#if loading}<LoaderCircle class="spin" size={16} /> Reviewing…{:else}Run review{/if}
+    </button>
   </div>
+
   <div class="results">
-    {#if loading && !explanation}<div class="thinking">
-        <LoaderCircle class="spin" size={16} /><span>Reviewing the available evidence…</span>
+    {#if loading && !report}<div class="thinking">
+        <LoaderCircle class="spin" size={16} />
+        <span>Codex is reviewing this comparison. Large changes may take a while…</span>
       </div>{/if}
-    <AiAnswerView {explanation} />
+    {#if report}
+      <article class="report">
+        <div class="eyebrow">Review report</div>
+        <p class="summary">{report.summary}</p>
+        <section>
+          <h3>Likely intent</h3>
+          <p>{report.inferredIntent}</p>
+        </section>
+        {#if report.groups.length}<section>
+            <h3>Change groups</h3>
+            <div class="groups">
+              {#each report.groups as group}
+                <article class="group">
+                  <button onclick={() => toggleGroup(group.id)}>
+                    {#if openGroups[group.id] ?? true}<ChevronDown size={14} />{:else}<ChevronRight
+                        size={14}
+                      />{/if}
+                    <strong>{group.title}</strong><span>{group.files.length}</span>
+                  </button>
+                  {#if openGroups[group.id] ?? true}<div>
+                      <p>{group.summary}</p>
+                      {#if group.keyPoints.length}<ul>
+                          {#each group.keyPoints as point}<li>{point}</li>{/each}
+                        </ul>{/if}
+                      {#if group.files.length}<small>{group.files.join(' · ')}</small>{/if}
+                    </div>{/if}
+                </article>
+              {/each}
+            </div>
+          </section>{/if}
+        <section>
+          <h3>Findings <span>{report.findings.length}</span></h3>
+          {#if report.findings.length}<div class="findings">
+              {#each report.findings as finding}
+                <article class="finding {finding.severity}">
+                  <div>
+                    {#if finding.severity === 'critical' || finding.severity === 'high'}<ShieldAlert
+                        size={13}
+                      />{:else}<AlertTriangle size={13} />{/if}
+                    <strong>{finding.title}</strong><span>{finding.severity}</span>
+                  </div>
+                  <p>{finding.body}</p>
+                  <code>{finding.path}:L{finding.startLine}–{finding.endLine}</code>
+                </article>
+              {/each}
+            </div>{:else}<p class="muted">
+              Codex did not identify a concrete issue in this comparison.
+            </p>{/if}
+        </section>
+        {#if report.caveats.length}<section class="caveats">
+            <h3>Caveats</h3>
+            <ul>
+              {#each report.caveats as caveat}<li>{caveat}</li>{/each}
+            </ul>
+          </section>{/if}
+      </article>
+    {/if}
   </div>
+
   <footer>
-    AI analysis runs through your local Codex CLI in a read-only sandbox. ReaDiff does not read an
-    API key.
+    Uses the local Codex CLI in a read-only sandbox. Results are not saved by ReaDiff.
   </footer>
 </aside>
 
@@ -50,7 +136,7 @@
     background: #0e141c;
     border-left: 1px solid var(--border);
   }
-  header {
+  .panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -58,18 +144,28 @@
     padding: 0 13px;
     border-bottom: 1px solid var(--border);
   }
-  header div {
+  .panel-header div {
     display: flex;
     align-items: center;
     gap: 7px;
   }
-  header strong {
+  .panel-header strong {
     font-size: 11px;
     font-weight: 620;
   }
-  header span {
-    color: #68737e;
-    font-size: 10px;
+  .panel-header button {
+    display: grid;
+    place-items: center;
+    padding: 5px;
+    color: var(--muted);
+    background: none;
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .panel-header button:hover {
+    color: var(--text);
+    background: var(--hover);
   }
   .action-card {
     display: grid;
@@ -87,14 +183,25 @@
     font-size: 11px;
   }
   .action-card p {
-    margin: 3px 0 9px;
+    margin: 3px 0 0;
     color: var(--muted);
     font-size: 10px;
     line-height: 1.45;
   }
-  .action-card button {
+  .action-card small {
+    display: block;
+    margin-top: 7px;
+    color: #c5a864;
+    font-size: 10px;
+    line-height: 1.45;
+  }
+  .action-card > button {
     grid-column: 2;
     justify-self: start;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
     padding: 6px 9px;
     color: #07130e;
     background: var(--accent-bright);
@@ -114,11 +221,140 @@
   }
   .thinking {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
     padding: 15px;
     color: var(--muted);
     font-size: 11px;
+    line-height: 1.5;
+  }
+  .report {
+    padding: 14px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .eyebrow {
+    margin-bottom: 8px;
+    color: var(--accent-bright);
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  p {
+    margin: 0;
+    color: #bbc5cf;
+  }
+  .summary {
+    color: #d0d7df;
+  }
+  section {
+    margin-top: 17px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 8px;
+    color: #e0e6ec;
+    font-size: 11px;
+  }
+  h3 span {
+    color: var(--muted);
+    font-size: 10px;
+  }
+  .groups,
+  .findings {
+    display: grid;
+    gap: 7px;
+  }
+  .group,
+  .finding {
+    overflow: hidden;
+    background: #0b1118;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .group > button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px;
+    color: var(--text);
+    background: none;
+    border: 0;
+    cursor: pointer;
+    text-align: left;
+  }
+  .group > button strong {
+    flex: 1;
+    font-size: 11px;
+  }
+  .group > button span {
+    color: var(--muted);
+    font-size: 9px;
+  }
+  .group > div {
+    padding: 0 9px 9px 28px;
+  }
+  ul {
+    display: grid;
+    gap: 4px;
+    margin: 7px 0 0;
+    padding-left: 17px;
+    color: #aeb8c2;
+  }
+  .group small {
+    display: block;
+    margin-top: 8px;
+    color: #65717d;
+    font: 9px/1.45 var(--mono);
+    overflow-wrap: anywhere;
+  }
+  .finding {
+    padding: 9px;
+    border-left: 3px solid #c8a457;
+  }
+  .finding.critical,
+  .finding.high {
+    border-left-color: var(--red);
+  }
+  .finding > div {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .finding strong {
+    flex: 1;
+    font-size: 11px;
+  }
+  .finding span {
+    color: #c8a457;
+    font-size: 8px;
+    text-transform: uppercase;
+  }
+  .finding.critical span,
+  .finding.high span {
+    color: var(--red);
+  }
+  .finding p {
+    margin-top: 6px;
+  }
+  code {
+    display: block;
+    margin-top: 7px;
+    color: var(--accent-bright);
+    font: 9px var(--mono);
+    overflow-wrap: anywhere;
+  }
+  .muted {
+    color: var(--muted);
+  }
+  .caveats {
+    color: #bca976;
   }
   footer {
     padding: 9px 12px;

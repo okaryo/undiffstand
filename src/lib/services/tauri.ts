@@ -1,6 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import type { DiffExplanation } from '$lib/domain/ai';
+import type {
+  ChangeReviewAvailability,
+  ChangeReviewReport,
+  DiffExplanation,
+  InlineAnswer,
+  InlineQuestion
+} from '$lib/domain/ai';
 import type { DiffSelection, DiffSummary, FileDiff } from '$lib/domain/diff';
 import { defaultUserPreferences, type UserPreferences } from '$lib/domain/preferences';
 import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
@@ -24,8 +30,14 @@ const nativeApi = {
     invoke<FileDiff>('get_file_diff', { projectId, selection, path }),
   getFileDiffs: (projectId: string, selection: DiffSelection, paths: string[]) =>
     invoke<FileDiff[]>('get_file_diffs', { projectId, selection, paths }),
-  explainFileDiff: (projectId: string, selection: DiffSelection, path: string) =>
-    invoke<DiffExplanation>('explain_file_diff', { projectId, selection, path })
+  explainFileChange: (projectId: string, selection: DiffSelection, path: string) =>
+    invoke<DiffExplanation>('explain_file_change', { projectId, selection, path }),
+  askInlineQuestion: (projectId: string, selection: DiffSelection, question: InlineQuestion) =>
+    invoke<InlineAnswer>('ask_inline_question', { projectId, selection, question }),
+  getChangeReviewAvailability: (projectId: string, selection: DiffSelection) =>
+    invoke<ChangeReviewAvailability>('get_change_review_availability', { projectId, selection }),
+  runChangeReview: (projectId: string, selection: DiffSelection) =>
+    invoke<ChangeReviewReport>('run_change_review', { projectId, selection })
 };
 
 const demoProject: ProjectConfig = {
@@ -175,15 +187,77 @@ const mockApi: typeof nativeApi = {
   getDiffSummary: async (_projectId, selection) => mockSummaryFor(selection),
   getFileDiff: async (_projectId, _selection, path) => mockDiff(path),
   getFileDiffs: async (_projectId, _selection, paths) => paths.map(mockDiff),
-  explainFileDiff: async (_projectId, _selection, path) => ({
+  explainFileChange: async (_projectId, _selection, path) => ({
     summary:
       'The change introduces a context-building step before producing a structured review result.',
     inferredIntent:
       'The likely intent is to make review explanations traceable to concrete diff evidence.',
-    risk: 'medium',
-    concerns: ['Callers may need to handle failures from the new asynchronous context step.'],
+    keyChanges: [
+      'Builds review context before creating the result.',
+      'Returns concrete evidence together with the summary.'
+    ],
     references: [{ path, startLine: 8, endLine: 10, side: 'new' }],
     caveats: ['Intent is inferred from the diff and has not been confirmed by the author.']
+  }),
+  askInlineQuestion: async (_projectId, _selection, question) => ({
+    answer: `These lines change how review evidence is assembled before it is returned. The selected ${question.side}-side range is treated as part of the current comparison.`,
+    references: [
+      {
+        path: question.path,
+        startLine: question.startLine,
+        endLine: question.endLine,
+        side: question.side
+      }
+    ],
+    caveats: ['This answer is inferred from the displayed diff.']
+  }),
+  getChangeReviewAvailability: async (_projectId, selection) => {
+    if (selection.base === 'HEAD' && selection.target === '.') {
+      return {
+        available: true,
+        target: { kind: 'uncommitted' },
+        scopeLabel: 'feature/readiff → working tree'
+      };
+    }
+    if (selection.base === 'main' && ['HEAD', 'feature/readiff'].includes(selection.target)) {
+      return {
+        available: true,
+        target: { kind: 'base', baseBranch: 'main' },
+        scopeLabel: `main → ${selection.target}`
+      };
+    }
+    return {
+      available: false,
+      reason: 'Change Review requires the target to be the current branch.',
+      scopeLabel: `${selection.base} → ${selection.target}`
+    };
+  },
+  runChangeReview: async () => ({
+    summary:
+      'The change introduces evidence-aware review output and wires it into the existing review flow.',
+    inferredIntent:
+      'The likely intent is to make review results easier to verify against the changed code.',
+    groups: [
+      {
+        id: 'review-context',
+        title: 'Review context',
+        summary: 'Builds and returns structured evidence for a review.',
+        files: ['src/services/review.ts', 'src/lib/context.ts'],
+        keyPoints: ['Context building is asynchronous.', 'Evidence is now part of the result.']
+      }
+    ],
+    findings: [
+      {
+        title: 'Handle context failures',
+        body: 'The new asynchronous context step can fail, but no recovery behavior is visible here.',
+        severity: 'medium',
+        path: 'src/services/review.ts',
+        startLine: 8,
+        endLine: 9,
+        side: 'new'
+      }
+    ],
+    caveats: ['Tests were not executed as part of this mock review.']
   })
 };
 

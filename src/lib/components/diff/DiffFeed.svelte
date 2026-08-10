@@ -1,6 +1,16 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { Check, ChevronDown, ChevronRight, Copy, LoaderCircle, RotateCw } from '@lucide/svelte';
+  import {
+    Check,
+    ChevronDown,
+    ChevronRight,
+    Copy,
+    LoaderCircle,
+    RotateCw,
+    Sparkles
+  } from '@lucide/svelte';
+  import type { ChangeReviewFinding, DiffExplanation, InlineAnswer } from '$lib/domain/ai';
+  import AiAnswer from '$lib/components/ai/AiAnswer.svelte';
   import { diffAnchorId, displayPath, type DiffFileSummary, type FileDiff } from '$lib/domain/diff';
   import DiffFileStatusIcon from './DiffFileStatusIcon.svelte';
   import DiffViewer from './DiffViewer.svelte';
@@ -13,8 +23,14 @@
     activePath,
     mode,
     wrap,
+    fileExplanations = {},
+    fileAiLoading = {},
+    fileAiErrors = {},
+    findings = [],
     onLoad,
-    onActive
+    onActive,
+    onExplainFile = () => {},
+    onAskInline = () => Promise.reject(new Error('Inline Ask is unavailable.'))
   }: {
     files: DiffFileSummary[];
     diffs: Record<string, FileDiff | undefined>;
@@ -23,8 +39,20 @@
     activePath?: string;
     mode: 'split' | 'unified';
     wrap: boolean;
+    fileExplanations?: Record<string, DiffExplanation | undefined>;
+    fileAiLoading?: Record<string, boolean | undefined>;
+    fileAiErrors?: Record<string, string | undefined>;
+    findings?: ChangeReviewFinding[];
     onLoad: (path: string) => void;
     onActive: (path: string) => void;
+    onExplainFile?: (path: string) => void;
+    onAskInline?: (
+      path: string,
+      side: 'old' | 'new',
+      startLine: number,
+      endLine: number,
+      question: string
+    ) => Promise<InlineAnswer>;
   } = $props();
 
   let feedElement = $state<HTMLElement>();
@@ -288,12 +316,40 @@
           {#if file.additions !== undefined}<b>+{file.additions}</b>{/if}
           {#if file.deletions !== undefined}<em>−{file.deletions}</em>{/if}
         </span>
+        <button
+          class="explain-file"
+          disabled={fileAiLoading[path] || file.status === 'binary'}
+          aria-label={`Explain changes in ${path}`}
+          title="Explain this file's changes"
+          onclick={() => onExplainFile(path)}
+          >{#if fileAiLoading[path]}<LoaderCircle class="spin" size={13} />{:else}<Sparkles
+              size={13}
+            />{/if}<span>Explain</span></button
+        >
       </header>
+
+      {#if fileExplanations[path] || fileAiLoading[path] || fileAiErrors[path]}
+        <div class="file-ai">
+          <div class="file-ai-title"><Sparkles size={13} /><strong>Change explanation</strong></div>
+          {#if fileAiLoading[path] && !fileExplanations[path]}<div class="file-ai-loading">
+              <LoaderCircle class="spin" size={14} />Explaining this file's changes…
+            </div>{/if}
+          {#if fileAiErrors[path]}<p class="file-ai-error">{fileAiErrors[path]}</p>{/if}
+          <AiAnswer explanation={fileExplanations[path]} />
+        </div>
+      {/if}
 
       {#if !collapsed[path]}
         <div class="diff-body">
           {#if renderedPaths[path] && diffs[path]}
-            <DiffViewer diff={diffs[path]} {mode} {wrap} />
+            <DiffViewer
+              diff={diffs[path]}
+              {mode}
+              {wrap}
+              findings={findings.filter((finding) => finding.path === path)}
+              onAskInline={(side, startLine, endLine, question) =>
+                onAskInline(path, side, startLine, endLine, question)}
+            />
           {:else if errors[path]}
             <div class="file-error">
               <span>{errors[path]}</span>
@@ -330,7 +386,7 @@
     z-index: 5;
     top: 0;
     display: grid;
-    grid-template-columns: 22px 14px minmax(0, 1fr) auto;
+    grid-template-columns: 22px 14px minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 7px;
     min-height: 36px;
@@ -403,6 +459,57 @@
   .file-counts em {
     color: var(--red);
     font-style: normal;
+  }
+  .explain-file {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 7px;
+    color: #91aa9f;
+    background: rgba(87, 184, 142, 0.06);
+    border: 1px solid rgba(87, 184, 142, 0.16);
+    border-radius: 5px;
+    font-size: 10px;
+    cursor: pointer;
+  }
+  .explain-file:hover:not(:disabled) {
+    color: var(--accent-bright);
+    background: rgba(87, 184, 142, 0.11);
+  }
+  .explain-file:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .file-ai {
+    margin: 10px;
+    color: var(--text);
+    background: #101821;
+    border: 1px solid #263440;
+    border-left: 3px solid var(--accent);
+    border-radius: 7px;
+  }
+  .file-ai-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 12px;
+    color: var(--accent-bright);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+  }
+  .file-ai-loading {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 13px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .file-ai-error {
+    margin: 0;
+    padding: 12px;
+    color: var(--red);
+    font-size: 11px;
   }
   .diff-body {
     min-height: 150px;

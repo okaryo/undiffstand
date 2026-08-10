@@ -1,7 +1,7 @@
 use crate::{
     domain::{
-        DiffComparison, DiffFileSummary, DiffSelection, DiffStatus, DiffSummary, FileDiff,
-        GitCommitSummary, RepositoryInfo,
+        ChangeReviewAvailability, ChangeReviewTarget, DiffComparison, DiffFileSummary,
+        DiffSelection, DiffStatus, DiffSummary, FileDiff, GitCommitSummary, RepositoryInfo,
     },
     error::{AppError, AppResult},
     services::file_service,
@@ -313,6 +313,85 @@ fn resolve_diff(repo: &Path, selection: &DiffSelection) -> AppResult<ResolvedDif
             },
             range: DiffRange::Revisions { from, to },
         })
+    }
+}
+
+pub fn change_review_availability(
+    repo: &Path,
+    selection: &DiffSelection,
+) -> AppResult<ChangeReviewAvailability> {
+    let base = normalized_ref(selection.base.trim());
+    let target = selection.target.trim();
+    let current_branch = current_branch(repo)?;
+    let display_ref = |reference: &str| {
+        if reference == "HEAD" {
+            current_branch.as_deref().unwrap_or("HEAD").to_owned()
+        } else {
+            reference.to_owned()
+        }
+    };
+    let target_label = if target == "." {
+        "working tree".to_owned()
+    } else {
+        display_ref(normalized_ref(target))
+    };
+    let scope_label = format!("{} → {}", display_ref(base), target_label);
+
+    if base == "HEAD" && target == "." {
+        return Ok(ChangeReviewAvailability {
+            available: true,
+            target: Some(ChangeReviewTarget::Uncommitted),
+            reason: None,
+            scope_label,
+        });
+    }
+
+    if target == "." {
+        return Ok(unavailable_review(
+            scope_label,
+            "Change Review supports the working tree only when the comparison starts at HEAD.",
+        ));
+    }
+
+    let Some(branch) = current_branch else {
+        return Ok(unavailable_review(
+            scope_label,
+            "Change Review is unavailable while HEAD is detached.",
+        ));
+    };
+    let target = normalized_ref(target);
+    if target != "HEAD" && target != branch {
+        return Ok(unavailable_review(
+            scope_label,
+            "Change Review requires the comparison target to be the current branch.",
+        ));
+    }
+
+    let mut branches = list_local_branches(repo)?;
+    branches.extend(list_refs(repo, "refs/remotes")?);
+    if !branches.iter().any(|candidate| candidate == base) {
+        return Ok(unavailable_review(
+            scope_label,
+            "Change Review requires the comparison base to be a branch.",
+        ));
+    }
+
+    Ok(ChangeReviewAvailability {
+        available: true,
+        target: Some(ChangeReviewTarget::Base {
+            base_branch: base.to_owned(),
+        }),
+        reason: None,
+        scope_label,
+    })
+}
+
+fn unavailable_review(scope_label: String, reason: &str) -> ChangeReviewAvailability {
+    ChangeReviewAvailability {
+        available: false,
+        target: None,
+        reason: Some(reason.to_owned()),
+        scope_label,
     }
 }
 
@@ -767,6 +846,50 @@ mod tests {
         assert!(summary.files.is_empty());
         assert_eq!(summary.comparison.from_label, "HEAD");
         assert_eq!(summary.comparison.to_label, "working tree");
+    }
+
+    #[test]
+    fn change_review_only_accepts_native_codex_review_targets() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        git(repo, &["init", "-b", "main"]);
+        git(repo, &["config", "user.email", "test@example.com"]);
+        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        fs::write(repo.join("base.txt"), "base\n").unwrap();
+        git(repo, &["add", "base.txt"]);
+        git(repo, &["commit", "-m", "base"]);
+        git(repo, &["switch", "-c", "feature"]);
+
+        let uncommitted = change_review_availability(repo, &DiffSelection::default()).unwrap();
+        assert!(uncommitted.available);
+        assert_eq!(uncommitted.target, Some(ChangeReviewTarget::Uncommitted));
+
+        let branch = change_review_availability(
+            repo,
+            &DiffSelection {
+                base: "main".to_owned(),
+                target: "feature".to_owned(),
+            },
+        )
+        .unwrap();
+        assert!(branch.available);
+        assert_eq!(
+            branch.target,
+            Some(ChangeReviewTarget::Base {
+                base_branch: "main".to_owned()
+            })
+        );
+
+        let unsupported = change_review_availability(
+            repo,
+            &DiffSelection {
+                base: "main".to_owned(),
+                target: ".".to_owned(),
+            },
+        )
+        .unwrap();
+        assert!(!unsupported.available);
+        assert!(unsupported.reason.unwrap().contains("starts at HEAD"));
     }
 
     #[test]

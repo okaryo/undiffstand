@@ -8,8 +8,7 @@ describe('AiAnswer', () => {
       explanation: {
         summary: 'The change prepares review context.',
         inferredIntent: 'Make review output traceable to evidence.',
-        risk: 'medium',
-        concerns: ['The new asynchronous step may fail.'],
+        keyChanges: ['The review result now includes concrete evidence.'],
         references: [{ path: 'src/lib/review.ts', startLine: 12, endLine: 18 }],
         caveats: ['The intent is inferred from the diff.']
       }

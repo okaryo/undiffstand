@@ -13,12 +13,12 @@
       <h4>Likely intent</h4>
       <p>{explanation.inferredIntent}</p>
     </section>
-    <section>
-      <h4>Risk <span class="risk {explanation.risk}">{explanation.risk}</span></h4>
-      {#if explanation.concerns.length}<ul>
-          {#each explanation.concerns as item}<li>{item}</li>{/each}
-        </ul>{:else}<p class="muted">No specific concern identified from this diff.</p>{/if}
-    </section>
+    {#if explanation.keyChanges.length}<section>
+        <h4>Key changes</h4>
+        <ul>
+          {#each explanation.keyChanges as item}<li>{item}</li>{/each}
+        </ul>
+      </section>{/if}
     {#if explanation.references.length}{@render References(explanation.references)}{/if}
     {#if explanation.caveats.length}{@render Caveats(explanation.caveats)}{/if}
   </div>
@@ -87,27 +87,6 @@
     margin: 0;
     padding-left: 17px;
     color: #aeb8c2;
-  }
-  .muted {
-    color: var(--muted);
-  }
-  .risk {
-    padding: 2px 5px;
-    border-radius: 4px;
-    font-size: 10px;
-    text-transform: uppercase;
-  }
-  .risk.low {
-    color: var(--green);
-    background: rgba(67, 176, 119, 0.12);
-  }
-  .risk.medium {
-    color: #d7b96c;
-    background: rgba(215, 185, 108, 0.12);
-  }
-  .risk.high {
-    color: var(--red);
-    background: rgba(222, 101, 92, 0.12);
   }
   .references {
     display: grid;

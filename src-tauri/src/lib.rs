@@ -19,7 +19,10 @@ pub fn run() {
             commands::git::get_diff_summary,
             commands::git::get_file_diff,
             commands::git::get_file_diffs,
-            commands::ai::explain_file_diff,
+            commands::ai::explain_file_change,
+            commands::ai::ask_inline_question,
+            commands::ai::get_change_review_availability,
+            commands::ai::run_change_review,
         ])
         .run(tauri::generate_context!())
         .expect("error while running ReaDiff");

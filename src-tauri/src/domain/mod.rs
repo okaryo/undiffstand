@@ -255,9 +255,89 @@ pub struct SourceReference {
 pub struct DiffExplanation {
     pub summary: String,
     pub inferred_intent: String,
-    pub risk: String,
-    pub concerns: Vec<String>,
+    pub key_changes: Vec<String>,
     pub references: Vec<SourceReference>,
+    pub caveats: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InlineQuestion {
+    pub path: String,
+    pub side: String,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub question: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InlineAnswer {
+    pub answer: String,
+    pub references: Vec<SourceReference>,
+    pub caveats: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum ChangeReviewTarget {
+    Uncommitted,
+    Base {
+        #[serde(rename = "baseBranch")]
+        base_branch: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeReviewAvailability {
+    pub available: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target: Option<ChangeReviewTarget>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    pub scope_label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeReviewGroup {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub files: Vec<String>,
+    pub key_points: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReviewFindingSeverity {
+    Critical,
+    High,
+    Medium,
+    Low,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeReviewFinding {
+    pub title: String,
+    pub body: String,
+    pub severity: ReviewFindingSeverity,
+    pub path: String,
+    pub start_line: usize,
+    pub end_line: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub side: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeReviewReport {
+    pub summary: String,
+    pub inferred_intent: String,
+    pub groups: Vec<ChangeReviewGroup>,
+    pub findings: Vec<ChangeReviewFinding>,
     pub caveats: Vec<String>,
 }
 
