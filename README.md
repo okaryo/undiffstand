@@ -1,8 +1,8 @@
-# ReaDiff
+# undiffstand
 
 AI-assisted diff understanding for human reviewers.
 
-ReaDiff is a read-only desktop app that helps human reviewers understand local Git changes with AI.
+undiffstand is a read-only desktop app that helps human reviewers understand local Git changes with AI.
 
 ## Features
 
@@ -34,14 +34,14 @@ The frontend can also be opened independently with `pnpm dev`. Outside Tauri it 
 
 ## AI configuration
 
-Install and authenticate Codex CLI before launching ReaDiff:
+Install and authenticate Codex CLI before launching undiffstand:
 
 ```bash
 codex login
 pnpm tauri dev
 ```
 
-ReaDiff runs `codex exec --ephemeral --sandbox read-only` in an isolated temporary directory and reuses the CLI's saved authentication, model, and local configuration. This avoids loading repository-specific agent instructions into the analysis process. `OPENAI_API_KEY` and `CODEX_API_KEY` are removed from the Codex child process so ReaDiff does not use API-key authentication. The selected file diff is provided only when an AI explanation is requested.
+undiffstand runs `codex exec --ephemeral --sandbox read-only` in an isolated temporary directory and reuses the CLI's saved authentication, model, and local configuration. This avoids loading repository-specific agent instructions into the analysis process. `OPENAI_API_KEY` and `CODEX_API_KEY` are removed from the Codex child process so undiffstand does not use API-key authentication. The selected file diff is provided only when an AI explanation is requested.
 
 ## Validation
 
@@ -61,7 +61,7 @@ pnpm tauri build
 - `@git-diff-view/svelte` is isolated behind a diff viewer component.
 - Git commands run without a shell.
 
-ReaDiff does not apply patches, modify repository files, or change Git state.
+undiffstand does not apply patches, modify repository files, or change Git state.
 
 ## Diff selection
 

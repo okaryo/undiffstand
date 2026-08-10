@@ -50,7 +50,7 @@
         <p>
           {project
             ? 'Update the project display name.'
-            : 'Confirm the repository to add to ReaDiff.'}
+            : 'Confirm the repository to add to undiffstand.'}
         </p>
       </div>
       <button class="icon-button" aria-label="Close" onclick={onClose}><X size={18} /></button>

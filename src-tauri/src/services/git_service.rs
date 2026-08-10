@@ -798,7 +798,7 @@ mod tests {
         let repo = temp.path();
         git(repo, &["init", "-b", "main"]);
         git(repo, &["config", "user.email", "test@example.com"]);
-        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        git(repo, &["config", "user.name", "undiffstand test"]);
         fs::write(repo.join("history.txt"), "base\n").unwrap();
         git(repo, &["add", "history.txt"]);
         git_with_date(repo, &["commit", "-m", "base"], "2026-01-01T00:00:00Z");
@@ -835,7 +835,7 @@ mod tests {
         let repo = temp.path();
         git(repo, &["init", "-b", "main"]);
         git(repo, &["config", "user.email", "test@example.com"]);
-        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        git(repo, &["config", "user.name", "undiffstand test"]);
         fs::write(repo.join("shared.txt"), "base\n").unwrap();
         git(repo, &["add", "shared.txt"]);
         git(repo, &["commit", "-m", "base"]);
@@ -861,7 +861,7 @@ mod tests {
         let repo = temp.path();
         git(repo, &["init", "-b", "main"]);
         git(repo, &["config", "user.email", "test@example.com"]);
-        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        git(repo, &["config", "user.name", "undiffstand test"]);
         fs::write(repo.join("base.txt"), "base\n").unwrap();
         git(repo, &["add", "base.txt"]);
         git(repo, &["commit", "-m", "base"]);
@@ -909,7 +909,7 @@ mod tests {
         let repo = temp.path();
         git(repo, &["init", "-b", "main"]);
         git(repo, &["config", "user.email", "test@example.com"]);
-        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        git(repo, &["config", "user.name", "undiffstand test"]);
         fs::write(repo.join("base.txt"), "base\n").unwrap();
         git(repo, &["add", "base.txt"]);
         git(repo, &["commit", "-m", "base"]);
@@ -929,7 +929,7 @@ mod tests {
         let repo = temp.path();
         git(repo, &["init", "-b", "main"]);
         git(repo, &["config", "user.email", "test@example.com"]);
-        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        git(repo, &["config", "user.name", "undiffstand test"]);
         fs::write(repo.join("base.txt"), "base\n").unwrap();
         git(repo, &["add", "base.txt"]);
         git(repo, &["commit", "-m", "base"]);
@@ -978,7 +978,7 @@ mod tests {
         let repo = temp.path();
         git(repo, &["init", "-b", "main"]);
         git(repo, &["config", "user.email", "test@example.com"]);
-        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        git(repo, &["config", "user.name", "undiffstand test"]);
         fs::write(repo.join("base.txt"), "base\n").unwrap();
         git(repo, &["add", "base.txt"]);
         git(repo, &["commit", "-m", "base"]);
@@ -1003,7 +1003,7 @@ mod tests {
         let repo = temp.path();
         git(repo, &["init", "-b", "main"]);
         git(repo, &["config", "user.email", "test@example.com"]);
-        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        git(repo, &["config", "user.name", "undiffstand test"]);
         fs::write(repo.join("base.txt"), "base\n").unwrap();
         git(repo, &["add", "base.txt"]);
         git(repo, &["commit", "-m", "base"]);

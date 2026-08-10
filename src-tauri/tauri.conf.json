@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ReaDiff",
+  "productName": "undiffstand",
   "version": "0.1.0",
-  "identifier": "studio.okaryo.readiff",
+  "identifier": "studio.okaryo.undiffstand",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "ReaDiff",
+        "title": "undiffstand",
         "width": 1440,
         "height": 900,
         "minWidth": 1024,

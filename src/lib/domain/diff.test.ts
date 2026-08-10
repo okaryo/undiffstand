@@ -10,12 +10,12 @@ import {
 
 describe('diff display labels', () => {
   it('shows the current branch name instead of HEAD', () => {
-    expect(revisionDisplayLabel('HEAD', 'feature/readiff')).toBe('feature/readiff');
-    expect(diffSelectionLabel({ base: 'HEAD', target: '.' }, 'feature/readiff')).toBe(
-      'feature/readiff → working tree'
+    expect(revisionDisplayLabel('HEAD', 'feature/undiffstand')).toBe('feature/undiffstand');
+    expect(diffSelectionLabel({ base: 'HEAD', target: '.' }, 'feature/undiffstand')).toBe(
+      'feature/undiffstand → working tree'
     );
-    expect(diffComparisonLabel({ fromLabel: 'HEAD', toLabel: 'main' }, 'feature/readiff')).toBe(
-      'feature/readiff → main'
+    expect(diffComparisonLabel({ fromLabel: 'HEAD', toLabel: 'main' }, 'feature/undiffstand')).toBe(
+      'feature/undiffstand → main'
     );
   });
 

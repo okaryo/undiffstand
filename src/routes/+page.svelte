@@ -436,7 +436,7 @@
   }
 
   async function removeProject(project: ProjectConfig) {
-    if (!confirm(`Remove ${project.name} from ReaDiff? The repository will not be changed.`))
+    if (!confirm(`Remove ${project.name} from undiffstand? The repository will not be changed.`))
       return;
     deleting = true;
     try {
@@ -799,7 +799,7 @@
 </script>
 
 <svelte:head>
-  <title>{activeProject ? `${activeProject.name} · ReaDiff` : 'ReaDiff'}</title>
+  <title>{activeProject ? `${activeProject.name} · undiffstand` : 'undiffstand'}</title>
   <meta name="description" content="AI-assisted diff understanding for human reviewers." />
 </svelte:head>
 
@@ -809,7 +809,7 @@
   <main class="app-shell">
     <header class="topbar">
       <button class="brand compact" onclick={goHome} title="Back to projects"
-        ><span class="brand-mark"><Braces size={16} /></span><strong>ReaDiff</strong></button
+        ><span class="brand-mark"><Braces size={16} /></span><strong>undiffstand</strong></button
       >
       <button
         class="sidebar-toggle"
@@ -976,7 +976,9 @@
       <div class="brand">
         <span class="brand-mark"><Braces size={20} /></span>
         <div>
-          <strong>ReaDiff</strong><small>AI-assisted diff understanding for human reviewers.</small>
+          <strong>undiffstand</strong><small
+            >AI-assisted diff understanding for human reviewers.</small
+          >
         </div>
       </div>
       <button class="settings-button" onclick={() => (showSettings = true)}
@@ -1117,8 +1119,8 @@
         <div>
           <span>Authentication</span><strong>codex login</strong>
           <p>
-            Saved Codex CLI authentication and your local Codex configuration are reused. ReaDiff
-            removes API-key environment variables from the child process.
+            Saved Codex CLI authentication and your local Codex configuration are reused.
+            undiffstand removes API-key environment variables from the child process.
           </p>
         </div>
         <div class="privacy">

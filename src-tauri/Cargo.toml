@@ -1,12 +1,12 @@
 [package]
-name = "readiff"
+name = "undiffstand"
 version = "0.1.0"
 description = "AI-assisted diff understanding for human reviewers."
 authors = ["okaryo"]
 edition = "2021"
 
 [lib]
-name = "readiff_lib"
+name = "undiffstand_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

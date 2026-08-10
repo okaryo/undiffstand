@@ -1,3 +1,3 @@
 fn main() {
-    readiff_lib::run();
+    undiffstand_lib::run();
 }

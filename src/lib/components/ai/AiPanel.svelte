@@ -145,7 +145,7 @@
   </div>
 
   <footer>
-    Uses the local Codex CLI in a read-only sandbox. Results are not saved by ReaDiff.
+    Uses the local Codex CLI in a read-only sandbox. Results are not saved by undiffstand.
   </footer>
 </aside>
 

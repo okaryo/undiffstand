@@ -15,7 +15,7 @@ changes, grounding the explanation in changed lines. Leave broad defect hunting 
 
 pub const CHANGE_REVIEW_ADAPTER: &str = r#"
 Built-in skill: change-review
-Convert the native Codex review into a useful ReaDiff report. Inspect the repository's exact review
+Convert the native Codex review into a useful undiffstand report. Inspect the repository's exact review
 target when necessary. Start with a concise overview and inferred intent. Group related changes
 according to this project's own architecture and purpose; do not use a fixed generic taxonomy.
 Preserve concrete actionable findings, including security concerns, and anchor them to the smallest

@@ -41,9 +41,9 @@ const nativeApi = {
 };
 
 const demoProject: ProjectConfig = {
-  id: 'readiff-browser-demo',
-  name: 'readiff-demo',
-  repoPath: '/Users/example/src/readiff-demo',
+  id: 'undiffstand-browser-demo',
+  name: 'undiffstand-demo',
+  repoPath: '/Users/example/src/undiffstand-demo',
   baseRef: 'main',
   lastOpenedAt: new Date().toISOString()
 };
@@ -148,9 +148,9 @@ const mockApi: typeof nativeApi = {
     repoPath: path,
     suggestedName: path.split('/').at(-1) ?? 'repository',
     detectedBaseRef: 'main',
-    currentBranch: 'feature/readiff',
+    currentBranch: 'feature/undiffstand',
     recentBranches: ['main'],
-    localBranches: ['feature/readiff', 'main'],
+    localBranches: ['feature/undiffstand', 'main'],
     remoteBranches: ['origin/main'],
     recentCommits: [
       {
@@ -216,10 +216,10 @@ const mockApi: typeof nativeApi = {
       return {
         available: true,
         target: { kind: 'uncommitted' },
-        scopeLabel: 'feature/readiff → working tree'
+        scopeLabel: 'feature/undiffstand → working tree'
       };
     }
-    if (selection.base === 'main' && ['HEAD', 'feature/readiff'].includes(selection.target)) {
+    if (selection.base === 'main' && ['HEAD', 'feature/undiffstand'].includes(selection.target)) {
       return {
         available: true,
         target: { kind: 'base', baseBranch: 'main' },

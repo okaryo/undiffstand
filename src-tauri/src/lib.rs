@@ -26,5 +26,5 @@ pub fn run() {
             commands::ai::run_change_review,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running ReaDiff");
+        .expect("error while running undiffstand");
 }
