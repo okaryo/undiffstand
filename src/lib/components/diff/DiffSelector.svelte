@@ -89,7 +89,7 @@
   }
   .prefix {
     color: #7c8994;
-    font-size: 11px;
+    font-size: 12px;
     white-space: nowrap;
   }
   button {
@@ -100,7 +100,7 @@
     background: var(--accent-bright);
     border: 1px solid var(--accent-bright);
     border-radius: 6px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 650;
     cursor: pointer;
   }

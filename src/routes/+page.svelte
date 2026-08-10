@@ -1231,7 +1231,7 @@
     display: block;
     margin-top: 2px;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: 0.03em;
   }
   .settings-button,
@@ -1244,7 +1244,7 @@
     background: rgba(16, 24, 33, 0.7);
     border: 1px solid var(--border);
     border-radius: 6px;
-    font-size: 11px;
+    font-size: 12px;
     cursor: pointer;
   }
   .section-heading button {
@@ -1320,7 +1320,7 @@
     overflow: hidden;
     margin: 4px 0 7px;
     color: #687581;
-    font: 11px/1.35 var(--mono);
+    font: 12px/1.35 var(--mono);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1329,7 +1329,7 @@
     align-items: center;
     gap: 4px;
     color: #8b9a95;
-    font-size: 11px;
+    font-size: 12px;
   }
   .project-meta {
     display: flex;
@@ -1341,7 +1341,7 @@
   }
   .project-meta time {
     color: #697681;
-    font-size: 11px;
+    font-size: 12px;
     white-space: nowrap;
   }
   .edit-project {
@@ -1522,7 +1522,7 @@
     padding: 0 12px;
     color: #78848e;
     border-bottom: 1px solid var(--border);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 650;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -1536,7 +1536,7 @@
     color: #7e8b96;
     background: #18212b;
     border-radius: 8px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .content-pane {
     display: grid;
@@ -1582,7 +1582,7 @@
     background: none;
     border: 1px solid transparent;
     border-radius: 4px;
-    font-size: 11px;
+    font-size: 12px;
     cursor: pointer;
   }
   .view-mode-switch button:hover {
@@ -1617,7 +1617,7 @@
     align-items: center;
     gap: 9px;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .dialog-backdrop,
@@ -1698,15 +1698,15 @@
   .settings-content span {
     grid-row: 1/3;
     color: var(--muted);
-    font-size: 10px;
+    font-size: 12px;
   }
   .settings-content strong {
-    font: 11px var(--mono);
+    font: 12px var(--mono);
   }
   .settings-content p {
     margin: 4px 0 0;
     color: var(--muted);
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1.55;
   }
   .settings-content code {

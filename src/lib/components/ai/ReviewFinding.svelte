@@ -50,7 +50,7 @@
   }
   header span {
     color: #c9a960;
-    font-size: 9px;
+    font-size: 12px;
     text-transform: uppercase;
   }
   .critical header span,

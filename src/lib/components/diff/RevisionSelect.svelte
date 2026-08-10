@@ -216,7 +216,7 @@
     border: 1px solid #293541;
     border-radius: 6px;
     outline: none;
-    font: 11px var(--mono);
+    font: 12px var(--mono);
     cursor: pointer;
   }
 
@@ -262,7 +262,7 @@
     margin: 0;
     padding: 5px 8px;
     color: #66737f;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 650;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -281,7 +281,7 @@
     background: transparent;
     border: 0;
     border-radius: 5px;
-    font: 11px var(--mono);
+    font: 12px var(--mono);
     cursor: pointer;
   }
 
@@ -312,6 +312,6 @@
 
   .group-toggle small {
     color: #55616c;
-    font: 10px var(--mono);
+    font: 12px var(--mono);
   }
 </style>

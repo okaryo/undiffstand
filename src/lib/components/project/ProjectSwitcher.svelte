@@ -103,7 +103,7 @@
     min-width: 0;
     gap: 5px;
     color: #5b6772;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .separator,
@@ -151,7 +151,7 @@
 
   .comparison {
     overflow: hidden;
-    font: 11px var(--mono);
+    font: 12px var(--mono);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -196,7 +196,7 @@
     margin: 0;
     padding: 6px 8px 7px;
     color: #66737f;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 650;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -258,6 +258,6 @@
   }
   .project-details small {
     color: #66737f;
-    font: 11px var(--mono);
+    font: 12px var(--mono);
   }
 </style>

@@ -168,7 +168,7 @@
     border: 1px solid #293541;
     border-radius: 6px;
     outline: none;
-    font: 11px var(--mono);
+    font: 12px var(--mono);
     cursor: pointer;
   }
 
@@ -217,7 +217,7 @@
     background: transparent;
     border: 0;
     border-radius: 5px;
-    font: 11px var(--mono);
+    font: 12px var(--mono);
     cursor: pointer;
   }
 

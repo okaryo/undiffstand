@@ -135,7 +135,7 @@
   .actions span,
   .answer small {
     color: var(--muted);
-    font-size: 10px;
+    font-size: 12px;
   }
   .ask {
     gap: 6px;
@@ -144,7 +144,7 @@
     background: var(--accent-bright);
     border: 0;
     border-radius: 5px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 650;
     cursor: pointer;
   }
@@ -162,7 +162,7 @@
   .error {
     margin: 0 10px 9px;
     color: var(--red);
-    font-size: 11px;
+    font-size: 12px;
   }
   :global(.spin) {
     animation: spin 1s linear infinite;

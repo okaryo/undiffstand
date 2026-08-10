@@ -36,7 +36,7 @@
   }
   .metric {
     color: var(--muted);
-    font-size: 11px;
+    font-size: 12px;
   }
   strong {
     color: var(--text);
@@ -51,7 +51,7 @@
   .commit {
     margin-left: auto;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 12px;
   }
   code {
     font-family: var(--mono);

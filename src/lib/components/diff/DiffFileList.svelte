@@ -156,7 +156,7 @@
     border: 0;
     outline: 0;
     font: inherit;
-    font-size: 11px;
+    font-size: 12px;
   }
   .tree {
     padding: 0 6px 10px;
@@ -193,7 +193,7 @@
   .file-row strong {
     overflow: hidden;
     color: inherit;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 550;
     text-overflow: ellipsis;
     white-space: nowrap;

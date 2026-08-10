@@ -58,7 +58,7 @@
     gap: 6px;
     margin-bottom: 9px;
     color: var(--accent-bright);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 650;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -78,7 +78,7 @@
     gap: 5px;
     margin: 0 0 8px;
     color: #e0e6ec;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 620;
   }
   ul {
@@ -111,7 +111,7 @@
   }
   code {
     color: var(--accent-bright);
-    font: 10px var(--mono);
+    font: 12px var(--mono);
   }
   .caveats {
     color: #bca976;

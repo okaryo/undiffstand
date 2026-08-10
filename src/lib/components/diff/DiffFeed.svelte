@@ -427,7 +427,7 @@
   .file-path strong {
     min-width: 0;
     color: #d2d9df;
-    font: 11px var(--mono);
+    font: 12px var(--mono);
     font-weight: 600;
   }
   .copy-path {
@@ -450,7 +450,7 @@
   .file-counts {
     display: flex;
     gap: 5px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .file-counts b {
     color: var(--green);
@@ -469,7 +469,7 @@
     background: rgba(87, 184, 142, 0.06);
     border: 1px solid rgba(87, 184, 142, 0.16);
     border-radius: 5px;
-    font-size: 10px;
+    font-size: 12px;
     cursor: pointer;
   }
   .explain-file:hover:not(:disabled) {
@@ -495,7 +495,7 @@
     padding: 9px 12px;
     color: var(--accent-bright);
     border-bottom: 1px solid var(--border);
-    font-size: 11px;
+    font-size: 12px;
   }
   .file-ai-loading {
     display: flex;
@@ -503,13 +503,13 @@
     gap: 7px;
     padding: 13px;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 12px;
   }
   .file-ai-error {
     margin: 0;
     padding: 12px;
     color: var(--red);
-    font-size: 11px;
+    font-size: 12px;
   }
   .diff-body {
     min-height: 150px;
@@ -522,7 +522,7 @@
     justify-content: center;
     gap: 8px;
     color: #687581;
-    font-size: 11px;
+    font-size: 12px;
   }
   .file-error {
     color: #c7867c;

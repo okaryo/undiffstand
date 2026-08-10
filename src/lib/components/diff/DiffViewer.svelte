@@ -197,7 +197,7 @@
     color: #d8b870;
     background: rgba(196, 148, 49, 0.09);
     border-bottom: 1px solid rgba(196, 148, 49, 0.2);
-    font-size: 11px;
+    font-size: 12px;
   }
   .diff-host {
     min-width: 720px;
@@ -212,6 +212,9 @@
     pointer-events: none;
     color: #07130e !important;
     background: var(--accent-bright) !important;
+  }
+  .diff-host :global(.diff-widget-tooltip::after) {
+    font-size: 12px;
   }
   .diff-host :global(.diff-multi-select-active.diff-line-content),
   .diff-host :global(.diff-multi-select-active.diff-line-old-content),

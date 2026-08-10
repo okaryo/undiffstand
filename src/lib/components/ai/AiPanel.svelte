@@ -175,7 +175,7 @@
     gap: 7px;
   }
   .panel-header strong {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 620;
   }
   .panel-header button {
@@ -205,19 +205,19 @@
   }
   .action-card strong {
     color: var(--text);
-    font-size: 11px;
+    font-size: 12px;
   }
   .action-card p {
     margin: 3px 0 0;
     color: var(--muted);
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1.45;
   }
   .action-card small {
     display: block;
     margin-top: 7px;
     color: #c5a864;
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1.45;
   }
   .output-language {
@@ -228,7 +228,7 @@
     gap: 7px;
     margin-top: 9px;
     color: var(--muted);
-    font-size: 9px;
+    font-size: 12px;
   }
   .action-card > button {
     grid-column: 2;
@@ -242,7 +242,7 @@
     background: var(--accent-bright);
     border: 0;
     border-radius: 5px;
-    font: 600 10px inherit;
+    font: 600 12px inherit;
     cursor: pointer;
   }
   button:disabled {
@@ -262,7 +262,7 @@
     gap: 8px;
     padding: 15px;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.5;
   }
   .report {
@@ -273,7 +273,7 @@
   .eyebrow {
     margin-bottom: 8px;
     color: var(--accent-bright);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 650;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -296,11 +296,11 @@
     gap: 6px;
     margin: 0 0 8px;
     color: #e0e6ec;
-    font-size: 11px;
+    font-size: 12px;
   }
   h3 span {
     color: var(--muted);
-    font-size: 10px;
+    font-size: 12px;
   }
   .groups,
   .findings {
@@ -328,11 +328,11 @@
   }
   .group > button strong {
     flex: 1;
-    font-size: 11px;
+    font-size: 12px;
   }
   .group > button span {
     color: var(--muted);
-    font-size: 9px;
+    font-size: 12px;
   }
   .group > div {
     padding: 0 9px 9px 28px;
@@ -348,7 +348,7 @@
     display: block;
     margin-top: 8px;
     color: #65717d;
-    font: 9px/1.45 var(--mono);
+    font: 12px/1.45 var(--mono);
     overflow-wrap: anywhere;
   }
   .finding {
@@ -366,11 +366,11 @@
   }
   .finding strong {
     flex: 1;
-    font-size: 11px;
+    font-size: 12px;
   }
   .finding span {
     color: #c8a457;
-    font-size: 8px;
+    font-size: 12px;
     text-transform: uppercase;
   }
   .finding.critical span,
@@ -384,7 +384,7 @@
     display: block;
     margin-top: 7px;
     color: var(--accent-bright);
-    font: 9px var(--mono);
+    font: 12px var(--mono);
     overflow-wrap: anywhere;
   }
   .muted {
@@ -397,7 +397,7 @@
     padding: 9px 12px;
     color: #59636e;
     border-top: 1px solid var(--border);
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1.45;
   }
   :global(.spin) {
