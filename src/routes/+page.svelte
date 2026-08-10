@@ -2,7 +2,6 @@
   import { onMount, tick } from 'svelte';
   import {
     Bot,
-    Braces,
     CirclePlus,
     Columns2,
     FolderGit2,
@@ -809,7 +808,9 @@
   <main class="app-shell">
     <header class="topbar">
       <button class="brand compact" onclick={goHome} title="Back to projects"
-        ><span class="brand-mark"><Braces size={16} /></span><strong>undiffstand</strong></button
+        ><span class="brand-mark"><img src="/undiffstand-icon.png" alt="" /></span><strong
+          >undiffstand</strong
+        ></button
       >
       <button
         class="sidebar-toggle"
@@ -974,7 +975,7 @@
   <main class="home">
     <header class="home-header">
       <div class="brand">
-        <span class="brand-mark"><Braces size={20} /></span>
+        <span class="brand-mark"><img src="/undiffstand-icon.png" alt="" /></span>
         <div>
           <strong>undiffstand</strong><small
             >AI-assisted diff understanding for human reviewers.</small
@@ -1212,10 +1213,14 @@
     place-items: center;
     width: 34px;
     height: 34px;
-    color: #07120e;
-    background: var(--accent-bright);
     border-radius: 8px;
     box-shadow: 0 0 24px rgba(87, 184, 142, 0.14);
+    overflow: hidden;
+  }
+  .brand-mark img {
+    display: block;
+    width: 100%;
+    height: 100%;
   }
   .brand strong {
     display: block;
