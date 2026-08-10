@@ -21,6 +21,7 @@
   import AiPanel from '$lib/components/ai/AiPanel.svelte';
   import EmptyState from '$lib/components/common/EmptyState.svelte';
   import ErrorBanner from '$lib/components/common/ErrorBanner.svelte';
+  import SelectMenu from '$lib/components/common/SelectMenu.svelte';
   import DiffFeed from '$lib/components/diff/DiffFeed.svelte';
   import DiffFileList from '$lib/components/diff/DiffFileList.svelte';
   import DiffSelector from '$lib/components/diff/DiffSelector.svelte';
@@ -109,6 +110,10 @@
   const AI_PANEL_MIN_WIDTH = 240;
   const AI_PANEL_MAX_WIDTH = 520;
   const PANEL_RESIZE_STEP = 10;
+  const outputLanguageOptions = [
+    { value: 'english', label: 'English' },
+    { value: 'japanese', label: '日本語' }
+  ];
   type ResizablePanel = 'sidebar' | 'ai';
   let activeResize = $state<
     | {
@@ -1092,19 +1097,13 @@
       <div class="settings-content">
         <div class="language-setting">
           <span>Output language</span>
-          <label>
-            <select
-              aria-label="Review output language"
-              value={reviewOutputLanguage}
-              onchange={(event) =>
-                setReviewOutputLanguage(
-                  (event.currentTarget as HTMLSelectElement).value as ReviewOutputLanguage
-                )}
-            >
-              <option value="english">English</option>
-              <option value="japanese">日本語</option>
-            </select>
-          </label>
+          <SelectMenu
+            id="review-output-language-settings"
+            label="Review output language"
+            value={reviewOutputLanguage}
+            options={outputLanguageOptions}
+            onChange={(language) => setReviewOutputLanguage(language as ReviewOutputLanguage)}
+          />
           <p>Used for Inline Ask, file change explanations, and Change Review reports.</p>
         </div>
         <div>
@@ -1696,16 +1695,6 @@
   }
   .settings-content strong {
     font: 11px var(--mono);
-  }
-  .settings-content select {
-    min-width: 130px;
-    padding: 6px 26px 6px 8px;
-    color: var(--text);
-    color-scheme: dark;
-    background: var(--input);
-    border: 1px solid var(--border-strong);
-    border-radius: 5px;
-    font: 11px inherit;
   }
   .settings-content p {
     margin: 4px 0 0;

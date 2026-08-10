@@ -10,6 +10,7 @@
     ShieldAlert,
     Sparkles
   } from '@lucide/svelte';
+  import SelectMenu from '$lib/components/common/SelectMenu.svelte';
   import type { ChangeReviewAvailability, ChangeReviewReport } from '$lib/domain/ai';
   import type { ReviewOutputLanguage } from '$lib/domain/preferences';
 
@@ -34,6 +35,10 @@
   } = $props();
 
   let openGroups = $state<Record<string, boolean>>({});
+  const outputLanguageOptions = [
+    { value: 'english', label: 'English' },
+    { value: 'japanese', label: '日本語' }
+  ];
 
   function toggleGroup(id: string) {
     openGroups[id] = !(openGroups[id] ?? true);
@@ -59,18 +64,15 @@
       {#if availability && !availability.available}<small>{availability.reason}</small>{/if}
       <label class="output-language">
         <span>Output</span>
-        <select
-          aria-label="Review output language"
+        <SelectMenu
+          id="review-output-language-panel"
+          label="Review output language"
           value={outputLanguage}
+          options={outputLanguageOptions}
           disabled={loading}
-          onchange={(event) =>
-            onOutputLanguageChange(
-              (event.currentTarget as HTMLSelectElement).value as ReviewOutputLanguage
-            )}
-        >
-          <option value="english">English</option>
-          <option value="japanese">日本語</option>
-        </select>
+          fluid
+          onChange={(language) => onOutputLanguageChange(language as ReviewOutputLanguage)}
+        />
       </label>
     </div>
     <button onclick={onReview} disabled={loading || !availability?.available}>
@@ -221,20 +223,12 @@
   .output-language {
     display: flex;
     align-items: center;
+    width: 100%;
+    max-width: 245px;
     gap: 7px;
     margin-top: 9px;
     color: var(--muted);
     font-size: 9px;
-  }
-  .output-language select {
-    min-width: 86px;
-    padding: 4px 21px 4px 6px;
-    color: var(--text);
-    color-scheme: dark;
-    background: #0a1016;
-    border: 1px solid var(--border-strong);
-    border-radius: 4px;
-    font: 10px inherit;
   }
   .action-card > button {
     grid-column: 2;

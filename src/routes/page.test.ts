@@ -389,8 +389,8 @@ describe('change details auto-refresh', () => {
     );
     expect(screen.getByTitle('Unified diff')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTitle('Wrap long lines')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('combobox', { name: 'Review output language' })).toHaveValue(
-      'japanese'
+    expect(screen.getByRole('combobox', { name: 'Review output language' })).toHaveTextContent(
+      '日本語'
     );
     expect(tauriApi.saveUserPreferences).not.toHaveBeenCalled();
   });
@@ -422,9 +422,13 @@ describe('change details auto-refresh', () => {
     render(Page);
     await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
 
-    await fireEvent.change(screen.getByRole('combobox', { name: 'Review output language' }), {
-      target: { value: 'japanese' }
-    });
+    await fireEvent.click(screen.getByRole('combobox', { name: 'Review output language' }));
+    await fireEvent.click(
+      within(screen.getByRole('listbox', { name: 'Review output language options' })).getByRole(
+        'option',
+        { name: '日本語' }
+      )
+    );
 
     await waitFor(() =>
       expect(tauriApi.saveUserPreferences).toHaveBeenLastCalledWith({
