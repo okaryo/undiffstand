@@ -2,7 +2,7 @@ mod codex;
 mod skills;
 
 use crate::{
-    domain::{DiffExplanation, FileDiff, InlineAnswer, InlineQuestion},
+    domain::{DiffExplanation, FileDiff, InlineAnswer, InlineQuestion, ReviewOutputLanguage},
     error::AppResult,
 };
 use async_trait::async_trait;
@@ -14,6 +14,7 @@ pub trait AiProvider: Send + Sync {
         from_label: &str,
         to_label: &str,
         diff: &FileDiff,
+        language: ReviewOutputLanguage,
     ) -> AppResult<DiffExplanation>;
 
     async fn answer_inline_question(
@@ -23,6 +24,7 @@ pub trait AiProvider: Send + Sync {
         diff: &FileDiff,
         question: &InlineQuestion,
         selected_source: &str,
+        language: ReviewOutputLanguage,
     ) -> AppResult<InlineAnswer>;
 }
 

@@ -46,8 +46,13 @@
     type FileDiff
   } from '$lib/domain/diff';
   import { normalizeError, type AppError } from '$lib/domain/error';
-  import type { DiffViewMode, UserPreferences } from '$lib/domain/preferences';
+  import type {
+    DiffViewMode,
+    ReviewOutputLanguage,
+    UserPreferences
+  } from '$lib/domain/preferences';
   import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
+  import { notifyReviewComplete } from '$lib/services/notification';
   import { tauriApi } from '$lib/services/tauri';
   import { resolveApplicationShortcut } from '$lib/shortcuts';
 
@@ -87,6 +92,7 @@
   let aiPanelOpen = $state(true);
   let sidebarWidth = $state(225);
   let aiPanelWidth = $state(290);
+  let reviewOutputLanguage = $state<ReviewOutputLanguage>('english');
   let preferencesLoaded = false;
   let preferencesSaving = false;
   let preferencesSaveRequested = false;
@@ -272,10 +278,12 @@
     aiPanelWidth = detail.aiPanel.width;
     diffMode = detail.diff.mode;
     wrapLines = detail.diff.wrapLongLines;
+    reviewOutputLanguage = preferences.ai?.outputLanguage ?? 'english';
   }
 
   function currentPreferences(): UserPreferences {
     return {
+      ai: { outputLanguage: reviewOutputLanguage },
       changeDetail: {
         changedFilesPanel: { open: sidebarOpen, width: sidebarWidth },
         aiPanel: { open: aiPanelOpen, width: aiPanelWidth },
@@ -322,6 +330,13 @@
 
   function toggleLineWrapping() {
     wrapLines = !wrapLines;
+    queuePreferencesSave();
+  }
+
+  function setReviewOutputLanguage(language: ReviewOutputLanguage) {
+    if (reviewOutputLanguage === language) return;
+    reviewOutputLanguage = language;
+    clearAiResults();
     queuePreferencesSave();
   }
 
@@ -527,7 +542,6 @@
         );
         diffLoadingPaths = {};
         diffErrors = {};
-        clearAiResults();
       }
 
       summary = orderedSummary;
@@ -676,6 +690,7 @@
       const explanation = await tauriApi.explainFileChange(projectId, selection, path);
       if (generation !== aiGeneration || activeProject?.id !== projectId) return;
       fileExplanations[path] = explanation;
+      void notifyReviewComplete('file');
     } catch (caught) {
       if (generation !== aiGeneration || activeProject?.id !== projectId) return;
       fileAiErrors[path] = normalizeError(caught).message;
@@ -707,6 +722,7 @@
     if (generation !== aiGeneration || activeProject?.id !== projectId) {
       throw new Error('The comparison changed before Codex answered.');
     }
+    void notifyReviewComplete('inline');
     return answer;
   }
 
@@ -722,6 +738,7 @@
       const report = await tauriApi.runChangeReview(projectId, selection);
       if (generation !== aiGeneration || activeProject?.id !== projectId) return;
       changeReviewReport = report;
+      void notifyReviewComplete('change');
     } catch (caught) {
       if (generation !== aiGeneration || activeProject?.id !== projectId) return;
       workspaceError = normalizeError(caught);
@@ -940,8 +957,10 @@
           report={changeReviewReport}
           loading={aiLoading}
           expanded={aiPanelExpanded}
+          outputLanguage={reviewOutputLanguage}
           onReview={runChangeReview}
           onToggleExpanded={toggleAiPanelExpanded}
+          onOutputLanguageChange={setReviewOutputLanguage}
         />
       {/if}
     </div>
@@ -1071,6 +1090,23 @@
         <button onclick={() => (showSettings = false)}><X size={17} /></button>
       </header>
       <div class="settings-content">
+        <div class="language-setting">
+          <span>Output language</span>
+          <label>
+            <select
+              aria-label="Review output language"
+              value={reviewOutputLanguage}
+              onchange={(event) =>
+                setReviewOutputLanguage(
+                  (event.currentTarget as HTMLSelectElement).value as ReviewOutputLanguage
+                )}
+            >
+              <option value="english">English</option>
+              <option value="japanese">日本語</option>
+            </select>
+          </label>
+          <p>Used for Inline Ask, file change explanations, and Change Review reports.</p>
+        </div>
         <div>
           <span>Runtime</span><strong>Codex CLI</strong>
           <p>
@@ -1423,6 +1459,7 @@
       var(--sidebar-width) var(--panel-handle-width) minmax(500px, 1fr)
       var(--panel-handle-width) var(--ai-panel-width);
     min-height: 0;
+    overflow: hidden;
     --panel-handle-width: 5px;
   }
   .workspace.withoutAi {
@@ -1659,6 +1696,16 @@
   }
   .settings-content strong {
     font: 11px var(--mono);
+  }
+  .settings-content select {
+    min-width: 130px;
+    padding: 6px 26px 6px 8px;
+    color: var(--text);
+    color-scheme: dark;
+    background: var(--input);
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    font: 11px inherit;
   }
   .settings-content p {
     margin: 4px 0 0;

@@ -11,21 +11,26 @@
     Sparkles
   } from '@lucide/svelte';
   import type { ChangeReviewAvailability, ChangeReviewReport } from '$lib/domain/ai';
+  import type { ReviewOutputLanguage } from '$lib/domain/preferences';
 
   let {
     availability,
     report,
     loading = false,
     expanded = false,
+    outputLanguage = 'english',
     onReview,
-    onToggleExpanded
+    onToggleExpanded,
+    onOutputLanguageChange
   }: {
     availability?: ChangeReviewAvailability;
     report?: ChangeReviewReport;
     loading?: boolean;
     expanded?: boolean;
+    outputLanguage?: ReviewOutputLanguage;
     onReview: () => void;
     onToggleExpanded: () => void;
+    onOutputLanguageChange: (language: ReviewOutputLanguage) => void;
   } = $props();
 
   let openGroups = $state<Record<string, boolean>>({});
@@ -52,6 +57,21 @@
       <strong>Review changes</strong>
       <p>{availability?.scopeLabel ?? 'Checking the selected comparison…'}</p>
       {#if availability && !availability.available}<small>{availability.reason}</small>{/if}
+      <label class="output-language">
+        <span>Output</span>
+        <select
+          aria-label="Review output language"
+          value={outputLanguage}
+          disabled={loading}
+          onchange={(event) =>
+            onOutputLanguageChange(
+              (event.currentTarget as HTMLSelectElement).value as ReviewOutputLanguage
+            )}
+        >
+          <option value="english">English</option>
+          <option value="japanese">日本語</option>
+        </select>
+      </label>
     </div>
     <button onclick={onReview} disabled={loading || !availability?.available}>
       {#if loading}<LoaderCircle class="spin" size={16} /> Reviewing…{:else}Run review{/if}
@@ -132,7 +152,10 @@
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr) auto;
     min-width: 0;
+    min-height: 0;
+    max-height: 100%;
     height: 100%;
+    overflow: hidden;
     background: #0e141c;
     border-left: 1px solid var(--border);
   }
@@ -195,6 +218,24 @@
     font-size: 10px;
     line-height: 1.45;
   }
+  .output-language {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 9px;
+    color: var(--muted);
+    font-size: 9px;
+  }
+  .output-language select {
+    min-width: 86px;
+    padding: 4px 21px 4px 6px;
+    color: var(--text);
+    color-scheme: dark;
+    background: #0a1016;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    font: 10px inherit;
+  }
   .action-card > button {
     grid-column: 2;
     justify-self: start;
@@ -217,6 +258,8 @@
   .results {
     min-height: 0;
     overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
     border-top: 1px solid var(--border);
   }
   .thinking {

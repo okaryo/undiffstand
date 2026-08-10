@@ -1,6 +1,10 @@
 export type DiffViewMode = 'split' | 'unified';
+export type ReviewOutputLanguage = 'english' | 'japanese';
 
 export type UserPreferences = {
+  ai?: {
+    outputLanguage: ReviewOutputLanguage;
+  };
   changeDetail: {
     changedFilesPanel: {
       open: boolean;
@@ -19,6 +23,7 @@ export type UserPreferences = {
 
 export function defaultUserPreferences(): UserPreferences {
   return {
+    ai: { outputLanguage: 'english' },
     changeDetail: {
       changedFilesPanel: { open: true, width: 225 },
       aiPanel: { open: true, width: 290 },

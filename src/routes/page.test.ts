@@ -20,8 +20,10 @@ const tauriApi = vi.hoisted(() => ({
   getChangeReviewAvailability: vi.fn(),
   runChangeReview: vi.fn()
 }));
+const notifyReviewComplete = vi.hoisted(() => vi.fn());
 
 vi.mock('$lib/services/tauri', () => ({ tauriApi }));
+vi.mock('$lib/services/notification', () => ({ notifyReviewComplete }));
 
 const project: ProjectConfig = {
   id: 'alpha',
@@ -93,6 +95,7 @@ describe('change details auto-refresh', () => {
       recentCommits: [{ sha: '1234567890abcdef', shortSha: '1234567', subject: 'Example change' }]
     });
     tauriApi.getUserPreferences.mockResolvedValue({
+      ai: { outputLanguage: 'english' },
       changeDetail: {
         changedFilesPanel: { open: true, width: 225 },
         aiPanel: { open: true, width: 290 },
@@ -296,6 +299,17 @@ describe('change details auto-refresh', () => {
       base: 'HEAD',
       target: '.'
     });
+    expect(notifyReviewComplete).toHaveBeenCalledWith('file');
+    expect(notifyReviewComplete).toHaveBeenCalledWith('change');
+
+    await fireEvent.focus(window);
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(2));
+    expect(
+      screen.getByText('This file now builds review context before returning evidence.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('The comparison adds evidence-aware review output.')
+    ).toBeInTheDocument();
   });
 
   it('resizes both side panels from their drag handles', async () => {
@@ -353,6 +367,7 @@ describe('change details auto-refresh', () => {
 
   it('restores change detail preferences', async () => {
     tauriApi.getUserPreferences.mockResolvedValue({
+      ai: { outputLanguage: 'japanese' },
       changeDetail: {
         changedFilesPanel: { open: false, width: 310 },
         aiPanel: { open: true, width: 360 },
@@ -374,6 +389,9 @@ describe('change details auto-refresh', () => {
     );
     expect(screen.getByTitle('Unified diff')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTitle('Wrap long lines')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('combobox', { name: 'Review output language' })).toHaveValue(
+      'japanese'
+    );
     expect(tauriApi.saveUserPreferences).not.toHaveBeenCalled();
   });
 
@@ -389,10 +407,32 @@ describe('change details auto-refresh', () => {
 
     await waitFor(() =>
       expect(tauriApi.saveUserPreferences).toHaveBeenLastCalledWith({
+        ai: { outputLanguage: 'english' },
         changeDetail: {
           changedFilesPanel: { open: false, width: 225 },
           aiPanel: { open: false, width: 290 },
           diff: { mode: 'unified', wrapLongLines: true }
+        }
+      })
+    );
+  });
+
+  it('saves the review output language', async () => {
+    history.replaceState(null, '', '/?project=alpha');
+    render(Page);
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+
+    await fireEvent.change(screen.getByRole('combobox', { name: 'Review output language' }), {
+      target: { value: 'japanese' }
+    });
+
+    await waitFor(() =>
+      expect(tauriApi.saveUserPreferences).toHaveBeenLastCalledWith({
+        ai: { outputLanguage: 'japanese' },
+        changeDetail: {
+          changedFilesPanel: { open: true, width: 225 },
+          aiPanel: { open: true, width: 290 },
+          diff: { mode: 'split', wrapLongLines: false }
         }
       })
     );
@@ -424,6 +464,7 @@ describe('change details auto-refresh', () => {
 
     await waitFor(() =>
       expect(tauriApi.saveUserPreferences).toHaveBeenLastCalledWith({
+        ai: { outputLanguage: 'english' },
         changeDetail: {
           changedFilesPanel: { open: false, width: 225 },
           aiPanel: { open: false, width: 290 },

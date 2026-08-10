@@ -37,6 +37,23 @@ impl Default for AppConfig {
 pub struct UserPreferences {
     #[serde(default)]
     pub change_detail: ChangeDetailPreferences,
+    #[serde(default)]
+    pub ai: AiPreferences,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AiPreferences {
+    #[serde(default)]
+    pub output_language: ReviewOutputLanguage,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ReviewOutputLanguage {
+    #[default]
+    English,
+    Japanese,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -376,5 +393,9 @@ mod tests {
         );
         assert_eq!(preferences.change_detail.diff.mode, DiffViewMode::Unified);
         assert!(!preferences.change_detail.diff.wrap_long_lines);
+        assert_eq!(
+            preferences.ai.output_language,
+            ReviewOutputLanguage::English
+        );
     }
 }

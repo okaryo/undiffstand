@@ -337,6 +337,13 @@ pub fn change_review_availability(
     };
     let scope_label = format!("{} → {}", display_ref(base), target_label);
 
+    if diff_summary(repo, selection)?.files.is_empty() {
+        return Ok(unavailable_review(
+            scope_label,
+            "Change Review is unavailable because this comparison has no changes.",
+        ));
+    }
+
     if base == "HEAD" && target == "." {
         return Ok(ChangeReviewAvailability {
             available: true,
@@ -859,6 +866,10 @@ mod tests {
         git(repo, &["add", "base.txt"]);
         git(repo, &["commit", "-m", "base"]);
         git(repo, &["switch", "-c", "feature"]);
+        fs::write(repo.join("feature.txt"), "feature\n").unwrap();
+        git(repo, &["add", "feature.txt"]);
+        git(repo, &["commit", "-m", "feature"]);
+        fs::write(repo.join("working.txt"), "working\n").unwrap();
 
         let uncommitted = change_review_availability(repo, &DiffSelection::default()).unwrap();
         assert!(uncommitted.available);
@@ -890,6 +901,26 @@ mod tests {
         .unwrap();
         assert!(!unsupported.available);
         assert!(unsupported.reason.unwrap().contains("starts at HEAD"));
+    }
+
+    #[test]
+    fn change_review_is_unavailable_without_changes() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        git(repo, &["init", "-b", "main"]);
+        git(repo, &["config", "user.email", "test@example.com"]);
+        git(repo, &["config", "user.name", "ReaDiff Test"]);
+        fs::write(repo.join("base.txt"), "base\n").unwrap();
+        git(repo, &["add", "base.txt"]);
+        git(repo, &["commit", "-m", "base"]);
+
+        let availability = change_review_availability(repo, &DiffSelection::default()).unwrap();
+
+        assert!(!availability.available);
+        assert!(availability
+            .reason
+            .unwrap()
+            .contains("comparison has no changes"));
     }
 
     #[test]

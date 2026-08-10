@@ -1,7 +1,7 @@
 use crate::{
     domain::{
         ChangeReviewAvailability, ChangeReviewReport, DiffExplanation, DiffSelection, InlineAnswer,
-        InlineQuestion,
+        InlineQuestion, ReviewOutputLanguage,
     },
     error::{AppError, AppResult},
     services::{
@@ -20,6 +20,7 @@ pub async fn explain_file_change<R: Runtime>(
     path: String,
 ) -> AppResult<DiffExplanation> {
     let project = config_service::find_project(&app, &project_id)?;
+    let language = output_language(&app)?;
     let repo = Path::new(&project.repo_path);
     let summary = git_service::diff_summary(repo, &selection)?;
     let diff = git_service::file_diff(repo, &selection, &path)?;
@@ -29,6 +30,7 @@ pub async fn explain_file_change<R: Runtime>(
             &summary.comparison.from_label,
             &summary.comparison.to_label,
             &diff,
+            language,
         )
         .await
 }
@@ -42,6 +44,7 @@ pub async fn ask_inline_question<R: Runtime>(
 ) -> AppResult<InlineAnswer> {
     validate_inline_question(&question)?;
     let project = config_service::find_project(&app, &project_id)?;
+    let language = output_language(&app)?;
     let repo = Path::new(&project.repo_path);
     let summary = git_service::diff_summary(repo, &selection)?;
     let diff = git_service::file_diff(repo, &selection, &question.path)?;
@@ -65,6 +68,7 @@ pub async fn ask_inline_question<R: Runtime>(
             &diff,
             &question,
             &selected_source,
+            language,
         )
         .await
 }
@@ -86,6 +90,7 @@ pub async fn run_change_review<R: Runtime>(
     selection: DiffSelection,
 ) -> AppResult<ChangeReviewReport> {
     let project = config_service::find_project(&app, &project_id)?;
+    let language = output_language(&app)?;
     let repo = Path::new(&project.repo_path);
     let availability = git_service::change_review_availability(repo, &selection)?;
     let target = availability.target.ok_or_else(|| {
@@ -97,8 +102,12 @@ pub async fn run_change_review<R: Runtime>(
         )
     })?;
     CodexProvider::new()
-        .review_changes(repo, &target, &availability.scope_label)
+        .review_changes(repo, &target, &availability.scope_label, language)
         .await
+}
+
+fn output_language<R: Runtime>(app: &AppHandle<R>) -> AppResult<ReviewOutputLanguage> {
+    Ok(config_service::load(app)?.preferences.ai.output_language)
 }
 
 fn ensure_ai_ready_diff(truncated: bool) -> AppResult<()> {
