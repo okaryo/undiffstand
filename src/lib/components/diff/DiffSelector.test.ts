@@ -54,7 +54,7 @@ describe('DiffSelector', () => {
     await fireEvent.click(within(menu).getByRole('button', { name: /Local branches/ }));
     expect(within(menu).getByRole('option', { name: 'main' })).toBeInTheDocument();
     await fireEvent.click(within(menu).getByRole('button', { name: /Remote branches/ }));
-    expect(within(menu).getByRole('option', { name: 'origin\/release' })).toBeInTheDocument();
+    expect(within(menu).getByRole('option', { name: 'origin/release' })).toBeInTheDocument();
   });
 
   it('builds a branch-to-branch comparison', async () => {

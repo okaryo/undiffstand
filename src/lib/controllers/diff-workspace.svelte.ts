@@ -1,4 +1,5 @@
 import { tick } from 'svelte';
+import { SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 import {
   defaultDiffSelection,
   diffAnchorId,
@@ -23,7 +24,7 @@ export class DiffWorkspaceController {
   loading = $state(false);
 
   private projectId?: string;
-  private pendingPaths = new Set<string>();
+  private pendingPaths = new SvelteSet<string>();
   private batchTimer: ReturnType<typeof setTimeout> | undefined;
   private generation = 0;
 
@@ -138,8 +139,8 @@ export class DiffWorkspaceController {
     summary: DiffSummary,
     selectedPath?: string
   ) {
-    const availablePaths = new Set(summary.files.map(displayPath));
-    const refreshPaths = new Set([
+    const availablePaths = new SvelteSet(summary.files.map(displayPath));
+    const refreshPaths = new SvelteSet([
       ...Object.keys(this.diffs),
       ...Object.keys(this.errors),
       ...Object.entries(this.loadingPaths)
@@ -213,7 +214,7 @@ export class DiffWorkspaceController {
 
   private syncUrl(file?: string) {
     if (!this.projectId) return;
-    const params = new URLSearchParams({ project: this.projectId });
+    const params = new SvelteURLSearchParams({ project: this.projectId });
     if (file) params.set('file', file);
     if (this.selection.base !== 'HEAD') params.set('base', this.selection.base);
     if (this.selection.target !== '.') params.set('target', this.selection.target);

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import type { ChangeReviewFinding, DiffExplanation, InlineAnswer } from '$lib/domain/ai';
   import { diffAnchorId, displayPath, type DiffFileSummary, type FileDiff } from '$lib/domain/diff';
   import DiffFileSection from './DiffFileSection.svelte';
@@ -55,11 +56,11 @@
   let copiedPath = $state<string>();
   let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
   let renderTimer: ReturnType<typeof setTimeout> | undefined;
-  const sectionElements = new Map<string, HTMLElement>();
-  const requestedPaths = new Set<string>();
+  const sectionElements = new SvelteMap<string, HTMLElement>();
+  const requestedPaths = new SvelteSet<string>();
   const pendingRenderPaths: string[] = [];
-  const pendingRenderPathSet = new Set<string>();
-  const activeSectionPaths = new Set<string>();
+  const pendingRenderPathSet = new SvelteSet<string>();
+  const activeSectionPaths = new SvelteSet<string>();
   const INITIAL_RENDERED_FILE_COUNT = 8;
   const LAZY_RENDER_ROOT_MARGIN = '1200px 0px';
   const ACTIVE_FILE_OFFSET = 52;

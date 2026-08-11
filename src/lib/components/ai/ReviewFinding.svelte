@@ -6,7 +6,7 @@
 </script>
 
 <div class="finding-list">
-  {#each findings as finding}
+  {#each findings as finding, index (index)}
     <article class="finding {finding.severity}">
       <header>
         {#if finding.severity === 'critical' || finding.severity === 'high'}<ShieldAlert

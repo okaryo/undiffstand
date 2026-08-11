@@ -1,4 +1,5 @@
 <script module lang="ts">
+  import { SvelteMap } from 'svelte/reactivity';
   import {
     bundledLanguages,
     getDiffViewHighlighter,
@@ -7,7 +8,7 @@
   } from '@git-diff-view/shiki';
 
   let highlighterPromise: Promise<DiffHighlighter> | undefined;
-  const languagePromises = new Map<string, Promise<void>>();
+  const languagePromises = new SvelteMap<string, Promise<void>>();
 
   async function loadHighlighter(language: string) {
     highlighterPromise ??= getDiffViewHighlighter();

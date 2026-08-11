@@ -16,7 +16,7 @@
     {#if explanation.keyChanges.length}<section>
         <h4>Key changes</h4>
         <ul>
-          {#each explanation.keyChanges as item}<li>{item}</li>{/each}
+          {#each explanation.keyChanges as item, index (index)}<li>{item}</li>{/each}
         </ul>
       </section>{/if}
     {#if explanation.references.length}{@render References(explanation.references)}{/if}
@@ -28,7 +28,7 @@
   <section>
     <h4>References</h4>
     <div class="references">
-      {#each references as reference}
+      {#each references as reference, index (index)}
         <div>
           <span>{reference.path}</span><code>L{reference.startLine}–{reference.endLine}</code>
         </div>
@@ -41,7 +41,7 @@
   <section class="caveats">
     <h4><CircleAlert size={13} /> Caveats</h4>
     <ul>
-      {#each caveats as caveat}<li>{caveat}</li>{/each}
+      {#each caveats as caveat, index (index)}<li>{caveat}</li>{/each}
     </ul>
   </section>
 {/snippet}

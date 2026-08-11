@@ -70,7 +70,7 @@
         {#if report.groups.length}<section>
             <h3>Change groups</h3>
             <div class="groups">
-              {#each report.groups as group}
+              {#each report.groups as group (group.id)}
                 <article class="group">
                   <button onclick={() => toggleGroup(group.id)}>
                     {#if openGroups[group.id] ?? true}<ChevronDown size={14} />{:else}<ChevronRight
@@ -81,7 +81,7 @@
                   {#if openGroups[group.id] ?? true}<div>
                       <p>{group.summary}</p>
                       {#if group.keyPoints.length}<ul>
-                          {#each group.keyPoints as point}<li>{point}</li>{/each}
+                          {#each group.keyPoints as point, index (index)}<li>{point}</li>{/each}
                         </ul>{/if}
                       {#if group.files.length}<small>{group.files.join(' · ')}</small>{/if}
                     </div>{/if}
@@ -92,7 +92,7 @@
         <section>
           <h3>Findings <span>{report.findings.length}</span></h3>
           {#if report.findings.length}<div class="findings">
-              {#each report.findings as finding}
+              {#each report.findings as finding, index (index)}
                 <article class="finding {finding.severity}">
                   <div>
                     {#if finding.severity === 'critical' || finding.severity === 'high'}<ShieldAlert
@@ -111,7 +111,7 @@
         {#if report.caveats.length}<section class="caveats">
             <h3>Caveats</h3>
             <ul>
-              {#each report.caveats as caveat}<li>{caveat}</li>{/each}
+              {#each report.caveats as caveat, index (index)}<li>{caveat}</li>{/each}
             </ul>
           </section>{/if}
       </article>
