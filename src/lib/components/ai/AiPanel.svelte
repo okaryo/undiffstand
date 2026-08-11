@@ -53,7 +53,10 @@
   <div class="action-card">
     <div>
       <strong>Review changes</strong>
-      <p>{availability?.scopeLabel ?? 'Checking the selected comparison…'}</p>
+      <p class="description">Codex reviews the selected changes and highlights potential issues.</p>
+      <p class="review-scope">
+        Scope: {availability?.scopeLabel ?? 'Checking the selected comparison…'}
+      </p>
       {#if availability && !availability.available}<small>{availability.reason}</small>{/if}
       <label class="output-language">
         <span>Output</span>
@@ -73,11 +76,7 @@
     </button>
   </div>
 
-  <div class="results">
-    {#if loading && !report}<div class="thinking">
-        <LoaderCircle class="spin" size={16} />
-        <span>Codex is reviewing this comparison. Large changes may take a while…</span>
-      </div>{/if}
+  <div class="results" class:has-report={report !== undefined}>
     {#if report}
       <article class="report">
         <div class="eyebrow">Review report</div>
@@ -205,6 +204,13 @@
     font-size: 12px;
     line-height: 1.45;
   }
+  .action-card .description {
+    margin-top: 6px;
+    color: #bac4cc;
+  }
+  .action-card .review-scope {
+    margin-top: 7px;
+  }
   .action-card small {
     display: block;
     margin-top: 7px;
@@ -245,16 +251,9 @@
     overflow: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
-    border-top: 1px solid var(--border);
   }
-  .thinking {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 15px;
-    color: var(--muted);
-    font-size: 12px;
-    line-height: 1.5;
+  .results.has-report {
+    border-top: 1px solid var(--border);
   }
   .report {
     padding: 14px;

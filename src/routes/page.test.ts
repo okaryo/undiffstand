@@ -128,7 +128,8 @@ describe('change details auto-refresh', () => {
 
     await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(2));
-    expect(screen.getAllByText('feature → working tree')).toHaveLength(2);
+    expect(screen.getByText('feature → working tree')).toBeInTheDocument();
+    expect(screen.getByText('Scope: feature → working tree')).toBeInTheDocument();
     expect(screen.queryByText('HEAD → working tree')).not.toBeInTheDocument();
     vi.mocked(Element.prototype.scrollIntoView).mockClear();
     await fireEvent.focus(window);
@@ -335,7 +336,26 @@ describe('change details auto-refresh', () => {
       'Change Review supports the working tree only when the comparison starts at HEAD.'
     );
     expect(reason).toBeInTheDocument();
+    expect(
+      screen.getByText('Codex reviews the selected changes and highlights potential issues.')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Scope: main → working tree')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run review' })).toBeDisabled();
+  });
+
+  it('shows the Change Review loading state only in the action button', async () => {
+    tauriApi.runChangeReview.mockReturnValue(new Promise(() => {}));
+    history.replaceState(null, '', '/?project=alpha');
+    render(Page);
+
+    const runReview = await screen.findByRole('button', { name: 'Run review' });
+    await waitFor(() => expect(runReview).toBeEnabled());
+    await fireEvent.click(runReview);
+
+    expect(await screen.findByRole('button', { name: 'Reviewing…' })).toBeDisabled();
+    expect(
+      screen.queryByText('Codex is reviewing this comparison. Large changes may take a while…')
+    ).not.toBeInTheDocument();
   });
 
   it('renders file explanations next to the file and Change Review in the side panel', async () => {
