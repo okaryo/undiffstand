@@ -22,8 +22,7 @@ pub async fn explain_file_change<R: Runtime>(
     let project = config_service::find_project(&app, &project_id)?;
     let language = output_language(&app)?;
     let repo = Path::new(&project.repo_path);
-    let summary = git_service::diff_summary(repo, &selection)?;
-    let diff = git_service::file_diff(repo, &selection, &path)?;
+    let (summary, diff) = git_service::file_diff_with_summary(repo, &selection, &path)?;
     ensure_ai_ready_diff(diff.truncated)?;
     CodexProvider::new()
         .explain_file_change(
@@ -46,8 +45,7 @@ pub async fn ask_inline_question<R: Runtime>(
     let project = config_service::find_project(&app, &project_id)?;
     let language = output_language(&app)?;
     let repo = Path::new(&project.repo_path);
-    let summary = git_service::diff_summary(repo, &selection)?;
-    let diff = git_service::file_diff(repo, &selection, &question.path)?;
+    let (summary, diff) = git_service::file_diff_with_summary(repo, &selection, &question.path)?;
     ensure_ai_ready_diff(diff.truncated)?;
     let content = match question.side.as_str() {
         "old" => diff.old_content.as_deref(),

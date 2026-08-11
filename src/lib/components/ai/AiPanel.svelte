@@ -12,7 +12,7 @@
   } from '@lucide/svelte';
   import SelectMenu from '$lib/components/common/SelectMenu.svelte';
   import type { ChangeReviewAvailability, ChangeReviewReport } from '$lib/domain/ai';
-  import type { ReviewOutputLanguage } from '$lib/domain/preferences';
+  import { reviewOutputLanguageOptions, type ReviewOutputLanguage } from '$lib/domain/preferences';
 
   let {
     availability,
@@ -35,11 +35,6 @@
   } = $props();
 
   let openGroups = $state<Record<string, boolean>>({});
-  const outputLanguageOptions = [
-    { value: 'english', label: 'English' },
-    { value: 'japanese', label: '日本語' }
-  ];
-
   function toggleGroup(id: string) {
     openGroups[id] = !(openGroups[id] ?? true);
   }
@@ -68,7 +63,7 @@
           id="review-output-language-panel"
           label="Review output language"
           value={outputLanguage}
-          options={outputLanguageOptions}
+          options={[...reviewOutputLanguageOptions]}
           disabled={loading}
           fluid
           onChange={(language) => onOutputLanguageChange(language as ReviewOutputLanguage)}

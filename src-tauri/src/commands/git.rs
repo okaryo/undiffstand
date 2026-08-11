@@ -17,17 +17,6 @@ pub fn get_diff_summary<R: Runtime>(
 }
 
 #[tauri::command]
-pub fn get_file_diff<R: Runtime>(
-    app: AppHandle<R>,
-    project_id: String,
-    selection: DiffSelection,
-    path: String,
-) -> AppResult<FileDiff> {
-    let project = config_service::find_project(&app, &project_id)?;
-    git_service::file_diff(Path::new(&project.repo_path), &selection, &path)
-}
-
-#[tauri::command]
 pub fn get_file_diffs<R: Runtime>(
     app: AppHandle<R>,
     project_id: String,

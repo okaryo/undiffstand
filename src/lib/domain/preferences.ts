@@ -1,6 +1,11 @@
 export type DiffViewMode = 'split' | 'unified';
 export type ReviewOutputLanguage = 'english' | 'japanese';
 
+export const reviewOutputLanguageOptions = [
+  { value: 'english', label: 'English' },
+  { value: 'japanese', label: '日本語' }
+] as const;
+
 export type UserPreferences = {
   ai?: {
     outputLanguage: ReviewOutputLanguage;

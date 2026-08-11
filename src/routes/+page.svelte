@@ -1,59 +1,43 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount } from 'svelte';
   import {
-    Bot,
-    Check,
-    CirclePlus,
     Columns2,
-    FolderGit2,
     GitBranch,
     LoaderCircle,
     PanelLeftClose,
     PanelLeftOpen,
     PanelRight,
-    Pencil,
     RefreshCw,
     Rows3,
     Settings,
-    WrapText,
-    X
+    WrapText
   } from '@lucide/svelte';
   import AiPanel from '$lib/components/ai/AiPanel.svelte';
   import EmptyState from '$lib/components/common/EmptyState.svelte';
   import ErrorBanner from '$lib/components/common/ErrorBanner.svelte';
-  import SelectMenu from '$lib/components/common/SelectMenu.svelte';
+  import ResizeHandle from '$lib/components/common/ResizeHandle.svelte';
+  import ComparisonDialog from '$lib/components/diff/ComparisonDialog.svelte';
   import DiffFeed from '$lib/components/diff/DiffFeed.svelte';
   import DiffFileList from '$lib/components/diff/DiffFileList.svelte';
-  import DiffSelector from '$lib/components/diff/DiffSelector.svelte';
   import DiffSummaryView from '$lib/components/diff/DiffSummary.svelte';
   import ProjectDialog from '$lib/components/project/ProjectDialog.svelte';
+  import ProjectHome from '$lib/components/project/ProjectHome.svelte';
   import ProjectSwitcher from '$lib/components/project/ProjectSwitcher.svelte';
-  import type {
-    ChangeReviewAvailability,
-    ChangeReviewReport,
-    DiffExplanation,
-    InlineAnswer
-  } from '$lib/domain/ai';
+  import AiSettingsDialog from '$lib/components/settings/AiSettingsDialog.svelte';
+  import { AiReviewController } from '$lib/controllers/ai-review.svelte';
+  import { DiffWorkspaceController } from '$lib/controllers/diff-workspace.svelte';
+  import { PreferencesController } from '$lib/controllers/preferences.svelte';
+  import type { InlineAnswer } from '$lib/domain/ai';
   import {
     defaultDiffSelection,
-    diffAnchorId,
     diffComparisonLabel,
     diffSelectionLabel,
-    displayPath,
     revisionDisplayLabel,
-    sortDiffFilesByTreeOrder,
-    type DiffSelection,
-    type DiffSummary,
-    type FileDiff
+    type DiffSelection
   } from '$lib/domain/diff';
   import { normalizeError, type AppError } from '$lib/domain/error';
-  import type {
-    DiffViewMode,
-    ReviewOutputLanguage,
-    UserPreferences
-  } from '$lib/domain/preferences';
+  import type { DiffViewMode, ReviewOutputLanguage } from '$lib/domain/preferences';
   import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
-  import { notifyReviewComplete } from '$lib/services/notification';
   import { tauriApi } from '$lib/services/tauri';
   import { resolveApplicationShortcut } from '$lib/shortcuts';
 
@@ -70,30 +54,22 @@
   let deleting = $state(false);
   let error = $state<AppError | null>(null);
   let workspaceError = $state<AppError | null>(null);
+  const preferences = new PreferencesController(tauriApi, (caught) => {
+    workspaceError = normalizeError(caught);
+  });
+  const aiReview = new AiReviewController(tauriApi, (caught) => {
+    workspaceError = caught === null ? null : normalizeError(caught);
+  });
+  const workspace = new DiffWorkspaceController(
+    tauriApi,
+    (caught) => {
+      workspaceError = caught === null ? null : normalizeError(caught);
+    },
+    () => aiReview.reset()
+  );
 
-  let diffMode = $state<DiffViewMode>('split');
-  let wrapLines = $state(false);
-  let summary = $state<DiffSummary | null>(null);
-  let diffSelection = $state<DiffSelection>(defaultDiffSelection());
-  let selectedDiffPath = $state<string | undefined>();
-  let diffsByPath = $state<Record<string, FileDiff | undefined>>({});
-  let diffLoadingPaths = $state<Record<string, boolean | undefined>>({});
-  let diffErrors = $state<Record<string, string | undefined>>({});
-  let fileExplanations = $state<Record<string, DiffExplanation | undefined>>({});
-  let fileAiLoading = $state<Record<string, boolean | undefined>>({});
-  let fileAiErrors = $state<Record<string, string | undefined>>({});
-  let changeReviewAvailability = $state<ChangeReviewAvailability>();
-  let changeReviewReport = $state<ChangeReviewReport>();
-  let aiLoading = $state(false);
-  let aiGeneration = 0;
   let aiPanelExpanded = $state(false);
   let aiPanelWidthBeforeExpand = 290;
-  let contentLoading = $state(false);
-  let sidebarOpen = $state(true);
-  let aiPanelOpen = $state(true);
-  let sidebarWidth = $state(225);
-  let aiPanelWidth = $state(290);
-  let reviewOutputLanguage = $state<ReviewOutputLanguage>('english');
   let activeBaseRef = $derived(
     activeProject?.baseRef && activeProject.baseRef !== 'HEAD'
       ? activeProject.baseRef
@@ -101,18 +77,12 @@
   );
   let baseToCurrentIsActive = $derived(
     Boolean(activeBaseRef) &&
-      diffSelection.base === activeBaseRef &&
-      diffSelection.target === 'HEAD'
+      workspace.selection.base === activeBaseRef &&
+      workspace.selection.target === 'HEAD'
   );
   let currentToWorkingTreeIsActive = $derived(
-    diffSelection.base === 'HEAD' && diffSelection.target === '.'
+    workspace.selection.base === 'HEAD' && workspace.selection.target === '.'
   );
-  let preferencesLoaded = false;
-  let preferencesSaving = false;
-  let preferencesSaveRequested = false;
-  let pendingDiffPaths = new Set<string>();
-  let diffBatchTimer: ReturnType<typeof setTimeout> | undefined;
-  let diffLoadGeneration = 0;
   let autoRefreshInProgress = false;
   let lastAutoRefreshAt = 0;
   const AUTO_REFRESH_COOLDOWN_MS = 1_000;
@@ -122,39 +92,18 @@
   const SIDEBAR_MAX_WIDTH = 420;
   const AI_PANEL_MIN_WIDTH = 240;
   const AI_PANEL_MAX_WIDTH = 520;
-  const PANEL_RESIZE_STEP = 10;
-  const outputLanguageOptions = [
-    { value: 'english', label: 'English' },
-    { value: 'japanese', label: '日本語' }
-  ];
   type ResizablePanel = 'sidebar' | 'ai';
-  let activeResize = $state<
-    | {
-        panel: ResizablePanel;
-        startX: number;
-        startWidth: number;
-        currentWidth: number;
-        workspaceWidth: number;
-        workspace: HTMLElement;
-      }
-    | undefined
-  >(undefined);
-  let pendingResizeClientX: number | undefined;
-  let resizeAnimationFrame: number | undefined;
-  let previousCursor = '';
-  let previousUserSelect = '';
 
   onMount(() => {
     if (window.innerWidth <= 1100) {
-      sidebarWidth = 200;
-      aiPanelWidth = 260;
+      preferences.sidebarWidth = 200;
+      preferences.aiPanelWidth = 260;
     }
     window.addEventListener('focus', refreshWorkspaceOnFocus);
     void initialize();
 
     return () => {
       window.removeEventListener('focus', refreshWorkspaceOnFocus);
-      stopPanelResize();
     };
   });
 
@@ -162,8 +111,14 @@
     const min = panel === 'sidebar' ? SIDEBAR_MIN_WIDTH : AI_PANEL_MIN_WIDTH;
     const configuredMax = panel === 'sidebar' ? SIDEBAR_MAX_WIDTH : AI_PANEL_MAX_WIDTH;
     const otherPanelWidth =
-      panel === 'sidebar' ? (aiPanelOpen ? aiPanelWidth : 0) : sidebarOpen ? sidebarWidth : 0;
-    const visibleHandleCount = Number(sidebarOpen) + Number(aiPanelOpen);
+      panel === 'sidebar'
+        ? preferences.aiPanelOpen
+          ? preferences.aiPanelWidth
+          : 0
+        : preferences.sidebarOpen
+          ? preferences.sidebarWidth
+          : 0;
+    const visibleHandleCount = Number(preferences.sidebarOpen) + Number(preferences.aiPanelOpen);
     const availableMax =
       workspaceWidth -
       otherPanelWidth -
@@ -173,200 +128,64 @@
     return { min, max: Math.max(min, Math.min(configuredMax, availableMax)) };
   }
 
-  function setPanelWidth(panel: ResizablePanel, width: number, workspaceWidth: number) {
-    const nextWidth = constrainedPanelWidth(panel, width, workspaceWidth);
-    if (panel === 'sidebar') sidebarWidth = nextWidth;
-    else aiPanelWidth = nextWidth;
-  }
-
   function constrainedPanelWidth(panel: ResizablePanel, width: number, workspaceWidth: number) {
     const { min, max } = panelWidthLimits(panel, workspaceWidth);
     return Math.round(Math.min(max, Math.max(min, width)));
   }
 
-  function startPanelResize(event: PointerEvent, panel: ResizablePanel) {
-    if (event.button !== 0) return;
-    const handle = event.currentTarget as HTMLElement;
-    const workspace = handle.parentElement;
-    if (!workspace) return;
-
-    event.preventDefault();
-    activeResize = {
-      panel,
-      startX: event.clientX,
-      startWidth: panel === 'sidebar' ? sidebarWidth : aiPanelWidth,
-      currentWidth: panel === 'sidebar' ? sidebarWidth : aiPanelWidth,
-      workspaceWidth: workspace.getBoundingClientRect().width,
-      workspace
-    };
-    previousCursor = document.body.style.cursor;
-    previousUserSelect = document.body.style.userSelect;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    window.addEventListener('pointermove', resizePanel);
-    window.addEventListener('pointerup', stopPanelResize);
-    window.addEventListener('pointercancel', stopPanelResize);
-  }
-
-  function resizePanel(event: PointerEvent) {
-    if (!activeResize) return;
-    if (activeResize.panel === 'ai') aiPanelExpanded = false;
-    pendingResizeClientX = event.clientX;
-    if (resizeAnimationFrame !== undefined) return;
-    resizeAnimationFrame = requestAnimationFrame(flushPanelResize);
-  }
-
-  function flushPanelResize() {
-    resizeAnimationFrame = undefined;
-    if (!activeResize || pendingResizeClientX === undefined) return;
-    const direction = activeResize.panel === 'sidebar' ? 1 : -1;
-    const requestedWidth =
-      activeResize.startWidth + (pendingResizeClientX - activeResize.startX) * direction;
-    pendingResizeClientX = undefined;
-    activeResize.currentWidth = constrainedPanelWidth(
-      activeResize.panel,
-      requestedWidth,
-      activeResize.workspaceWidth
-    );
-    const property = activeResize.panel === 'sidebar' ? '--sidebar-width' : '--ai-panel-width';
-    activeResize.workspace.style.setProperty(property, `${activeResize.currentWidth}px`);
-  }
-
-  function stopPanelResize() {
-    if (!activeResize) return;
-    if (resizeAnimationFrame !== undefined) {
-      cancelAnimationFrame(resizeAnimationFrame);
-      resizeAnimationFrame = undefined;
-    }
-    flushPanelResize();
-    const { panel, currentWidth } = activeResize;
-    if (panel === 'sidebar') sidebarWidth = currentWidth;
-    else aiPanelWidth = currentWidth;
-    queuePreferencesSave();
-    activeResize = undefined;
-    pendingResizeClientX = undefined;
-    document.body.style.cursor = previousCursor;
-    document.body.style.userSelect = previousUserSelect;
-    window.removeEventListener('pointermove', resizePanel);
-    window.removeEventListener('pointerup', stopPanelResize);
-    window.removeEventListener('pointercancel', stopPanelResize);
-  }
-
-  function resizePanelWithKeyboard(event: KeyboardEvent, panel: ResizablePanel) {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const workspace = (event.currentTarget as HTMLElement).parentElement;
-    if (!workspace) return;
-
-    event.preventDefault();
-    const workspaceWidth = workspace.getBoundingClientRect().width;
-    const currentWidth = panel === 'sidebar' ? sidebarWidth : aiPanelWidth;
-    const direction = panel === 'sidebar' ? 1 : -1;
-    const { min, max } = panelWidthLimits(panel, workspaceWidth);
-    if (event.key === 'Home') setPanelWidth(panel, min, workspaceWidth);
-    else if (event.key === 'End') setPanelWidth(panel, max, workspaceWidth);
-    else {
-      const movement = event.key === 'ArrowRight' ? PANEL_RESIZE_STEP : -PANEL_RESIZE_STEP;
-      setPanelWidth(panel, currentWidth + movement * direction, workspaceWidth);
-    }
-    queuePreferencesSave();
-  }
-
   function resetPanelWidth(panel: ResizablePanel) {
-    if (panel === 'sidebar') sidebarWidth = window.innerWidth <= 1100 ? 200 : 225;
-    else aiPanelWidth = window.innerWidth <= 1100 ? 260 : 290;
-    queuePreferencesSave();
+    if (panel === 'sidebar') preferences.sidebarWidth = window.innerWidth <= 1100 ? 200 : 225;
+    else preferences.aiPanelWidth = window.innerWidth <= 1100 ? 260 : 290;
+    preferences.queueSave();
   }
 
   function toggleAiPanelExpanded() {
     if (aiPanelExpanded) {
-      aiPanelWidth = aiPanelWidthBeforeExpand;
+      preferences.aiPanelWidth = aiPanelWidthBeforeExpand;
       aiPanelExpanded = false;
     } else {
-      aiPanelWidthBeforeExpand = aiPanelWidth;
-      aiPanelWidth = AI_PANEL_MAX_WIDTH;
+      aiPanelWidthBeforeExpand = preferences.aiPanelWidth;
+      preferences.aiPanelWidth = AI_PANEL_MAX_WIDTH;
       aiPanelExpanded = true;
     }
   }
 
-  function applyPreferences(preferences: UserPreferences) {
-    const detail = preferences.changeDetail;
-    sidebarOpen = detail.changedFilesPanel.open;
-    sidebarWidth = detail.changedFilesPanel.width;
-    aiPanelOpen = detail.aiPanel.open;
-    aiPanelWidth = detail.aiPanel.width;
-    diffMode = detail.diff.mode;
-    wrapLines = detail.diff.wrapLongLines;
-    reviewOutputLanguage = preferences.ai?.outputLanguage ?? 'english';
-  }
-
-  function currentPreferences(): UserPreferences {
-    return {
-      ai: { outputLanguage: reviewOutputLanguage },
-      changeDetail: {
-        changedFilesPanel: { open: sidebarOpen, width: sidebarWidth },
-        aiPanel: { open: aiPanelOpen, width: aiPanelWidth },
-        diff: { mode: diffMode, wrapLongLines: wrapLines }
-      }
-    };
-  }
-
-  function queuePreferencesSave() {
-    if (!preferencesLoaded) return;
-    preferencesSaveRequested = true;
-    if (!preferencesSaving) void flushPreferencesSave();
-  }
-
-  async function flushPreferencesSave() {
-    preferencesSaving = true;
-    while (preferencesSaveRequested) {
-      preferencesSaveRequested = false;
-      try {
-        await tauriApi.saveUserPreferences(currentPreferences());
-      } catch (caught) {
-        workspaceError = normalizeError(caught);
-        preferencesSaveRequested = false;
-      }
-    }
-    preferencesSaving = false;
-  }
-
   function toggleSidebar() {
-    sidebarOpen = !sidebarOpen;
-    queuePreferencesSave();
+    preferences.sidebarOpen = !preferences.sidebarOpen;
+    preferences.queueSave();
   }
 
   function toggleAiPanel() {
-    aiPanelOpen = !aiPanelOpen;
-    queuePreferencesSave();
+    preferences.aiPanelOpen = !preferences.aiPanelOpen;
+    preferences.queueSave();
   }
 
   function setDiffMode(mode: DiffViewMode) {
-    if (diffMode === mode) return;
-    diffMode = mode;
-    queuePreferencesSave();
+    if (preferences.diffMode === mode) return;
+    preferences.diffMode = mode;
+    preferences.queueSave();
   }
 
   function toggleLineWrapping() {
-    wrapLines = !wrapLines;
-    queuePreferencesSave();
+    preferences.wrapLines = !preferences.wrapLines;
+    preferences.queueSave();
   }
 
   function setReviewOutputLanguage(language: ReviewOutputLanguage) {
-    if (reviewOutputLanguage === language) return;
-    reviewOutputLanguage = language;
-    clearAiResults();
-    queuePreferencesSave();
+    if (preferences.reviewOutputLanguage === language) return;
+    preferences.reviewOutputLanguage = language;
+    aiReview.reset();
+    preferences.queueSave();
   }
 
   async function initialize() {
     try {
-      const [loadedProjects, preferences] = await Promise.all([
+      const [loadedProjects, loadedPreferences] = await Promise.all([
         tauriApi.listProjects(),
         tauriApi.getUserPreferences()
       ]);
       projects = loadedProjects;
-      applyPreferences(preferences);
-      preferencesLoaded = true;
+      preferences.apply(loadedPreferences);
       const params = new URLSearchParams(window.location.search);
       const projectId = params.get('project');
       if (projectId) {
@@ -390,8 +209,8 @@
       !activeProject ||
       showProjectDialog ||
       showSettings ||
-      contentLoading ||
-      aiLoading ||
+      workspace.loading ||
+      aiReview.loading ||
       autoRefreshInProgress ||
       now - lastAutoRefreshAt < AUTO_REFRESH_COOLDOWN_MS
     )
@@ -399,18 +218,9 @@
 
     lastAutoRefreshAt = now;
     autoRefreshInProgress = true;
-    void loadWorkspace(selectedDiffPath, { silent: true }).finally(() => {
+    void workspace.load(workspace.selectedPath, { silent: true }).finally(() => {
       autoRefreshInProgress = false;
     });
-  }
-
-  function setUrl(file?: string) {
-    if (!activeProject) return;
-    const params = new URLSearchParams({ project: activeProject.id });
-    if (file) params.set('file', file);
-    if (diffSelection.base !== 'HEAD') params.set('base', diffSelection.base);
-    if (diffSelection.target !== '.') params.set('target', diffSelection.target);
-    history.replaceState(null, '', `?${params.toString()}`);
   }
 
   async function addRepository() {
@@ -437,7 +247,7 @@
       editingProject = undefined;
       if (activeProject?.id === project.id) {
         activeProject = project;
-        await loadWorkspace();
+        await workspace.load();
       } else {
         await openProject(project);
       }
@@ -482,9 +292,9 @@
       ]);
       activeProject = openedProject;
       activeRepository = repository;
-      diffSelection = requestedSelection;
+      workspace.activate(openedProject.id, requestedSelection);
       projects = [activeProject, ...projects.filter((item) => item.id !== activeProject?.id)];
-      await loadWorkspace(requestedFile);
+      await workspace.load(requestedFile);
     } catch (caught) {
       workspaceError = normalizeError(caught);
     } finally {
@@ -492,114 +302,8 @@
     }
   }
 
-  async function loadWorkspace(requestedFile?: string, options: { silent?: boolean } = {}) {
-    if (!activeProject) return;
-    const projectId = activeProject.id;
-    const selection: DiffSelection = {
-      base: diffSelection.base,
-      target: diffSelection.target
-    };
-    const silent = options.silent ?? false;
-    workspaceError = null;
-    if (!silent) {
-      summary = null;
-      contentLoading = true;
-      clearWorkspaceDiffs();
-    }
-    try {
-      const [loadedSummary, reviewAvailability] = await Promise.all([
-        tauriApi.getDiffSummary(projectId, selection),
-        tauriApi.getChangeReviewAvailability(projectId, selection)
-      ]);
-      if (
-        activeProject?.id !== projectId ||
-        diffSelection.base !== selection.base ||
-        diffSelection.target !== selection.target
-      )
-        return;
-      const orderedSummary = {
-        ...loadedSummary,
-        files: sortDiffFilesByTreeOrder(loadedSummary.files)
-      };
-      changeReviewAvailability = reviewAvailability;
-      const path =
-        requestedFile && orderedSummary.files.some((file) => displayPath(file) === requestedFile)
-          ? requestedFile
-          : orderedSummary.files[0]
-            ? displayPath(orderedSummary.files[0])
-            : undefined;
-
-      if (silent) {
-        const availablePaths = new Set(orderedSummary.files.map(displayPath));
-        const refreshPaths = new Set([
-          ...Object.keys(diffsByPath),
-          ...Object.keys(diffErrors),
-          ...Object.entries(diffLoadingPaths)
-            .filter(([, isLoading]) => isLoading)
-            .map(([loadingPath]) => loadingPath)
-        ]);
-        if (path) refreshPaths.add(path);
-
-        const pathsToRefresh = [...refreshPaths].filter((refreshPath) =>
-          availablePaths.has(refreshPath)
-        );
-        const refreshedDiffs =
-          pathsToRefresh.length > 0
-            ? await tauriApi.getFileDiffs(projectId, selection, pathsToRefresh)
-            : [];
-        if (
-          activeProject?.id !== projectId ||
-          diffSelection.base !== selection.base ||
-          diffSelection.target !== selection.target
-        )
-          return;
-
-        clearPendingDiffs();
-        diffsByPath = Object.fromEntries(
-          refreshedDiffs.map((diff) => [displayPath(diff.file), diff])
-        );
-        diffLoadingPaths = {};
-        diffErrors = {};
-      }
-
-      summary = orderedSummary;
-      if (!silent) contentLoading = false;
-      selectedDiffPath = path;
-      setUrl(path);
-      if (path) {
-        queueDiff(path);
-        await tick();
-        if (!silent && activeProject?.id === projectId) scrollToDiff(path, false);
-      }
-    } catch (caught) {
-      if (activeProject?.id === projectId) workspaceError = normalizeError(caught);
-    } finally {
-      if (!silent && activeProject?.id === projectId) contentLoading = false;
-    }
-  }
-
-  function clearWorkspaceDiffs() {
-    clearPendingDiffs();
-    diffsByPath = {};
-    diffLoadingPaths = {};
-    diffErrors = {};
-    changeReviewAvailability = undefined;
-    clearAiResults();
-  }
-
-  function clearAiResults() {
-    aiGeneration += 1;
-    aiLoading = false;
-    fileExplanations = {};
-    fileAiLoading = {};
-    fileAiErrors = {};
-    changeReviewReport = undefined;
-  }
-
   async function applyDiffSelection(selection: DiffSelection) {
-    diffSelection = selection;
-    selectedDiffPath = undefined;
-    await loadWorkspace();
+    await workspace.applySelection(selection);
     showComparisonDialog = false;
   }
 
@@ -615,14 +319,14 @@
       if (showProjectDialog || showSettings || showComparisonDialog) event.preventDefault();
       showProjectDialog = false;
       showSettings = false;
-      if (!contentLoading) showComparisonDialog = false;
+      if (!workspace.loading) showComparisonDialog = false;
     } else if (shortcut === 'open-settings') {
       event.preventDefault();
       if (activeProject) void editActiveProject();
       else showSettings = true;
     } else if (shortcut === 'refresh-change-detail' && activeProject) {
       event.preventDefault();
-      void loadWorkspace(selectedDiffPath);
+      void workspace.load(workspace.selectedPath);
     } else if (shortcut === 'toggle-changed-files' && activeProject) {
       event.preventDefault();
       toggleSidebar();
@@ -632,96 +336,8 @@
     }
   }
 
-  function selectDiff(path: string) {
-    if (!activeProject) return;
-    selectedDiffPath = path;
-    setUrl(path);
-    queueDiff(path);
-    scrollToDiff(path, true);
-  }
-
-  function scrollToDiff(path: string, smooth: boolean) {
-    document
-      .getElementById(diffAnchorId(path))
-      ?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
-  }
-
-  function setActiveDiff(path: string) {
-    if (selectedDiffPath === path) return;
-    selectedDiffPath = path;
-    setUrl(path);
-  }
-
-  function queueDiff(path: string) {
-    if (!activeProject || diffsByPath[path] || diffLoadingPaths[path]) return;
-    diffErrors[path] = undefined;
-    diffLoadingPaths[path] = true;
-    pendingDiffPaths.add(path);
-    diffBatchTimer ??= setTimeout(loadPendingDiffs, 16);
-  }
-
-  async function loadPendingDiffs() {
-    diffBatchTimer = undefined;
-    if (!activeProject || pendingDiffPaths.size === 0) return;
-    const projectId = activeProject.id;
-    const generation = diffLoadGeneration;
-    const paths = [...pendingDiffPaths];
-    pendingDiffPaths.clear();
-
-    try {
-      const selection: DiffSelection = {
-        base: diffSelection.base,
-        target: diffSelection.target
-      };
-      const loadedDiffs = await tauriApi.getFileDiffs(projectId, selection, paths);
-      if (activeProject?.id !== projectId || diffLoadGeneration !== generation) return;
-      for (const diff of loadedDiffs) {
-        diffsByPath[displayPath(diff.file)] = diff;
-      }
-      if (selectedDiffPath && paths.includes(selectedDiffPath)) {
-        await tick();
-        if (diffLoadGeneration === generation) scrollToDiff(selectedDiffPath, false);
-      }
-    } catch (caught) {
-      const normalized = normalizeError(caught);
-      if (activeProject?.id === projectId && diffLoadGeneration === generation) {
-        for (const path of paths) diffErrors[path] = normalized.message;
-      }
-    } finally {
-      if (activeProject?.id === projectId && diffLoadGeneration === generation) {
-        for (const path of paths) diffLoadingPaths[path] = false;
-      }
-    }
-  }
-
-  function clearPendingDiffs() {
-    if (diffBatchTimer !== undefined) clearTimeout(diffBatchTimer);
-    diffBatchTimer = undefined;
-    pendingDiffPaths.clear();
-    diffLoadGeneration += 1;
-  }
-
   async function explainFileChange(path: string) {
-    if (!activeProject || fileAiLoading[path]) return;
-    const generation = aiGeneration;
-    const projectId = activeProject.id;
-    const selection = { ...diffSelection };
-    fileAiLoading[path] = true;
-    fileAiErrors[path] = undefined;
-    fileExplanations[path] = undefined;
-    try {
-      const explanation = await tauriApi.explainFileChange(projectId, selection, path);
-      if (generation !== aiGeneration || activeProject?.id !== projectId) return;
-      fileExplanations[path] = explanation;
-      void notifyReviewComplete('file');
-    } catch (caught) {
-      if (generation !== aiGeneration || activeProject?.id !== projectId) return;
-      fileAiErrors[path] = normalizeError(caught).message;
-    } finally {
-      if (generation === aiGeneration && activeProject?.id === projectId) {
-        fileAiLoading[path] = false;
-      }
-    }
+    if (activeProject) await aiReview.explainFile(activeProject.id, workspace.selection, path);
   }
 
   async function askInline(
@@ -732,58 +348,27 @@
     question: string
   ): Promise<InlineAnswer> {
     if (!activeProject) return Promise.reject(new Error('No project is open.'));
-    const generation = aiGeneration;
-    const projectId = activeProject.id;
-    const selection = { ...diffSelection };
-    const answer = await tauriApi.askInlineQuestion(projectId, selection, {
+    return aiReview.askInline(
+      activeProject.id,
+      workspace.selection,
       path,
       side,
       startLine,
       endLine,
       question
-    });
-    if (generation !== aiGeneration || activeProject?.id !== projectId) {
-      throw new Error('The comparison changed before Codex answered.');
-    }
-    void notifyReviewComplete('inline');
-    return answer;
+    );
   }
 
   async function runChangeReview() {
-    if (!activeProject || !changeReviewAvailability?.available || aiLoading) return;
-    const generation = aiGeneration;
-    const projectId = activeProject.id;
-    const selection = { ...diffSelection };
-    aiLoading = true;
-    changeReviewReport = undefined;
-    workspaceError = null;
-    try {
-      const report = await tauriApi.runChangeReview(projectId, selection);
-      if (generation !== aiGeneration || activeProject?.id !== projectId) return;
-      changeReviewReport = report;
-      void notifyReviewComplete('change');
-    } catch (caught) {
-      if (generation !== aiGeneration || activeProject?.id !== projectId) return;
-      workspaceError = normalizeError(caught);
-    } finally {
-      if (generation === aiGeneration && activeProject?.id === projectId) {
-        aiLoading = false;
-      }
+    if (activeProject) {
+      await aiReview.review(activeProject.id, workspace.selection, workspace.reviewAvailability);
     }
   }
 
   function goHome() {
     activeProject = null;
     activeRepository = undefined;
-    summary = null;
-    diffSelection = defaultDiffSelection();
-    selectedDiffPath = undefined;
-    clearPendingDiffs();
-    diffsByPath = {};
-    diffLoadingPaths = {};
-    diffErrors = {};
-    changeReviewAvailability = undefined;
-    clearAiResults();
+    workspace.reset();
     workspaceError = null;
     history.replaceState(null, '', window.location.pathname);
   }
@@ -804,15 +389,6 @@
 
   async function editActiveProject() {
     if (activeProject) await editProject(activeProject);
-  }
-
-  function formatDate(value: string) {
-    const date = new Date(value);
-    return Number.isNaN(date.valueOf())
-      ? value
-      : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
-          date
-        );
   }
 </script>
 
@@ -835,28 +411,34 @@
         class="sidebar-toggle"
         type="button"
         aria-controls="changed-files-sidebar"
-        aria-expanded={sidebarOpen}
-        aria-label={sidebarOpen ? 'Hide changed files sidebar' : 'Show changed files sidebar'}
-        title={sidebarOpen ? 'Hide changed files' : 'Show changed files'}
+        aria-expanded={preferences.sidebarOpen}
+        aria-label={preferences.sidebarOpen
+          ? 'Hide changed files sidebar'
+          : 'Show changed files sidebar'}
+        title={preferences.sidebarOpen ? 'Hide changed files' : 'Show changed files'}
         onclick={toggleSidebar}
       >
-        {#if sidebarOpen}<PanelLeftClose size={15} />{:else}<PanelLeftOpen size={15} />{/if}
+        {#if preferences.sidebarOpen}<PanelLeftClose size={15} />{:else}<PanelLeftOpen
+            size={15}
+          />{/if}
       </button>
       <ProjectSwitcher
         {projects}
         {activeProject}
-        comparisonLabel={summary
-          ? diffComparisonLabel(summary.comparison, activeRepository?.currentBranch)
-          : diffSelectionLabel(diffSelection, activeRepository?.currentBranch)}
+        comparisonLabel={workspace.summary
+          ? diffComparisonLabel(workspace.summary.comparison, activeRepository?.currentBranch)
+          : diffSelectionLabel(workspace.selection, activeRepository?.currentBranch)}
         onEditComparison={() => (showComparisonDialog = true)}
         onSelect={openProject}
       />
       <div class="top-actions">
-        <button onclick={() => loadWorkspace(selectedDiffPath)} title="Refresh"
+        <button onclick={() => workspace.load(workspace.selectedPath)} title="Refresh"
           ><RefreshCw size={14} /></button
         >
-        <button onclick={toggleAiPanel} class:active={aiPanelOpen} title="Toggle AI panel"
-          ><PanelRight size={14} /></button
+        <button
+          onclick={toggleAiPanel}
+          class:active={preferences.aiPanelOpen}
+          title="Toggle AI panel"><PanelRight size={14} /></button
         >
         <button onclick={editActiveProject} title="Project settings"><Settings size={14} /></button>
       </div>
@@ -869,120 +451,115 @@
     {/if}
 
     <div
-      class:withoutAi={!aiPanelOpen}
-      class:withoutSidebar={!sidebarOpen}
+      class:withoutAi={!preferences.aiPanelOpen}
+      class:withoutSidebar={!preferences.sidebarOpen}
       class="workspace"
-      style:--sidebar-width={`${sidebarWidth}px`}
-      style:--ai-panel-width={`${aiPanelWidth}px`}
+      style:--sidebar-width={`${preferences.sidebarWidth}px`}
+      style:--ai-panel-width={`${preferences.aiPanelWidth}px`}
     >
-      {#if sidebarOpen}
+      {#if preferences.sidebarOpen}
         <aside id="changed-files-sidebar" class="sidebar">
           <div class="pane-title">
-            <span>Changed files</span><b>{summary?.files.length ?? 0}</b>
+            <span>Changed files</span><b>{workspace.summary?.files.length ?? 0}</b>
           </div>
-          {#if summary}<DiffFileList
-              files={summary.files}
-              selectedPath={selectedDiffPath}
-              onSelect={selectDiff}
+          {#if workspace.summary}<DiffFileList
+              files={workspace.summary.files}
+              selectedPath={workspace.selectedPath}
+              onSelect={(path) => workspace.select(path)}
             />{/if}
         </aside>
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions, a11y_no_noninteractive_tabindex (separator is an interactive window splitter) -->
-        <div
-          class="resize-handle"
-          class:resizing={activeResize?.panel === 'sidebar'}
-          role="separator"
-          aria-label="Resize changed files sidebar"
-          aria-orientation="vertical"
-          aria-valuemin={SIDEBAR_MIN_WIDTH}
-          aria-valuemax={SIDEBAR_MAX_WIDTH}
-          aria-valuenow={sidebarWidth}
-          tabindex="0"
-          onpointerdown={(event) => startPanelResize(event, 'sidebar')}
-          onkeydown={(event) => resizePanelWithKeyboard(event, 'sidebar')}
-          ondblclick={() => resetPanelWidth('sidebar')}
-        ></div>
+        <ResizeHandle
+          label="Resize changed files sidebar"
+          value={preferences.sidebarWidth}
+          minimum={SIDEBAR_MIN_WIDTH}
+          maximum={SIDEBAR_MAX_WIDTH}
+          cssProperty="--sidebar-width"
+          constrain={(width, workspaceWidth) =>
+            constrainedPanelWidth('sidebar', width, workspaceWidth)}
+          onChange={(width) => (preferences.sidebarWidth = width)}
+          onCommit={() => preferences.queueSave()}
+          onReset={() => resetPanelWidth('sidebar')}
+        />
       {/if}
 
       <section class="content-pane">
         <div class="content-toolbar">
-          {#if summary}<DiffSummaryView {summary} />{/if}
+          {#if workspace.summary}<DiffSummaryView summary={workspace.summary} />{/if}
           <div class="view-controls">
             <div class="view-mode-switch" role="group" aria-label="Diff layout">
               <button
-                class:active={diffMode === 'split'}
-                aria-pressed={diffMode === 'split'}
+                class:active={preferences.diffMode === 'split'}
+                aria-pressed={preferences.diffMode === 'split'}
                 onclick={() => setDiffMode('split')}
                 title="Split diff"><Columns2 size={13} />Split</button
               >
               <button
-                class:active={diffMode === 'unified'}
-                aria-pressed={diffMode === 'unified'}
+                class:active={preferences.diffMode === 'unified'}
+                aria-pressed={preferences.diffMode === 'unified'}
                 onclick={() => setDiffMode('unified')}
                 title="Unified diff"><Rows3 size={13} />Unified</button
               >
             </div>
             <button
               class="wrap-control"
-              class:active={wrapLines}
-              aria-pressed={wrapLines}
+              class:active={preferences.wrapLines}
+              aria-pressed={preferences.wrapLines}
               onclick={toggleLineWrapping}
               title="Wrap long lines"><WrapText size={13} /></button
             >
           </div>
         </div>
         <div class="viewer-scroll">
-          {#if contentLoading}<div class="loading-state">
+          {#if workspace.loading}<div class="loading-state">
               <LoaderCircle class="spin" size={20} />Loading changes…
             </div>
-          {:else if summary && summary.files.length > 0}<DiffFeed
-              files={summary.files}
-              diffs={diffsByPath}
-              loadingPaths={diffLoadingPaths}
-              errors={diffErrors}
-              activePath={selectedDiffPath}
-              mode={diffMode}
-              wrap={wrapLines}
-              {fileExplanations}
-              {fileAiLoading}
-              {fileAiErrors}
-              findings={changeReviewReport?.findings ?? []}
-              onLoad={queueDiff}
-              onActive={setActiveDiff}
+          {:else if workspace.summary && workspace.summary.files.length > 0}<DiffFeed
+              files={workspace.summary.files}
+              diffs={workspace.diffs}
+              loadingPaths={workspace.loadingPaths}
+              errors={workspace.errors}
+              activePath={workspace.selectedPath}
+              mode={preferences.diffMode}
+              wrap={preferences.wrapLines}
+              fileExplanations={aiReview.fileExplanations}
+              fileAiLoading={aiReview.fileLoading}
+              fileAiErrors={aiReview.fileErrors}
+              findings={aiReview.report?.findings ?? []}
+              onLoad={(path) => workspace.queue(path)}
+              onActive={(path) => workspace.setActive(path)}
               onExplainFile={explainFileChange}
               onAskInline={askInline}
             />
-          {:else if summary}<EmptyState
+          {:else if workspace.summary}<EmptyState
               icon={GitBranch}
               title="No changes"
-              message={`No changes found from ${revisionDisplayLabel(summary.comparison.fromLabel, activeRepository?.currentBranch)} to ${revisionDisplayLabel(summary.comparison.toLabel, activeRepository?.currentBranch)}.`}
+              message={`No changes found from ${revisionDisplayLabel(workspace.summary.comparison.fromLabel, activeRepository?.currentBranch)} to ${revisionDisplayLabel(workspace.summary.comparison.toLabel, activeRepository?.currentBranch)}.`}
               fill
             />
           {/if}
         </div>
       </section>
 
-      {#if aiPanelOpen}
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions, a11y_no_noninteractive_tabindex (separator is an interactive window splitter) -->
-        <div
-          class="resize-handle"
-          class:resizing={activeResize?.panel === 'ai'}
-          role="separator"
-          aria-label="Resize AI panel"
-          aria-orientation="vertical"
-          aria-valuemin={AI_PANEL_MIN_WIDTH}
-          aria-valuemax={AI_PANEL_MAX_WIDTH}
-          aria-valuenow={aiPanelWidth}
-          tabindex="0"
-          onpointerdown={(event) => startPanelResize(event, 'ai')}
-          onkeydown={(event) => resizePanelWithKeyboard(event, 'ai')}
-          ondblclick={() => resetPanelWidth('ai')}
-        ></div>
+      {#if preferences.aiPanelOpen}
+        <ResizeHandle
+          label="Resize AI panel"
+          value={preferences.aiPanelWidth}
+          minimum={AI_PANEL_MIN_WIDTH}
+          maximum={AI_PANEL_MAX_WIDTH}
+          direction={-1}
+          cssProperty="--ai-panel-width"
+          constrain={(width, workspaceWidth) => constrainedPanelWidth('ai', width, workspaceWidth)}
+          onChange={(width) => (preferences.aiPanelWidth = width)}
+          onCommit={() => preferences.queueSave()}
+          onStart={() => (aiPanelExpanded = false)}
+          onReset={() => resetPanelWidth('ai')}
+        />
         <AiPanel
-          availability={changeReviewAvailability}
-          report={changeReviewReport}
-          loading={aiLoading}
+          availability={workspace.reviewAvailability}
+          report={aiReview.report}
+          loading={aiReview.loading}
           expanded={aiPanelExpanded}
-          outputLanguage={reviewOutputLanguage}
+          outputLanguage={preferences.reviewOutputLanguage}
           onReview={runChangeReview}
           onToggleExpanded={toggleAiPanelExpanded}
           onOutputLanguageChange={setReviewOutputLanguage}
@@ -991,63 +568,16 @@
     </div>
   </main>
 {:else}
-  <main class="home">
-    <header class="home-header">
-      <div class="brand">
-        <span class="brand-mark"><img src="/undiffstand-icon.png" alt="" /></span>
-        <div>
-          <strong>undiffstand</strong><small
-            >AI-assisted diff understanding for human reviewers.</small
-          >
-        </div>
-      </div>
-      <button class="settings-button" onclick={() => (showSettings = true)}
-        ><Settings size={14} />Settings</button
-      >
-    </header>
-
-    <section class="projects-section">
-      {#if error}<ErrorBanner {error} onDismiss={() => (error = null)} />{/if}
-      {#if loading}
-        <div class="loading-state"><LoaderCircle class="spin" size={20} />Loading projects…</div>
-      {:else if projects.length}
-        <div class="section-heading">
-          <h1>Continue reviewing</h1>
-          <button onclick={addRepository}><CirclePlus size={14} />Add Project</button>
-        </div>
-        <div class="project-grid">
-          {#each projects as project (project.id)}
-            <article>
-              <button class="project-main" onclick={() => openProject(project)}>
-                <div class="project-icon"><FolderGit2 size={19} /></div>
-                <div class="project-info">
-                  <h3>{project.name}</h3>
-                  <p>{project.repoPath}</p>
-                  <span><GitBranch size={11} />Current branch → working tree</span>
-                </div>
-              </button>
-              <div class="project-meta">
-                <button
-                  class="edit-project"
-                  onclick={() => editProject(project)}
-                  title={`Edit ${project.name}`}
-                  aria-label={`Edit ${project.name}`}><Pencil size={14} /></button
-                >
-                <time>{formatDate(project.lastOpenedAt)}</time>
-              </div>
-            </article>
-          {/each}
-        </div>
-      {:else}
-        <div class="empty-projects">
-          <div class="empty-project-icon"><FolderGit2 size={28} strokeWidth={1.5} /></div>
-          <h1>Add your first project</h1>
-          <p>Choose a local Git repository to start reviewing its changes.</p>
-          <button onclick={addRepository}><CirclePlus size={16} />Add Project</button>
-        </div>
-      {/if}
-    </section>
-  </main>
+  <ProjectHome
+    {projects}
+    {loading}
+    {error}
+    onAdd={addRepository}
+    onOpen={openProject}
+    onEdit={editProject}
+    onOpenSettings={() => (showSettings = true)}
+    onDismissError={() => (error = null)}
+  />
 {/if}
 
 {#if showProjectDialog}
@@ -1062,222 +592,29 @@
   />
 {/if}
 
-{#if activeProject && showComparisonDialog}
-  <div
-    class="dialog-backdrop"
-    role="presentation"
-    onclick={(event) =>
-      event.target === event.currentTarget && !contentLoading && (showComparisonDialog = false)}
-  >
-    <div
-      class="comparison-dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="comparison-dialog-title"
-    >
-      <header>
-        <div>
-          <GitBranch size={17} />
-          <h2 id="comparison-dialog-title">Change comparison</h2>
-        </div>
-        <button
-          aria-label="Close comparison dialog"
-          disabled={contentLoading}
-          onclick={() => (showComparisonDialog = false)}><X size={17} /></button
-        >
-      </header>
-      <div class="comparison-dialog-content">
-        <section class="comparison-editor" aria-label="Comparison">
-          <DiffSelector
-            selection={diffSelection}
-            recentBranches={activeRepository?.recentBranches ?? []}
-            localBranches={activeRepository?.localBranches ?? []}
-            remoteBranches={activeRepository?.remoteBranches ?? []}
-            recentCommits={activeRepository?.recentCommits ?? []}
-            currentBranch={activeRepository?.currentBranch}
-            loading={contentLoading}
-            onApply={applyDiffSelection}
-          />
-        </section>
-        <section class="quick-comparisons" aria-labelledby="quick-comparisons-title">
-          <div class="comparison-section-heading">
-            <div>
-              <h3 id="quick-comparisons-title">Quick comparisons</h3>
-              <p>Apply a common comparison immediately.</p>
-            </div>
-            {#if !activeBaseRef}
-              <button type="button" class="settings-link" onclick={configureBaseBranch}
-                >Set base branch in Project settings</button
-              >
-            {/if}
-          </div>
-          <div class="quick-comparison-list">
-            <div class="quick-comparison-row">
-              <div>
-                <strong
-                  >{activeBaseRef ?? 'Base branch'} → {activeRepository?.currentBranch ??
-                    'Current branch'}</strong
-                >
-                <span>Base branch → Current branch</span>
-              </div>
-              {#if baseToCurrentIsActive}
-                <span class="current-comparison" role="status" aria-label="Current comparison"
-                  ><Check size={13} />Current</span
-                >
-              {:else if activeBaseRef && activeBaseRef === activeRepository?.currentBranch}
-                <span class="comparison-unavailable">Same branch</span>
-              {:else}
-                <button
-                  type="button"
-                  class="compare-button"
-                  aria-label={`Compare ${activeBaseRef ?? 'base branch'} → ${activeRepository?.currentBranch ?? 'current branch'}`}
-                  disabled={contentLoading || !activeBaseRef || !activeRepository?.currentBranch}
-                  title={!activeBaseRef ? 'Set a base branch in Project settings.' : undefined}
-                  onclick={() =>
-                    activeBaseRef && applyDiffSelection({ base: activeBaseRef, target: 'HEAD' })}
-                  >Compare</button
-                >
-              {/if}
-            </div>
-            <div class="quick-comparison-row">
-              <div>
-                <strong>{activeRepository?.currentBranch ?? 'HEAD'} → Working tree</strong>
-                <span>Current branch → Working tree</span>
-              </div>
-              {#if currentToWorkingTreeIsActive}
-                <span class="current-comparison" role="status" aria-label="Current comparison"
-                  ><Check size={13} />Current</span
-                >
-              {:else}
-                <button
-                  type="button"
-                  class="compare-button"
-                  aria-label={`Compare ${activeRepository?.currentBranch ?? 'HEAD'} → Working tree`}
-                  disabled={contentLoading}
-                  onclick={() => applyDiffSelection({ base: 'HEAD', target: '.' })}>Compare</button
-                >
-              {/if}
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-  </div>
+{#if activeProject && activeRepository && showComparisonDialog}
+  <ComparisonDialog
+    selection={workspace.selection}
+    repository={activeRepository}
+    {activeBaseRef}
+    loading={workspace.loading}
+    {baseToCurrentIsActive}
+    {currentToWorkingTreeIsActive}
+    onApply={applyDiffSelection}
+    onConfigureBase={configureBaseBranch}
+    onClose={() => (showComparisonDialog = false)}
+  />
 {/if}
 
 {#if showSettings}
-  <div
-    class="settings-backdrop"
-    role="presentation"
-    onclick={(event) => event.target === event.currentTarget && (showSettings = false)}
-  >
-    <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-      <header>
-        <div>
-          <Settings size={17} />
-          <h2 id="settings-title">AI settings</h2>
-        </div>
-        <button onclick={() => (showSettings = false)}><X size={17} /></button>
-      </header>
-      <div class="settings-content">
-        <div class="language-setting">
-          <span>Output language</span>
-          <SelectMenu
-            id="review-output-language-settings"
-            label="Review output language"
-            value={reviewOutputLanguage}
-            options={outputLanguageOptions}
-            onChange={(language) => setReviewOutputLanguage(language as ReviewOutputLanguage)}
-          />
-          <p>Used for Inline Ask, file change explanations, and Change Review reports.</p>
-        </div>
-        <div>
-          <span>Runtime</span><strong>Codex CLI</strong>
-          <p>
-            Inline and file explanations use <code>codex exec</code>. Change Review uses Codex's
-            native
-            <code>review</code> target when the selected comparison is compatible.
-          </p>
-        </div>
-        <div>
-          <span>Authentication</span><strong>codex login</strong>
-          <p>
-            Saved Codex CLI authentication and your local Codex configuration are reused.
-            undiffstand removes API-key environment variables from the child process.
-          </p>
-        </div>
-        <div class="privacy">
-          <Bot size={15} />
-          <p>
-            Codex receives the active comparison or selected changed lines according to your local
-            configuration. Results are kept only for this app session and may be wrong.
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
+  <AiSettingsDialog
+    outputLanguage={preferences.reviewOutputLanguage}
+    onOutputLanguageChange={setReviewOutputLanguage}
+    onClose={() => (showSettings = false)}
+  />
 {/if}
 
 <style>
-  :global(:root) {
-    font-family:
-      Inter,
-      ui-sans-serif,
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
-      sans-serif;
-    color-scheme: dark;
-    --bg: #090e14;
-    --panel: #0e141c;
-    --panel-raised: #111923;
-    --input: #0a1016;
-    --hover: rgba(137, 158, 178, 0.07);
-    --border: #1b2530;
-    --border-strong: #2a3642;
-    --text: #dbe2e8;
-    --muted: #7d8995;
-    --accent: #3f9471;
-    --accent-bright: #63c69a;
-    --green: #55bd83;
-    --red: #e06c64;
-    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
-    background: var(--bg);
-  }
-
-  :global(*) {
-    box-sizing: border-box;
-  }
-  :global(html, body) {
-    margin: 0;
-    min-width: 900px;
-    min-height: 100%;
-    background: var(--bg);
-  }
-  :global(body) {
-    color: var(--text);
-  }
-  :global(button) {
-    font-family: inherit;
-  }
-  :global(::selection) {
-    background: rgba(87, 184, 142, 0.3);
-  }
-
-  .home {
-    min-height: 100vh;
-    background: var(--bg);
-  }
-  .home-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    max-width: 900px;
-    height: 72px;
-    margin: auto;
-    padding: 0 28px;
-    border-bottom: 1px solid var(--border);
-  }
   .brand {
     display: flex;
     align-items: center;
@@ -1309,184 +646,6 @@
     font-size: 15px;
     letter-spacing: -0.01em;
   }
-  .brand small {
-    display: block;
-    margin-top: 2px;
-    color: var(--muted);
-    font-size: 12px;
-    letter-spacing: 0.03em;
-  }
-  .settings-button,
-  .section-heading button {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 7px 10px;
-    color: #aab4be;
-    background: rgba(16, 24, 33, 0.7);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  .section-heading button {
-    color: #07120e;
-    background: var(--accent-bright);
-    border-color: var(--accent-bright);
-    font-weight: 650;
-  }
-  .projects-section {
-    max-width: 900px;
-    margin: auto;
-    padding: 36px 28px 72px;
-  }
-  .section-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-  }
-  .section-heading h1 {
-    margin: 0;
-    color: #eef3f6;
-    font-size: 22px;
-    letter-spacing: -0.025em;
-  }
-  .project-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-  }
-  article {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    overflow: hidden;
-    background: #0d141c;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-  }
-  article:hover {
-    border-color: #2c3b48;
-    background: #101821;
-  }
-  .project-main {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 12px;
-    align-items: center;
-    width: 100%;
-    padding: 14px;
-    color: var(--text);
-    text-align: left;
-    background: none;
-    border: 0;
-    cursor: pointer;
-  }
-  .project-icon {
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    color: var(--accent-bright);
-    background: rgba(87, 184, 142, 0.08);
-    border-radius: 7px;
-  }
-  .project-info {
-    min-width: 0;
-  }
-  .project-info h3 {
-    margin: 0;
-    font-size: 14px;
-  }
-  .project-info p {
-    overflow: hidden;
-    margin: 4px 0 7px;
-    color: #687581;
-    font: 12px/1.35 var(--mono);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .project-info span {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: #8b9a95;
-    font-size: 12px;
-  }
-  .project-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 7px;
-    padding: 10px 12px 10px 6px;
-  }
-  .project-meta time {
-    color: #697681;
-    font-size: 12px;
-    white-space: nowrap;
-  }
-  .edit-project {
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    color: #687581;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  .edit-project:hover {
-    color: var(--text);
-    background: var(--hover);
-    border-color: var(--border-strong);
-  }
-  .empty-projects {
-    display: grid;
-    place-items: center;
-    min-height: 420px;
-    padding: 64px 40px;
-    color: #596570;
-    text-align: center;
-  }
-  .empty-project-icon {
-    display: grid;
-    place-items: center;
-    width: 56px;
-    height: 56px;
-    color: var(--accent-bright);
-    background: rgba(87, 184, 142, 0.08);
-    border: 1px solid rgba(87, 184, 142, 0.14);
-    border-radius: 14px;
-  }
-  .empty-projects h1 {
-    margin: 18px 0 7px;
-    color: #eef3f6;
-    font-size: 22px;
-    letter-spacing: -0.025em;
-  }
-  .empty-projects p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 12px;
-  }
-  .empty-projects button {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin-top: 22px;
-    padding: 10px 14px;
-    color: #07120e;
-    background: var(--accent-bright);
-    border: 1px solid var(--accent-bright);
-    border-radius: 7px;
-    font-size: 12px;
-    font-weight: 650;
-    cursor: pointer;
-  }
-
   .app-shell {
     height: 100vh;
     display: grid;
@@ -1564,37 +723,6 @@
     overflow: auto;
     background: #0c1219;
     border-right: 1px solid var(--border);
-  }
-  .resize-handle {
-    position: relative;
-    z-index: 2;
-    min-width: var(--panel-handle-width);
-    padding: 0;
-    background: transparent;
-    border: 0;
-    border-radius: 0;
-    cursor: col-resize;
-    touch-action: none;
-  }
-  .resize-handle::after {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    width: 1px;
-    background: transparent;
-    content: '';
-    transform: translateX(-50%);
-    transition: background 120ms ease;
-  }
-  .resize-handle:hover::after,
-  .resize-handle:focus-visible::after,
-  .resize-handle.resizing::after {
-    background: var(--accent-bright);
-  }
-  .resize-handle:focus-visible {
-    outline: 1px solid var(--accent-bright);
-    outline-offset: -1px;
   }
   .pane-title {
     display: flex;
@@ -1702,226 +830,6 @@
     font-size: 12px;
   }
 
-  .dialog-backdrop,
-  .settings-backdrop {
-    position: fixed;
-    z-index: 50;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 24px;
-    background: rgba(4, 7, 11, 0.72);
-    backdrop-filter: blur(6px);
-  }
-  .dialog-backdrop {
-    z-index: 60;
-  }
-  .comparison-dialog,
-  .settings-dialog {
-    width: min(490px, 100%);
-    background: #111821;
-    border: 1px solid var(--border-strong);
-    border-radius: 12px;
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
-  }
-  .comparison-dialog {
-    width: min(760px, 100%);
-  }
-  .comparison-dialog header,
-  .settings-dialog header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 15px 17px;
-    border-bottom: 1px solid var(--border);
-  }
-  .comparison-dialog header div,
-  .settings-dialog header div {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .comparison-dialog h2,
-  .settings-dialog h2 {
-    margin: 0;
-    font-size: 14px;
-  }
-  .comparison-dialog header button,
-  .settings-dialog header button {
-    display: grid;
-    padding: 3px;
-    color: var(--muted);
-    background: none;
-    border: 0;
-    cursor: pointer;
-  }
-  .comparison-dialog header button:disabled {
-    opacity: 0.45;
-    cursor: default;
-  }
-  .comparison-dialog-content {
-    display: grid;
-    gap: 20px;
-    padding: 20px;
-  }
-  .comparison-dialog-content h3 {
-    margin: 0;
-    color: #87939e;
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-  }
-  .comparison-section-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-  }
-  .comparison-section-heading > div {
-    display: grid;
-    gap: 4px;
-  }
-  .comparison-section-heading p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 11px;
-  }
-  .quick-comparisons {
-    display: grid;
-    gap: 10px;
-    padding-top: 18px;
-    border-top: 1px solid var(--border);
-  }
-  .quick-comparison-list {
-    overflow: hidden;
-    border: 1px solid var(--border-strong);
-    border-radius: 8px;
-  }
-  .quick-comparison-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 16px;
-    min-height: 54px;
-    padding: 9px 11px;
-    background: #0b1118;
-  }
-  .quick-comparison-row + .quick-comparison-row {
-    border-top: 1px solid var(--border);
-  }
-  .quick-comparison-row > div {
-    display: grid;
-    min-width: 0;
-    gap: 4px;
-  }
-  .quick-comparison-row strong {
-    overflow: hidden;
-    color: #c3ccd4;
-    font: 12px var(--mono);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .quick-comparison-row > div > span {
-    color: var(--muted);
-    font-size: 11px;
-  }
-  .compare-button {
-    min-width: 70px;
-    height: 29px;
-    padding: 0 10px;
-    color: var(--accent-bright);
-    background: rgba(87, 184, 142, 0.08);
-    border: 1px solid rgba(87, 184, 142, 0.35);
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 650;
-    cursor: pointer;
-  }
-  .compare-button:hover {
-    color: #07120e;
-    background: var(--accent-bright);
-    border-color: var(--accent-bright);
-  }
-  .compare-button:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-  .current-comparison {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 5px 7px;
-    color: #8fb7d9;
-    background: rgba(91, 137, 176, 0.14);
-    border-radius: 5px;
-    font-size: 11px;
-    font-weight: 650;
-  }
-  .comparison-unavailable {
-    color: var(--muted);
-    font-size: 11px;
-  }
-  .settings-link {
-    padding: 0;
-    color: var(--accent-bright);
-    background: none;
-    border: 0;
-    font-size: 11px;
-    cursor: pointer;
-  }
-  .comparison-dialog-content :global(.selector) {
-    justify-content: center;
-  }
-  @media (max-width: 680px) {
-    .comparison-dialog-content :global(.selector) {
-      flex-wrap: wrap;
-    }
-  }
-  .settings-content {
-    display: grid;
-    gap: 15px;
-    padding: 18px;
-  }
-  .settings-content > div:not(.privacy) {
-    display: grid;
-    grid-template-columns: 100px 1fr;
-    gap: 3px 12px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--border);
-  }
-  .settings-content span {
-    grid-row: 1/3;
-    color: var(--muted);
-    font-size: 12px;
-  }
-  .settings-content strong {
-    font: 12px var(--mono);
-  }
-  .settings-content p {
-    margin: 4px 0 0;
-    color: var(--muted);
-    font-size: 12px;
-    line-height: 1.55;
-  }
-  .settings-content code {
-    color: var(--accent-bright);
-    font-family: var(--mono);
-  }
-  .privacy {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 10px;
-    color: #c2ad70;
-    background: rgba(183, 145, 52, 0.07);
-    border: 1px solid rgba(183, 145, 52, 0.14);
-    border-radius: 6px;
-  }
-  .privacy p {
-    margin: 0;
-    color: #a99361;
-  }
   :global(.spin) {
     animation: spin 1s linear infinite;
   }

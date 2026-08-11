@@ -18,7 +18,6 @@ pub fn run() {
             commands::preferences::get_user_preferences,
             commands::preferences::save_user_preferences,
             commands::git::get_diff_summary,
-            commands::git::get_file_diff,
             commands::git::get_file_diffs,
             commands::ai::explain_file_change,
             commands::ai::ask_inline_question,
