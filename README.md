@@ -13,6 +13,7 @@ undiffstand is a read-only desktop app that helps human reviewers understand loc
 - Inspect file statistics and Split/Unified diffs
 - Explain a changed file's likely intent, risk, concerns, and evidence with the local Codex CLI
 - Persist project metadata with Tauri Store
+- Check for desktop app updates and install available releases in place
 
 ## Requirements
 

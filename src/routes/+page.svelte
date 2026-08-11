@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { relaunch } from '@tauri-apps/plugin-process';
+  import { check, type Update } from '@tauri-apps/plugin-updater';
   import {
     Columns2,
     GitBranch,
@@ -16,6 +19,7 @@
   import EmptyState from '$lib/components/common/EmptyState.svelte';
   import ErrorBanner from '$lib/components/common/ErrorBanner.svelte';
   import ResizeHandle from '$lib/components/common/ResizeHandle.svelte';
+  import UpdateAction from '$lib/components/common/UpdateAction.svelte';
   import ComparisonDialog from '$lib/components/diff/ComparisonDialog.svelte';
   import DiffFeed from '$lib/components/diff/DiffFeed.svelte';
   import DiffFileList from '$lib/components/diff/DiffFileList.svelte';
@@ -38,6 +42,7 @@
   import { normalizeError, type AppError } from '$lib/domain/error';
   import type { DiffViewMode, ReviewOutputLanguage } from '$lib/domain/preferences';
   import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
+  import type { UpdateState } from '$lib/domain/update';
   import { tauriApi } from '$lib/services/tauri';
   import { resolveApplicationShortcut } from '$lib/shortcuts';
 
@@ -54,6 +59,12 @@
   let deleting = $state(false);
   let error = $state<AppError | null>(null);
   let workspaceError = $state<AppError | null>(null);
+  let updateState = $state<UpdateState>('unavailable');
+  let availableUpdate = $state<Update | null>(null);
+  let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
+  let unlistenUpdateFocusChange: (() => void) | null = null;
+  let updateCheckInFlight = false;
+  let lastUpdateCheckAttemptAt = 0;
   const preferences = new PreferencesController(tauriApi, (caught) => {
     workspaceError = normalizeError(caught);
   });
@@ -86,6 +97,7 @@
   let autoRefreshInProgress = false;
   let lastAutoRefreshAt = 0;
   const AUTO_REFRESH_COOLDOWN_MS = 1_000;
+  const UPDATE_CHECK_COOLDOWN_MS = 24 * 60 * 60 * 1_000;
   const PANEL_HANDLE_WIDTH = 5;
   const CONTENT_MIN_WIDTH = 500;
   const SIDEBAR_MIN_WIDTH = 160;
@@ -100,12 +112,96 @@
       preferences.aiPanelWidth = 260;
     }
     window.addEventListener('focus', refreshWorkspaceOnFocus);
+    startUpdateChecks();
     void initialize();
 
     return () => {
       window.removeEventListener('focus', refreshWorkspaceOnFocus);
+      stopUpdateChecks();
     };
   });
+
+  function startUpdateChecks() {
+    if (!isTauriRuntime()) {
+      updateState = 'unavailable';
+      return;
+    }
+
+    void checkForUpdates({ force: true });
+    updateCheckInterval = setInterval(() => {
+      void checkForUpdates();
+    }, UPDATE_CHECK_COOLDOWN_MS);
+
+    void getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => {
+        if (focused) void checkForUpdates();
+      })
+      .then((unlisten) => {
+        unlistenUpdateFocusChange = unlisten;
+      })
+      .catch((caught) => {
+        console.warn('Update focus listener setup failed', caught);
+      });
+  }
+
+  function stopUpdateChecks() {
+    if (updateCheckInterval) {
+      clearInterval(updateCheckInterval);
+      updateCheckInterval = null;
+    }
+
+    unlistenUpdateFocusChange?.();
+    unlistenUpdateFocusChange = null;
+  }
+
+  async function checkForUpdates(options: { force?: boolean } = {}) {
+    if (!isTauriRuntime()) {
+      updateState = 'unavailable';
+      return;
+    }
+
+    if (shouldSkipUpdateCheck(options.force ?? false)) return;
+
+    updateCheckInFlight = true;
+    lastUpdateCheckAttemptAt = Date.now();
+    updateState = 'checking';
+
+    try {
+      const update = await check();
+      availableUpdate = update;
+      updateState = update ? 'available' : 'idle';
+    } catch (caught) {
+      console.warn('Update check failed', caught);
+      updateState = 'error';
+    } finally {
+      updateCheckInFlight = false;
+    }
+  }
+
+  function shouldSkipUpdateCheck(force: boolean) {
+    if (updateCheckInFlight || updateState === 'available' || updateState === 'installing')
+      return true;
+
+    return !force && Date.now() - lastUpdateCheckAttemptAt < UPDATE_CHECK_COOLDOWN_MS;
+  }
+
+  async function installUpdate() {
+    if (!availableUpdate) return;
+
+    updateState = 'installing';
+
+    try {
+      await availableUpdate.downloadAndInstall();
+      await relaunch();
+    } catch (caught) {
+      console.warn('Update installation failed', caught);
+      updateState = 'error';
+    }
+  }
+
+  function isTauriRuntime() {
+    return '__TAURI_INTERNALS__' in window;
+  }
 
   function panelWidthLimits(panel: ResizablePanel, workspaceWidth: number) {
     const min = panel === 'sidebar' ? SIDEBAR_MIN_WIDTH : AI_PANEL_MIN_WIDTH;
@@ -467,6 +563,7 @@
           ><Settings size={14} /></button
         >
       </div>
+      <UpdateAction state={updateState} onInstall={() => void installUpdate()} />
     </header>
 
     {#if workspaceError}
@@ -574,6 +671,8 @@
     onAdd={addRepository}
     onOpen={openProject}
     onEdit={editProject}
+    {updateState}
+    onInstallUpdate={() => void installUpdate()}
     onOpenSettings={() => (showSettings = true)}
     onDismissError={() => (error = null)}
   />
@@ -653,7 +752,7 @@
   }
   .topbar {
     display: grid;
-    grid-template-columns: auto auto minmax(220px, 1fr) auto auto;
+    grid-template-columns: auto auto minmax(220px, 1fr) auto auto auto;
     align-items: center;
     gap: 8px;
     padding: 0 11px;

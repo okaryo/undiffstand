@@ -28,6 +28,13 @@
     "active": true,
     "targets": "all",
     "category": "DeveloperTool",
-    "shortDescription": "AI-assisted diff understanding for human reviewers."
+    "shortDescription": "AI-assisted diff understanding for human reviewers.",
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRERTY3MDRBMUE0NkIzQjEKUldTeHMwWWFTbkRtVGFZeWdBNFN0VE8rR1pGR2tDckxrOHd6cVJ6L0xPdWdyMk5MOE1NZ2sxeWgK",
+      "endpoints": ["https://github.com/okaryo/undiffstand/releases/latest/download/latest.json"]
+    }
   }
 }

@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
@@ -26,11 +26,11 @@ jobs:
             args: --target x86_64-apple-darwin --bundles app,dmg
           - name: Linux x64
             runner: ubuntu-22.04
-            target: ''
+            target: ""
             args: --bundles deb,appimage
           - name: Windows x64
             runner: windows-latest
-            target: ''
+            target: ""
             args: --bundles nsis,msi
 
     steps:
@@ -71,6 +71,8 @@ jobs:
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ inputs.tag_name || github.ref_name }}
           releaseName: ${{ inputs.tag_name || github.ref_name }}
@@ -78,4 +80,5 @@ jobs:
           prerelease: false
           generateReleaseNotes: true
           retryAttempts: 3
+          updaterJsonPreferNsis: true
           args: ${{ matrix.args }}

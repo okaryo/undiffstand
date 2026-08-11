@@ -8,8 +8,10 @@
     Settings
   } from '@lucide/svelte';
   import ErrorBanner from '$lib/components/common/ErrorBanner.svelte';
+  import UpdateAction from '$lib/components/common/UpdateAction.svelte';
   import type { AppError } from '$lib/domain/error';
   import type { ProjectConfig } from '$lib/domain/project';
+  import type { UpdateState } from '$lib/domain/update';
 
   let {
     projects,
@@ -18,6 +20,8 @@
     onAdd,
     onOpen,
     onEdit,
+    updateState,
+    onInstallUpdate,
     onOpenSettings,
     onDismissError
   }: {
@@ -27,6 +31,8 @@
     onAdd: () => void | Promise<void>;
     onOpen: (project: ProjectConfig) => void | Promise<void>;
     onEdit: (project: ProjectConfig) => void | Promise<void>;
+    updateState: UpdateState;
+    onInstallUpdate: () => void;
     onOpenSettings: () => void;
     onDismissError: () => void;
   } = $props();
@@ -51,7 +57,12 @@
         >
       </div>
     </div>
-    <button class="settings-button" onclick={onOpenSettings}><Settings size={14} />Settings</button>
+    <div class="app-actions">
+      <button class="settings-button" onclick={onOpenSettings}
+        ><Settings size={14} />Settings</button
+      >
+      <UpdateAction state={updateState} onInstall={onInstallUpdate} />
+    </div>
   </header>
 
   <section class="projects-section">
@@ -155,6 +166,11 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     font-size: 12px;
+  }
+  .app-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   .section-heading button {
     color: #07120e;

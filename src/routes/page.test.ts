@@ -21,9 +21,20 @@ const tauriApi = vi.hoisted(() => ({
   runChangeReview: vi.fn()
 }));
 const notifyReviewComplete = vi.hoisted(() => vi.fn());
+const updater = vi.hoisted(() => ({
+  check: vi.fn(),
+  downloadAndInstall: vi.fn(),
+  relaunch: vi.fn(),
+  onFocusChanged: vi.fn()
+}));
 
 vi.mock('$lib/services/tauri', () => ({ tauriApi }));
 vi.mock('$lib/services/notification', () => ({ notifyReviewComplete }));
+vi.mock('@tauri-apps/plugin-updater', () => ({ check: updater.check }));
+vi.mock('@tauri-apps/plugin-process', () => ({ relaunch: updater.relaunch }));
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({ onFocusChanged: updater.onFocusChanged })
+}));
 
 const project: ProjectConfig = {
   id: 'alpha',
@@ -105,6 +116,10 @@ describe('change details auto-refresh', () => {
     tauriApi.saveUserPreferences.mockImplementation(async (preferences) => preferences);
     tauriApi.getDiffSummary.mockResolvedValue(summary);
     tauriApi.getFileDiffs.mockResolvedValue([fileDiff]);
+    updater.check.mockResolvedValue(null);
+    updater.downloadAndInstall.mockResolvedValue(undefined);
+    updater.relaunch.mockResolvedValue(undefined);
+    updater.onFocusChanged.mockResolvedValue(vi.fn());
     tauriApi.getChangeReviewAvailability.mockImplementation(
       async (_projectId: string, selection: { base: string; target: string }) => ({
         available:
@@ -117,6 +132,7 @@ describe('change details auto-refresh', () => {
   });
 
   afterEach(() => {
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
     vi.unstubAllGlobals();
     Element.prototype.scrollIntoView = originalScrollIntoView;
     HTMLCanvasElement.prototype.getContext = originalGetContext;
@@ -211,6 +227,41 @@ describe('change details auto-refresh', () => {
       await screen.findByLabelText('1 changed file, 2 additions, 1 deletion')
     ).toBeInTheDocument();
     expect(screen.queryByText('12345678')).not.toBeInTheDocument();
+  });
+
+  it('shows an available update beside settings on the project list', async () => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+      configurable: true,
+      value: {}
+    });
+    updater.check.mockResolvedValue({ downloadAndInstall: updater.downloadAndInstall });
+    const { container } = render(Page);
+
+    const installButton = await within(container).findByRole('button', {
+      name: 'Install available update'
+    });
+    expect(container.querySelector('.home header .app-actions')).toContainElement(installButton);
+    expect(container.querySelector('.home header .app-actions')?.lastElementChild).toBe(
+      installButton
+    );
+  });
+
+  it('shows an available update in the workspace app actions', async () => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+      configurable: true,
+      value: {}
+    });
+    updater.check.mockResolvedValue({ downloadAndInstall: updater.downloadAndInstall });
+    history.replaceState(null, '', '/?project=alpha');
+    const { container } = render(Page);
+
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledOnce());
+    const topbar = container.querySelector<HTMLElement>('.topbar');
+    const installButton = within(container).getByRole('button', {
+      name: 'Install available update'
+    });
+    expect(topbar?.querySelector('.top-actions')).not.toContainElement(installButton);
+    expect(topbar?.lastElementChild).toBe(installButton);
   });
 
   it('coalesces repeated focus events', async () => {
