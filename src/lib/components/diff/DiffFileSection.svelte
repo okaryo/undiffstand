@@ -6,8 +6,7 @@
     ChevronRight,
     Copy,
     LoaderCircle,
-    RotateCw,
-    Sparkles
+    RotateCw
   } from '@lucide/svelte';
   import AiAnswer from '$lib/components/ai/AiAnswer.svelte';
   import type { ChangeReviewFinding, DiffExplanation, InlineAnswer } from '$lib/domain/ai';
@@ -105,7 +104,7 @@
 
 {#if explanation || aiLoading || aiError}
   <div class="file-ai">
-    <div class="file-ai-title"><Sparkles size={13} /><strong>Change explanation</strong></div>
+    <div class="file-ai-title"><Bot size={13} /><strong>Change explanation</strong></div>
     {#if aiLoading && !explanation}<div class="file-ai-loading">
         <LoaderCircle class="spin" size={14} />Explaining this file's changes…
       </div>{/if}

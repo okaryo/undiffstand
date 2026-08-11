@@ -7,7 +7,6 @@
     Maximize2,
     Minimize2,
     ShieldAlert,
-    Sparkles,
     TriangleAlert
   } from '@lucide/svelte';
   import SelectMenu from '$lib/components/common/SelectMenu.svelte';
@@ -52,7 +51,6 @@
   </header>
 
   <div class="action-card">
-    <Sparkles size={17} />
     <div>
       <strong>Review changes</strong>
       <p>{availability?.scopeLabel ?? 'Checking the selected comparison…'}</p>
@@ -189,8 +187,7 @@
   }
   .action-card {
     display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 9px;
+    grid-template-columns: minmax(0, 1fr);
     margin: 12px;
     padding: 12px;
     color: var(--accent-bright);
@@ -226,7 +223,6 @@
     font-size: 12px;
   }
   .action-card > button {
-    grid-column: 2;
     justify-self: start;
     display: flex;
     align-items: center;
