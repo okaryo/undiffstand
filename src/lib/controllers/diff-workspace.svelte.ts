@@ -1,5 +1,5 @@
-import { tick } from 'svelte';
-import { SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
+import { tick } from "svelte";
+import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
 import {
   defaultDiffSelection,
   diffAnchorId,
@@ -7,11 +7,11 @@ import {
   sortDiffFilesByTreeOrder,
   type DiffSelection,
   type DiffSummary,
-  type FileDiff
-} from '$lib/domain/diff';
-import type { ChangeReviewAvailability } from '$lib/domain/ai';
-import { normalizeError } from '$lib/domain/error';
-import type { AppApi } from '$lib/services/api';
+  type FileDiff,
+} from "$lib/domain/diff";
+import type { ChangeReviewAvailability } from "$lib/domain/ai";
+import { normalizeError } from "$lib/domain/error";
+import type { AppApi } from "$lib/services/api";
 
 export class DiffWorkspaceController {
   summary = $state<DiffSummary | null>(null);
@@ -31,13 +31,16 @@ export class DiffWorkspaceController {
   constructor(
     private readonly api: Pick<
       AppApi,
-      'getDiffSummary' | 'getChangeReviewAvailability' | 'getFileDiffs'
+      "getDiffSummary" | "getChangeReviewAvailability" | "getFileDiffs"
     >,
     private readonly onError: (error: unknown) => void,
-    private readonly onResetAi: () => void
+    private readonly onResetAi: () => void,
   ) {}
 
-  activate(projectId: string, selection: DiffSelection = defaultDiffSelection()) {
+  activate(
+    projectId: string,
+    selection: DiffSelection = defaultDiffSelection(),
+  ) {
     this.projectId = projectId;
     this.selection = { ...selection };
   }
@@ -57,23 +60,30 @@ export class DiffWorkspaceController {
     try {
       const [loadedSummary, reviewAvailability] = await Promise.all([
         this.api.getDiffSummary(projectId, selection),
-        this.api.getChangeReviewAvailability(projectId, selection)
+        this.api.getChangeReviewAvailability(projectId, selection),
       ]);
       if (!this.isCurrent(projectId, selection)) return;
 
       const orderedSummary = {
         ...loadedSummary,
-        files: sortDiffFilesByTreeOrder(loadedSummary.files)
+        files: sortDiffFilesByTreeOrder(loadedSummary.files),
       };
       this.reviewAvailability = reviewAvailability;
       const path =
-        requestedFile && orderedSummary.files.some((file) => displayPath(file) === requestedFile)
+        requestedFile &&
+        orderedSummary.files.some((file) => displayPath(file) === requestedFile)
           ? requestedFile
           : orderedSummary.files[0]
             ? displayPath(orderedSummary.files[0])
             : undefined;
 
-      if (silent) await this.refreshLoadedDiffs(projectId, selection, orderedSummary, path);
+      if (silent)
+        await this.refreshLoadedDiffs(
+          projectId,
+          selection,
+          orderedSummary,
+          path,
+        );
       if (!this.isCurrent(projectId, selection)) return;
 
       this.summary = orderedSummary;
@@ -83,7 +93,8 @@ export class DiffWorkspaceController {
       if (path) {
         this.queue(path);
         await tick();
-        if (!silent && this.isCurrent(projectId, selection)) this.scrollTo(path, false);
+        if (!silent && this.isCurrent(projectId, selection))
+          this.scrollTo(path, false);
       }
     } catch (error) {
       if (this.projectId === projectId) this.onError(error);
@@ -137,7 +148,7 @@ export class DiffWorkspaceController {
     projectId: string,
     selection: DiffSelection,
     summary: DiffSummary,
-    selectedPath?: string
+    selectedPath?: string,
   ) {
     const availablePaths = new SvelteSet(summary.files.map(displayPath));
     const refreshPaths = new SvelteSet([
@@ -145,16 +156,20 @@ export class DiffWorkspaceController {
       ...Object.keys(this.errors),
       ...Object.entries(this.loadingPaths)
         .filter(([, isLoading]) => isLoading)
-        .map(([path]) => path)
+        .map(([path]) => path),
     ]);
     if (selectedPath) refreshPaths.add(selectedPath);
     const paths = [...refreshPaths].filter((path) => availablePaths.has(path));
     const refreshedDiffs =
-      paths.length > 0 ? await this.api.getFileDiffs(projectId, selection, paths) : [];
+      paths.length > 0
+        ? await this.api.getFileDiffs(projectId, selection, paths)
+        : [];
     if (!this.isCurrent(projectId, selection)) return;
 
     this.clearPending();
-    this.diffs = Object.fromEntries(refreshedDiffs.map((diff) => [displayPath(diff.file), diff]));
+    this.diffs = Object.fromEntries(
+      refreshedDiffs.map((diff) => [displayPath(diff.file), diff]),
+    );
     this.loadingPaths = {};
     this.errors = {};
   }
@@ -178,20 +193,35 @@ export class DiffWorkspaceController {
     this.pendingPaths.clear();
 
     try {
-      const loadedDiffs = await this.api.getFileDiffs(projectId, selection, paths);
-      if (!this.isCurrent(projectId, selection) || this.generation !== generation) return;
+      const loadedDiffs = await this.api.getFileDiffs(
+        projectId,
+        selection,
+        paths,
+      );
+      if (
+        !this.isCurrent(projectId, selection) ||
+        this.generation !== generation
+      )
+        return;
       for (const diff of loadedDiffs) this.diffs[displayPath(diff.file)] = diff;
       if (this.selectedPath && paths.includes(this.selectedPath)) {
         await tick();
-        if (this.generation === generation) this.scrollTo(this.selectedPath, false);
+        if (this.generation === generation)
+          this.scrollTo(this.selectedPath, false);
       }
     } catch (error) {
-      if (this.isCurrent(projectId, selection) && this.generation === generation) {
+      if (
+        this.isCurrent(projectId, selection) &&
+        this.generation === generation
+      ) {
         const message = normalizeError(error).message;
         for (const path of paths) this.errors[path] = message;
       }
     } finally {
-      if (this.isCurrent(projectId, selection) && this.generation === generation) {
+      if (
+        this.isCurrent(projectId, selection) &&
+        this.generation === generation
+      ) {
         for (const path of paths) this.loadingPaths[path] = false;
       }
     }
@@ -215,15 +245,19 @@ export class DiffWorkspaceController {
   private syncUrl(file?: string) {
     if (!this.projectId) return;
     const params = new SvelteURLSearchParams({ project: this.projectId });
-    if (file) params.set('file', file);
-    if (this.selection.base !== 'HEAD') params.set('base', this.selection.base);
-    if (this.selection.target !== '.') params.set('target', this.selection.target);
-    history.replaceState(null, '', `?${params.toString()}`);
+    if (file) params.set("file", file);
+    if (this.selection.base !== "HEAD") params.set("base", this.selection.base);
+    if (this.selection.target !== ".")
+      params.set("target", this.selection.target);
+    history.replaceState(null, "", `?${params.toString()}`);
   }
 
   private scrollTo(path: string, smooth: boolean) {
     document
       .getElementById(diffAnchorId(path))
-      ?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+      ?.scrollIntoView({
+        behavior: smooth ? "smooth" : "auto",
+        block: "start",
+      });
   }
 }

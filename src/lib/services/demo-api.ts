@@ -1,20 +1,20 @@
-import type { DiffSelection, DiffSummary, FileDiff } from '$lib/domain/diff';
-import { defaultUserPreferences } from '$lib/domain/preferences';
-import type { ProjectConfig } from '$lib/domain/project';
-import type { AppApi } from './api';
+import type { DiffSelection, DiffSummary, FileDiff } from "$lib/domain/diff";
+import { defaultUserPreferences } from "$lib/domain/preferences";
+import type { ProjectConfig } from "$lib/domain/project";
+import type { AppApi } from "./api";
 
 const demoProject: ProjectConfig = {
-  id: 'undiffstand-browser-demo',
-  name: 'undiffstand-demo',
-  repoPath: '/Users/example/src/undiffstand-demo',
-  baseRef: 'main',
-  lastOpenedAt: new Date().toISOString()
+  id: "undiffstand-browser-demo",
+  name: "undiffstand-demo",
+  repoPath: "/Users/example/src/undiffstand-demo",
+  baseRef: "main",
+  lastOpenedAt: new Date().toISOString(),
 };
 
 let projects = [demoProject];
 let userPreferences = defaultUserPreferences();
 const contents: Record<string, string> = {
-  'src/services/review.ts': `import { buildContext } from '../lib/context';
+  "src/services/review.ts": `import { buildContext } from '../lib/context';
 
 export type Review = {
   summary: string;
@@ -26,40 +26,40 @@ export async function review(diff: string): Promise<Review> {
   return { summary: context.summary, evidence: context.references };
 }
 `,
-  'src/lib/context.ts': `export async function buildContext(diff: string) {
+  "src/lib/context.ts": `export async function buildContext(diff: string) {
   const lines = diff.split('\\n');
   return {
     summary: \`Reviewing \${lines.length} diff lines\`,
     references: lines.filter((line) => line.startsWith('+'))
   };
 }
-`
+`,
 };
 
 const summary: DiffSummary = {
-  selection: { base: 'HEAD', target: '.' },
+  selection: { base: "HEAD", target: "." },
   comparison: {
-    fromLabel: 'HEAD',
-    toLabel: 'working tree',
-    fromSha: '8f31dc290c98f3ebd149ebf4e9cdb594d7356cb7'
+    fromLabel: "HEAD",
+    toLabel: "working tree",
+    fromSha: "8f31dc290c98f3ebd149ebf4e9cdb594d7356cb7",
   },
   totalAdditions: 8,
   totalDeletions: 2,
   files: [
     {
-      oldPath: 'src/services/review.ts',
-      newPath: 'src/services/review.ts',
-      status: 'modified',
+      oldPath: "src/services/review.ts",
+      newPath: "src/services/review.ts",
+      status: "modified",
       additions: 6,
-      deletions: 2
+      deletions: 2,
     },
     {
-      newPath: 'src/lib/context.ts',
-      status: 'added',
+      newPath: "src/lib/context.ts",
+      status: "added",
       additions: 2,
-      deletions: 0
-    }
-  ]
+      deletions: 0,
+    },
+  ],
 };
 
 function summaryFor(selection: DiffSelection): DiffSummary {
@@ -68,60 +68,60 @@ function summaryFor(selection: DiffSelection): DiffSummary {
     selection,
     comparison: {
       fromLabel: selection.base,
-      toLabel: selection.target === '.' ? 'working tree' : selection.target,
+      toLabel: selection.target === "." ? "working tree" : selection.target,
       fromSha: summary.comparison.fromSha,
-      toSha: selection.target === '.' ? undefined : summary.comparison.fromSha
-    }
+      toSha: selection.target === "." ? undefined : summary.comparison.fromSha,
+    },
   };
 }
 
 function diffFor(path: string): FileDiff {
-  if (path === 'src/lib/context.ts') {
+  if (path === "src/lib/context.ts") {
     const content = contents[path];
     return {
       file: summary.files[1],
       newContent: content,
       hunks: [
-        `@@ -0,0 +1,8 @@\n+export async function buildContext(diff: string) {\n+  const lines = diff.split('\\n');\n+  return {\n+    summary: \`Reviewing \${lines.length} diff lines\`,\n+    references: lines.filter((line) => line.startsWith('+'))\n+  };\n+}\n+`
+        `@@ -0,0 +1,8 @@\n+export async function buildContext(diff: string) {\n+  const lines = diff.split('\\n');\n+  return {\n+    summary: \`Reviewing \${lines.length} diff lines\`,\n+    references: lines.filter((line) => line.startsWith('+'))\n+  };\n+}\n+`,
       ],
       unifiedDiff: `diff --git a/${path} b/${path}\nnew file mode 100644\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,8 @@\n+export async function buildContext(diff: string) {\n+  const lines = diff.split('\\n');\n+  return {\n+    summary: \`Reviewing \${lines.length} diff lines\`,\n+    references: lines.filter((line) => line.startsWith('+'))\n+  };\n+}\n+`,
-      truncated: false
+      truncated: false,
     };
   }
   const oldContent = `export async function review(diff: string) {
   return summarize(diff);
 }
 `;
-  const newContent = contents['src/services/review.ts'];
+  const newContent = contents["src/services/review.ts"];
   return {
     file: summary.files[0],
     oldContent,
     newContent,
     hunks: [
-      `@@ -1,3 +1,12 @@\n+import { buildContext } from '../lib/context';\n+\n+export type Review = {\n+  summary: string;\n+  evidence: string[];\n+};\n+\n export async function review(diff: string) {\n-  return summarize(diff);\n+  const context = await buildContext(diff);\n+  return { summary: context.summary, evidence: context.references };\n }\n`
+      `@@ -1,3 +1,12 @@\n+import { buildContext } from '../lib/context';\n+\n+export type Review = {\n+  summary: string;\n+  evidence: string[];\n+};\n+\n export async function review(diff: string) {\n-  return summarize(diff);\n+  const context = await buildContext(diff);\n+  return { summary: context.summary, evidence: context.references };\n }\n`,
     ],
     unifiedDiff: `diff --git a/src/services/review.ts b/src/services/review.ts\n--- a/src/services/review.ts\n+++ b/src/services/review.ts\n@@ -1,3 +1,12 @@\n+import { buildContext } from '../lib/context';\n+\n+export type Review = {\n+  summary: string;\n+  evidence: string[];\n+};\n+\n export async function review(diff: string) {\n-  return summarize(diff);\n+  const context = await buildContext(diff);\n+  return { summary: context.summary, evidence: context.references };\n }\n`,
-    truncated: false
+    truncated: false,
   };
 }
 
 export const demoApi: AppApi = {
-  selectRepository: async () => '/Users/example/src/new-repository',
+  selectRepository: async () => "/Users/example/src/new-repository",
   validateRepository: async (path) => ({
     repoPath: path,
-    suggestedName: path.split('/').at(-1) ?? 'repository',
-    detectedBaseRef: 'main',
-    currentBranch: 'feature/undiffstand',
-    recentBranches: ['main'],
-    localBranches: ['feature/undiffstand', 'main'],
-    remoteBranches: ['origin/main'],
+    suggestedName: path.split("/").at(-1) ?? "repository",
+    detectedBaseRef: "main",
+    currentBranch: "feature/undiffstand",
+    recentBranches: ["main"],
+    localBranches: ["feature/undiffstand", "main"],
+    remoteBranches: ["origin/main"],
     recentCommits: [
       {
-        sha: '8f31dc290c98f3ebd149ebf4e9cdb594d7356cb7',
-        shortSha: '8f31dc2',
-        subject: 'Improve review context'
-      }
-    ]
+        sha: "8f31dc290c98f3ebd149ebf4e9cdb594d7356cb7",
+        shortSha: "8f31dc2",
+        subject: "Improve review context",
+      },
+    ],
   }),
   listProjects: async () => projects,
   saveProject: async (input) => {
@@ -130,13 +130,14 @@ export const demoApi: AppApi = {
       name: input.name,
       repoPath: input.repoPath,
       baseRef: input.baseRef,
-      lastOpenedAt: new Date().toISOString()
+      lastOpenedAt: new Date().toISOString(),
     };
     projects = [project, ...projects.filter((item) => item.id !== project.id)];
     return project;
   },
   touchProject: async (projectId) => {
-    const project = projects.find((item) => item.id === projectId) ?? demoProject;
+    const project =
+      projects.find((item) => item.id === projectId) ?? demoProject;
     return { ...project, lastOpenedAt: new Date().toISOString() };
   },
   removeProject: async (projectId) => {
@@ -151,15 +152,17 @@ export const demoApi: AppApi = {
   getFileDiffs: async (_projectId, _selection, paths) => paths.map(diffFor),
   explainFileChange: async (_projectId, _selection, path) => ({
     summary:
-      'The change introduces a context-building step before producing a structured review result.',
+      "The change introduces a context-building step before producing a structured review result.",
     inferredIntent:
-      'The likely intent is to make review explanations traceable to concrete diff evidence.',
+      "The likely intent is to make review explanations traceable to concrete diff evidence.",
     keyChanges: [
-      'Builds review context before creating the result.',
-      'Returns concrete evidence together with the summary.'
+      "Builds review context before creating the result.",
+      "Returns concrete evidence together with the summary.",
     ],
-    references: [{ path, startLine: 8, endLine: 10, side: 'new' }],
-    caveats: ['Intent is inferred from the diff and has not been confirmed by the author.']
+    references: [{ path, startLine: 8, endLine: 10, side: "new" }],
+    caveats: [
+      "Intent is inferred from the diff and has not been confirmed by the author.",
+    ],
   }),
   askInlineQuestion: async (_projectId, _selection, question) => ({
     answer: `These lines change how review evidence is assembled before it is returned. The selected ${question.side}-side range is treated as part of the current comparison.`,
@@ -168,57 +171,63 @@ export const demoApi: AppApi = {
         path: question.path,
         startLine: question.startLine,
         endLine: question.endLine,
-        side: question.side
-      }
+        side: question.side,
+      },
     ],
-    caveats: ['This answer is inferred from the displayed diff.']
+    caveats: ["This answer is inferred from the displayed diff."],
   }),
   getChangeReviewAvailability: async (_projectId, selection) => {
-    if (selection.base === 'HEAD' && selection.target === '.') {
+    if (selection.base === "HEAD" && selection.target === ".") {
       return {
         available: true,
-        target: { kind: 'uncommitted' },
-        scopeLabel: 'feature/undiffstand → working tree'
+        target: { kind: "uncommitted" },
+        scopeLabel: "feature/undiffstand → working tree",
       };
     }
-    if (selection.base === 'main' && ['HEAD', 'feature/undiffstand'].includes(selection.target)) {
+    if (
+      selection.base === "main" &&
+      ["HEAD", "feature/undiffstand"].includes(selection.target)
+    ) {
       return {
         available: true,
-        target: { kind: 'base', baseBranch: 'main' },
-        scopeLabel: `main → ${selection.target}`
+        target: { kind: "base", baseBranch: "main" },
+        scopeLabel: `main → ${selection.target}`,
       };
     }
     return {
       available: false,
-      reason: 'Change Review requires the target to be the current branch.',
-      scopeLabel: `${selection.base} → ${selection.target}`
+      reason: "Change Review requires the target to be the current branch.",
+      scopeLabel: `${selection.base} → ${selection.target}`,
     };
   },
   runChangeReview: async () => ({
     summary:
-      'The change introduces evidence-aware review output and wires it into the existing review flow.',
+      "The change introduces evidence-aware review output and wires it into the existing review flow.",
     inferredIntent:
-      'The likely intent is to make review results easier to verify against the changed code.',
+      "The likely intent is to make review results easier to verify against the changed code.",
     groups: [
       {
-        id: 'review-context',
-        title: 'Review context',
-        summary: 'Builds and returns structured evidence for a review.',
-        files: ['src/services/review.ts', 'src/lib/context.ts'],
-        keyPoints: ['Context building is asynchronous.', 'Evidence is now part of the result.']
-      }
+        id: "review-context",
+        title: "Review context",
+        summary: "Builds and returns structured evidence for a review.",
+        files: ["src/services/review.ts", "src/lib/context.ts"],
+        keyPoints: [
+          "Context building is asynchronous.",
+          "Evidence is now part of the result.",
+        ],
+      },
     ],
     findings: [
       {
-        title: 'Handle context failures',
-        body: 'The new asynchronous context step can fail, but no recovery behavior is visible here.',
-        severity: 'medium',
-        path: 'src/services/review.ts',
+        title: "Handle context failures",
+        body: "The new asynchronous context step can fail, but no recovery behavior is visible here.",
+        severity: "medium",
+        path: "src/services/review.ts",
         startLine: 8,
         endLine: 9,
-        side: 'new'
-      }
+        side: "new",
+      },
     ],
-    caveats: ['Tests were not executed as part of this mock review.']
-  })
+    caveats: ["Tests were not executed as part of this mock review."],
+  }),
 };

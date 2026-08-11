@@ -1,7 +1,11 @@
 <script lang="ts">
-  import { FolderGit2, X } from '@lucide/svelte';
-  import SelectMenu from '$lib/components/common/SelectMenu.svelte';
-  import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
+  import { FolderGit2, X } from "@lucide/svelte";
+  import SelectMenu from "$lib/components/common/SelectMenu.svelte";
+  import type {
+    ProjectConfig,
+    RepositoryInfo,
+    SaveProjectInput,
+  } from "$lib/domain/project";
 
   let {
     repository,
@@ -10,7 +14,7 @@
     deleting = false,
     onSave,
     onDelete,
-    onClose
+    onClose,
   }: {
     repository?: RepositoryInfo;
     project?: ProjectConfig;
@@ -21,24 +25,31 @@
     onClose: () => void;
   } = $props();
 
-  let name = $state('');
-  let baseRef = $state('');
+  let name = $state("");
+  let baseRef = $state("");
   let initialized = false;
-  const repoPath = $derived(project?.repoPath ?? repository?.repoPath ?? '');
+  const repoPath = $derived(project?.repoPath ?? repository?.repoPath ?? "");
   const branchOptions = $derived([
-    ...(!baseRef ? [{ value: '', label: 'Select a branch', disabled: true }] : []),
-    ...[...new Set([...(repository?.localBranches ?? []), ...(repository?.remoteBranches ?? [])])]
-      .filter((branch) => branch === baseRef || !branch.endsWith('/HEAD'))
-      .map((branch) => ({ value: branch, label: branch }))
+    ...(!baseRef
+      ? [{ value: "", label: "Select a branch", disabled: true }]
+      : []),
+    ...[
+      ...new Set([
+        ...(repository?.localBranches ?? []),
+        ...(repository?.remoteBranches ?? []),
+      ]),
+    ]
+      .filter((branch) => branch === baseRef || !branch.endsWith("/HEAD"))
+      .map((branch) => ({ value: branch, label: branch })),
   ]);
 
   $effect(() => {
     if (!initialized) {
-      name = project?.name ?? repository?.suggestedName ?? '';
+      name = project?.name ?? repository?.suggestedName ?? "";
       baseRef =
-        project?.baseRef && project.baseRef !== 'HEAD'
+        project?.baseRef && project.baseRef !== "HEAD"
           ? project.baseRef
-          : (repository?.detectedBaseRef ?? '');
+          : (repository?.detectedBaseRef ?? "");
       initialized = true;
     }
   });
@@ -55,18 +66,27 @@
   role="presentation"
   onclick={(event) => event.target === event.currentTarget && onClose()}
 >
-  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="project-dialog-title">
+  <div
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="project-dialog-title"
+  >
     <header>
       <div class="icon"><FolderGit2 size={20} /></div>
       <div>
-        <h2 id="project-dialog-title">{project ? 'Project settings' : 'Add repository'}</h2>
+        <h2 id="project-dialog-title">
+          {project ? "Project settings" : "Add repository"}
+        </h2>
         <p>
           {project
-            ? 'Update the project display name.'
-            : 'Confirm the repository to add to undiffstand.'}
+            ? "Update the project display name."
+            : "Confirm the repository to add to undiffstand."}
         </p>
       </div>
-      <button class="icon-button" aria-label="Close" onclick={onClose}><X size={18} /></button>
+      <button class="icon-button" aria-label="Close" onclick={onClose}
+        ><X size={18} /></button
+      >
     </header>
 
     <form onsubmit={submit}>
@@ -94,24 +114,32 @@
         {#if repository?.detectedBaseRef}
           <small>Automatically detected. Used by quick comparisons.</small>
         {:else if !baseRef}
-          <small class="warning">Base branch could not be detected. Select it to continue.</small>
+          <small class="warning"
+            >Base branch could not be detected. Select it to continue.</small
+          >
         {:else}
           <small>Used by quick comparisons.</small>
         {/if}
       </label>
       <footer>
         {#if project && onDelete}
-          <button class="danger" type="button" disabled={saving || deleting} onclick={onDelete}>
-            {deleting ? 'Removing…' : 'Remove project'}
+          <button
+            class="danger"
+            type="button"
+            disabled={saving || deleting}
+            onclick={onDelete}
+          >
+            {deleting ? "Removing…" : "Remove project"}
           </button>
         {/if}
-        <button class="secondary" type="button" onclick={onClose}>Cancel</button>
+        <button class="secondary" type="button" onclick={onClose}>Cancel</button
+        >
         <button
           class="primary"
           type="submit"
           disabled={saving || deleting || !name.trim() || !baseRef}
         >
-          {saving ? 'Saving…' : project ? 'Save settings' : 'Add project'}
+          {saving ? "Saving…" : project ? "Save settings" : "Add project"}
         </button>
       </footer>
     </form>

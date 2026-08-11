@@ -1,9 +1,18 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
-  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-  import type { ChangeReviewFinding, DiffExplanation, InlineAnswer } from '$lib/domain/ai';
-  import { diffAnchorId, displayPath, type DiffFileSummary, type FileDiff } from '$lib/domain/diff';
-  import DiffFileSection from './DiffFileSection.svelte';
+  import { onDestroy, onMount } from "svelte";
+  import { SvelteMap, SvelteSet } from "svelte/reactivity";
+  import type {
+    ChangeReviewFinding,
+    DiffExplanation,
+    InlineAnswer,
+  } from "$lib/domain/ai";
+  import {
+    diffAnchorId,
+    displayPath,
+    type DiffFileSummary,
+    type FileDiff,
+  } from "$lib/domain/diff";
+  import DiffFileSection from "./DiffFileSection.svelte";
 
   let {
     files,
@@ -20,14 +29,14 @@
     onLoad,
     onActive,
     onExplainFile = () => {},
-    onAskInline = () => Promise.reject(new Error('Inline Ask is unavailable.'))
+    onAskInline = () => Promise.reject(new Error("Inline Ask is unavailable.")),
   }: {
     files: DiffFileSummary[];
     diffs: Record<string, FileDiff | undefined>;
     loadingPaths: Record<string, boolean | undefined>;
     errors: Record<string, string | undefined>;
     activePath?: string;
-    mode: 'split' | 'unified';
+    mode: "split" | "unified";
     wrap: boolean;
     fileExplanations?: Record<string, DiffExplanation | undefined>;
     fileAiLoading?: Record<string, boolean | undefined>;
@@ -38,10 +47,10 @@
     onExplainFile?: (path: string) => void;
     onAskInline?: (
       path: string,
-      side: 'old' | 'new',
+      side: "old" | "new",
       startLine: number,
       endLine: number,
-      question: string
+      question: string,
     ) => Promise<InlineAnswer>;
   } = $props();
 
@@ -51,7 +60,7 @@
   let activeObserver: IntersectionObserver | undefined;
   let renderedPaths = $state<Record<string, boolean | undefined>>({});
   let requestedPathsVersion = $state(0);
-  let lastFilesKey = $state('');
+  let lastFilesKey = $state("");
   let collapsed = $state<Record<string, boolean>>({});
   let copiedPath = $state<string>();
   let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
@@ -62,7 +71,7 @@
   const pendingRenderPathSet = new SvelteSet<string>();
   const activeSectionPaths = new SvelteSet<string>();
   const INITIAL_RENDERED_FILE_COUNT = 8;
-  const LAZY_RENDER_ROOT_MARGIN = '1200px 0px';
+  const LAZY_RENDER_ROOT_MARGIN = "1200px 0px";
   const ACTIVE_FILE_OFFSET = 52;
   const RENDER_INTERVAL_MS = 32;
 
@@ -73,20 +82,22 @@
 
   onMount(() => {
     scroller =
-      (feedElement?.closest('.viewer-scroll') as HTMLElement | null) ?? feedElement ?? null;
+      (feedElement?.closest(".viewer-scroll") as HTMLElement | null) ??
+      feedElement ??
+      null;
     setupRenderObserver();
     setupActiveObserver();
-    window.addEventListener('resize', setupActiveObserver);
+    window.addEventListener("resize", setupActiveObserver);
 
     return () => {
-      window.removeEventListener('resize', setupActiveObserver);
+      window.removeEventListener("resize", setupActiveObserver);
       renderObserver?.disconnect();
       activeObserver?.disconnect();
     };
   });
 
   $effect(() => {
-    const filesKey = files.map(displayPath).join('\0');
+    const filesKey = files.map(displayPath).join("\0");
     if (filesKey === lastFilesKey) return;
     lastFilesKey = filesKey;
     resetDeferredRendering();
@@ -119,7 +130,7 @@
           requestFileRender(path);
         }
       },
-      { root: scroller, rootMargin: LAZY_RENDER_ROOT_MARGIN }
+      { root: scroller, rootMargin: LAZY_RENDER_ROOT_MARGIN },
     );
     observeDeferredSections();
   }
@@ -128,13 +139,17 @@
     activeObserver?.disconnect();
     activeSectionPaths.clear();
     if (!scroller) return;
-    const offset = Math.min(ACTIVE_FILE_OFFSET, Math.max(0, scroller.clientHeight - 1));
+    const offset = Math.min(
+      ACTIVE_FILE_OFFSET,
+      Math.max(0, scroller.clientHeight - 1),
+    );
     const bottomMargin = Math.max(0, scroller.clientHeight - offset - 1);
     activeObserver = new IntersectionObserver(updateActiveSections, {
       root: scroller,
-      rootMargin: `-${offset}px 0px -${bottomMargin}px 0px`
+      rootMargin: `-${offset}px 0px -${bottomMargin}px 0px`,
     });
-    for (const section of sectionElements.values()) activeObserver.observe(section);
+    for (const section of sectionElements.values())
+      activeObserver.observe(section);
   }
 
   function updateActiveSections(entries: IntersectionObserverEntry[]) {
@@ -144,8 +159,11 @@
       if (entry.isIntersecting) activeSectionPaths.add(path);
       else activeSectionPaths.delete(path);
     }
-    const nextActivePath = files.map(displayPath).find((path) => activeSectionPaths.has(path));
-    if (nextActivePath && nextActivePath !== activePath) onActive(nextActivePath);
+    const nextActivePath = files
+      .map(displayPath)
+      .find((path) => activeSectionPaths.has(path));
+    if (nextActivePath && nextActivePath !== activePath)
+      onActive(nextActivePath);
   }
 
   function observeDeferredSections() {
@@ -166,7 +184,7 @@
         activeObserver?.unobserve(node);
         sectionElements.delete(path);
         activeSectionPaths.delete(path);
-      }
+      },
     };
   }
 
@@ -228,7 +246,8 @@
     const path = pendingRenderPaths.shift();
     if (!path) return;
     pendingRenderPathSet.delete(path);
-    if (requestedPaths.has(path) && diffs[path] && !collapsed[path]) renderedPaths[path] = true;
+    if (requestedPaths.has(path) && diffs[path] && !collapsed[path])
+      renderedPaths[path] = true;
     scheduleNextRender();
   }
 
@@ -257,15 +276,15 @@
       return;
     }
 
-    const textarea = document.createElement('textarea');
+    const textarea = document.createElement("textarea");
     textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
     document.body.append(textarea);
     textarea.select();
-    const copied = document.execCommand('copy');
+    const copied = document.execCommand("copy");
     textarea.remove();
-    if (!copied) throw new Error('Copy failed');
+    if (!copied) throw new Error("Copy failed");
   }
 </script>
 
@@ -277,7 +296,7 @@
       data-diff-path={path}
       class="file-diff"
       class:active={activePath === path}
-      aria-current={activePath === path ? 'true' : undefined}
+      aria-current={activePath === path ? "true" : undefined}
       use:observeSection={path}
     >
       <DiffFileSection

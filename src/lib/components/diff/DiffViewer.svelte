@@ -1,11 +1,11 @@
 <script module lang="ts">
-  import { SvelteMap } from 'svelte/reactivity';
+  import { SvelteMap } from "svelte/reactivity";
   import {
     bundledLanguages,
     getDiffViewHighlighter,
     type BundledLanguage,
-    type DiffHighlighter
-  } from '@git-diff-view/shiki';
+    type DiffHighlighter,
+  } from "@git-diff-view/shiki";
 
   let highlighterPromise: Promise<DiffHighlighter> | undefined;
   const languagePromises = new SvelteMap<string, Promise<void>>();
@@ -30,32 +30,36 @@
 </script>
 
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { DiffModeEnum, DiffViewWithMultiSelect, SplitSide } from '@git-diff-view/svelte';
-  import '@git-diff-view/svelte/styles/diff-view-pure.css';
-  import { Binary, FileExclamationPoint } from '@lucide/svelte';
-  import type { FileDiff } from '$lib/domain/diff';
-  import type { ChangeReviewFinding, InlineAnswer } from '$lib/domain/ai';
-  import InlineAsk from '$lib/components/ai/InlineAsk.svelte';
-  import ReviewFinding from '$lib/components/ai/ReviewFinding.svelte';
-  import EmptyState from '$lib/components/common/EmptyState.svelte';
+  import { onMount } from "svelte";
+  import {
+    DiffModeEnum,
+    DiffViewWithMultiSelect,
+    SplitSide,
+  } from "@git-diff-view/svelte";
+  import "@git-diff-view/svelte/styles/diff-view-pure.css";
+  import { Binary, FileExclamationPoint } from "@lucide/svelte";
+  import type { FileDiff } from "$lib/domain/diff";
+  import type { ChangeReviewFinding, InlineAnswer } from "$lib/domain/ai";
+  import InlineAsk from "$lib/components/ai/InlineAsk.svelte";
+  import ReviewFinding from "$lib/components/ai/ReviewFinding.svelte";
+  import EmptyState from "$lib/components/common/EmptyState.svelte";
 
   let {
     diff,
     mode,
     wrap,
     findings = [],
-    onAskInline
+    onAskInline,
   }: {
     diff: FileDiff;
-    mode: 'split' | 'unified';
+    mode: "split" | "unified";
     wrap: boolean;
     findings?: ChangeReviewFinding[];
     onAskInline?: (
-      side: 'old' | 'new',
+      side: "old" | "new",
       startLine: number,
       endLine: number,
-      question: string
+      question: string,
     ) => Promise<InlineAnswer>;
   } = $props();
   let highlighter = $state<DiffHighlighter>();
@@ -67,43 +71,66 @@
       }
     | undefined;
   const language = $derived(
-    ((diff.file.newPath ?? diff.file.oldPath ?? '').split('.').at(-1) ?? 'txt').toLowerCase()
+    (
+      (diff.file.newPath ?? diff.file.oldPath ?? "").split(".").at(-1) ?? "txt"
+    ).toLowerCase(),
   );
   const diffData = $derived.by(() => ({
     oldFile: diff.file.oldPath
-      ? { fileName: diff.file.oldPath, fileLang: language, content: diff.oldContent ?? '' }
+      ? {
+          fileName: diff.file.oldPath,
+          fileLang: language,
+          content: diff.oldContent ?? "",
+        }
       : undefined,
     newFile: diff.file.newPath
-      ? { fileName: diff.file.newPath, fileLang: language, content: diff.newContent ?? '' }
+      ? {
+          fileName: diff.file.newPath,
+          fileLang: language,
+          content: diff.newContent ?? "",
+        }
       : undefined,
-    hunks: [diff.unifiedDiff]
+    hunks: [diff.unifiedDiff],
   }));
   const extendData = $derived.by(() => {
     const oldFile: Record<string, { data: ChangeReviewFinding[] }> = {};
     const newFile: Record<string, { data: ChangeReviewFinding[] }> = {};
     for (const finding of findings) {
-      const target = finding.side === 'old' ? oldFile : newFile;
+      const target = finding.side === "old" ? oldFile : newFile;
       const key = String(finding.endLine);
       (target[key] ??= { data: [] }).data.push(finding);
     }
     return { oldFile, newFile };
   });
 
-  function sideName(side: SplitSide): 'old' | 'new' {
-    return side === SplitSide.old ? 'old' : 'new';
+  function sideName(side: SplitSide): "old" | "new" {
+    return side === SplitSide.old ? "old" : "new";
   }
 
-  function askInline(side: SplitSide, startLine: number, endLine: number, question: string) {
-    if (!onAskInline) return Promise.reject(new Error('Inline Ask is unavailable.'));
+  function askInline(
+    side: SplitSide,
+    startLine: number,
+    endLine: number,
+    question: string,
+  ) {
+    if (!onAskInline)
+      return Promise.reject(new Error("Inline Ask is unavailable."));
     return onAskInline(sideName(side), startLine, endLine, question);
   }
 
   function openInlineForSelection(result: {
-    range: { side: 'old' | 'new'; startLineNumber: number; endLineNumber: number };
+    range: {
+      side: "old" | "new";
+      startLineNumber: number;
+      endLineNumber: number;
+    };
   }) {
     widgetState = {
-      side: result.range.side === 'old' ? SplitSide.old : SplitSide.new,
-      lineNumber: Math.max(result.range.startLineNumber, result.range.endLineNumber)
+      side: result.range.side === "old" ? SplitSide.old : SplitSide.new,
+      lineNumber: Math.max(
+        result.range.startLineNumber,
+        result.range.endLineNumber,
+      ),
     };
   }
 
@@ -122,7 +149,7 @@
         if (mounted) highlighter = loadedHighlighter;
       })
       .catch((error: unknown) => {
-        console.error('Failed to initialize Shiki syntax highlighting.', error);
+        console.error("Failed to initialize Shiki syntax highlighting.", error);
       });
 
     return () => {
@@ -131,7 +158,7 @@
   });
 </script>
 
-{#if diff.file.status === 'binary'}
+{#if diff.file.status === "binary"}
   <EmptyState
     icon={Binary}
     title="Binary file changed"
@@ -150,7 +177,9 @@
   <div class="diff-host">
     <DiffViewWithMultiSelect
       data={diffData}
-      diffViewMode={mode === 'split' ? DiffModeEnum.Split : DiffModeEnum.Unified}
+      diffViewMode={mode === "split"
+        ? DiffModeEnum.Split
+        : DiffModeEnum.Unified}
       diffViewTheme="dark"
       diffViewWrap={wrap}
       diffViewHighlight={highlighter !== undefined}
@@ -172,7 +201,7 @@
   lineNumber,
   fromLineNumber,
   side,
-  onClose
+  onClose,
 }: {
   lineNumber: number;
   fromLineNumber: number;

@@ -1,5 +1,11 @@
 export type DiffStatus =
-  'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'binary' | 'submodule';
+  | "added"
+  | "modified"
+  | "deleted"
+  | "renamed"
+  | "copied"
+  | "binary"
+  | "submodule";
 
 export type DiffFileSummary = {
   oldPath?: string;
@@ -29,31 +35,37 @@ export type DiffSummary = {
   totalDeletions: number;
 };
 
-export const defaultDiffSelection = (): DiffSelection => ({ base: 'HEAD', target: '.' });
+export const defaultDiffSelection = (): DiffSelection => ({
+  base: "HEAD",
+  target: ".",
+});
 
-export function revisionDisplayLabel(revision: string, currentBranch?: string | null): string {
-  if (revision === 'HEAD') return currentBranch ?? 'HEAD';
-  if (revision === '.') return 'working tree';
+export function revisionDisplayLabel(
+  revision: string,
+  currentBranch?: string | null,
+): string {
+  if (revision === "HEAD") return currentBranch ?? "HEAD";
+  if (revision === ".") return "working tree";
   return revision;
 }
 
 export function diffSelectionLabel(
   selection: DiffSelection,
-  currentBranch?: string | null
+  currentBranch?: string | null,
 ): string {
   return `${revisionDisplayLabel(selection.base, currentBranch)} → ${revisionDisplayLabel(
     selection.target,
-    currentBranch
+    currentBranch,
   )}`;
 }
 
 export function diffComparisonLabel(
   comparison: DiffComparison,
-  currentBranch?: string | null
+  currentBranch?: string | null,
 ): string {
   return `${revisionDisplayLabel(comparison.fromLabel, currentBranch)} → ${revisionDisplayLabel(
     comparison.toLabel,
-    currentBranch
+    currentBranch,
   )}`;
 }
 
@@ -67,7 +79,7 @@ export type FileDiff = {
 };
 
 export function displayPath(file: DiffFileSummary): string {
-  return file.newPath ?? file.oldPath ?? 'Unknown file';
+  return file.newPath ?? file.oldPath ?? "Unknown file";
 }
 
 type DiffFileTreeNode = {
@@ -75,11 +87,13 @@ type DiffFileTreeNode = {
   files: DiffFileSummary[];
 };
 
-export function sortDiffFilesByTreeOrder(files: DiffFileSummary[]): DiffFileSummary[] {
+export function sortDiffFilesByTreeOrder(
+  files: DiffFileSummary[],
+): DiffFileSummary[] {
   const root: DiffFileTreeNode = { directories: new Map(), files: [] };
 
   for (const file of files) {
-    const parts = displayPath(file).split('/');
+    const parts = displayPath(file).split("/");
     parts.pop();
     let directory = root;
 
@@ -98,15 +112,15 @@ export function sortDiffFilesByTreeOrder(files: DiffFileSummary[]): DiffFileSumm
   const sortedFiles: DiffFileSummary[] = [];
 
   function visit(directory: DiffFileTreeNode) {
-    const directories = [...directory.directories.entries()].sort(([left], [right]) =>
-      left.localeCompare(right)
+    const directories = [...directory.directories.entries()].sort(
+      ([left], [right]) => left.localeCompare(right),
     );
     for (const [, child] of directories) visit(child);
 
     sortedFiles.push(
       ...[...directory.files].sort((left, right) =>
-        displayPath(left).localeCompare(displayPath(right))
-      )
+        displayPath(left).localeCompare(displayPath(right)),
+      ),
     );
   }
 

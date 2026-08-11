@@ -1,26 +1,26 @@
 <script lang="ts">
-  import { Download, LoaderCircle } from '@lucide/svelte';
-  import type { UpdateState } from '$lib/domain/update';
+  import { Download, LoaderCircle } from "@lucide/svelte";
+  import type { UpdateState } from "$lib/domain/update";
 
   let {
     state,
-    onInstall
+    onInstall,
   }: {
     state: UpdateState;
     onInstall: () => void;
   } = $props();
 
-  const installing = $derived(state === 'installing');
+  const installing = $derived(state === "installing");
 </script>
 
-{#if state === 'available' || installing}
+{#if state === "available" || installing}
   <button
     class="update-action"
     class:installing
     type="button"
     disabled={installing}
-    aria-label={installing ? 'Installing update' : 'Install available update'}
-    title={installing ? 'Installing update' : 'Install available update'}
+    aria-label={installing ? "Installing update" : "Install available update"}
+    title={installing ? "Installing update" : "Install available update"}
     onclick={onInstall}
   >
     {#if installing}

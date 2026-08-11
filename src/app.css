@@ -4,7 +4,7 @@
     ui-sans-serif,
     -apple-system,
     BlinkMacSystemFont,
-    'Segoe UI',
+    "Segoe UI",
     sans-serif;
   color-scheme: dark;
   --bg: #090e14;
@@ -20,7 +20,7 @@
   --accent-bright: #63c69a;
   --green: #55bd83;
   --red: #e06c64;
-  --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   background: var(--bg);
 }
 

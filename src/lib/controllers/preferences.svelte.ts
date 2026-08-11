@@ -1,22 +1,22 @@
-import type { UserPreferences } from '$lib/domain/preferences';
-import type { AppApi } from '$lib/services/api';
+import type { UserPreferences } from "$lib/domain/preferences";
+import type { AppApi } from "$lib/services/api";
 
 export class PreferencesController {
   sidebarOpen = $state(true);
   sidebarWidth = $state(225);
   aiPanelOpen = $state(true);
   aiPanelWidth = $state(290);
-  diffMode = $state<'split' | 'unified'>('split');
+  diffMode = $state<"split" | "unified">("split");
   wrapLines = $state(false);
-  reviewOutputLanguage = $state<'english' | 'japanese'>('english');
+  reviewOutputLanguage = $state<"english" | "japanese">("english");
 
   private loaded = false;
   private saving = false;
   private saveRequested = false;
 
   constructor(
-    private readonly api: Pick<AppApi, 'saveUserPreferences'>,
-    private readonly onError: (error: unknown) => void
+    private readonly api: Pick<AppApi, "saveUserPreferences">,
+    private readonly onError: (error: unknown) => void,
   ) {}
 
   apply(preferences: UserPreferences) {
@@ -27,7 +27,7 @@ export class PreferencesController {
     this.aiPanelWidth = detail.aiPanel.width;
     this.diffMode = detail.diff.mode;
     this.wrapLines = detail.diff.wrapLongLines;
-    this.reviewOutputLanguage = preferences.ai?.outputLanguage ?? 'english';
+    this.reviewOutputLanguage = preferences.ai?.outputLanguage ?? "english";
     this.loaded = true;
   }
 
@@ -37,8 +37,8 @@ export class PreferencesController {
       changeDetail: {
         changedFilesPanel: { open: this.sidebarOpen, width: this.sidebarWidth },
         aiPanel: { open: this.aiPanelOpen, width: this.aiPanelWidth },
-        diff: { mode: this.diffMode, wrapLongLines: this.wrapLines }
-      }
+        diff: { mode: this.diffMode, wrapLongLines: this.wrapLines },
+      },
     };
   }
 

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { Check, GitBranch, X } from '@lucide/svelte';
-  import type { DiffSelection } from '$lib/domain/diff';
-  import type { RepositoryInfo } from '$lib/domain/project';
-  import DiffSelector from './DiffSelector.svelte';
+  import { Check, GitBranch, X } from "@lucide/svelte";
+  import type { DiffSelection } from "$lib/domain/diff";
+  import type { RepositoryInfo } from "$lib/domain/project";
+  import DiffSelector from "./DiffSelector.svelte";
 
   let {
     selection,
@@ -13,7 +13,7 @@
     currentToWorkingTreeIsActive = false,
     onApply,
     onConfigureBase,
-    onClose
+    onClose,
   }: {
     selection: DiffSelection;
     repository: RepositoryInfo;
@@ -30,16 +30,24 @@
 <div
   class="backdrop"
   role="presentation"
-  onclick={(event) => event.target === event.currentTarget && !loading && onClose()}
+  onclick={(event) =>
+    event.target === event.currentTarget && !loading && onClose()}
 >
-  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="comparison-dialog-title">
+  <div
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="comparison-dialog-title"
+  >
     <header>
       <div>
         <GitBranch size={17} />
         <h2 id="comparison-dialog-title">Change comparison</h2>
       </div>
-      <button aria-label="Close comparison dialog" disabled={loading} onclick={onClose}
-        ><X size={17} /></button
+      <button
+        aria-label="Close comparison dialog"
+        disabled={loading}
+        onclick={onClose}><X size={17} /></button
       >
     </header>
     <div class="content">
@@ -55,14 +63,20 @@
           {onApply}
         />
       </section>
-      <section class="quick-comparisons" aria-labelledby="quick-comparisons-title">
+      <section
+        class="quick-comparisons"
+        aria-labelledby="quick-comparisons-title"
+      >
         <div class="section-heading">
           <div>
             <h3 id="quick-comparisons-title">Quick comparisons</h3>
             <p>Apply a common comparison immediately.</p>
           </div>
           {#if !activeBaseRef}
-            <button type="button" class="settings-link" onclick={onConfigureBase}
+            <button
+              type="button"
+              class="settings-link"
+              onclick={onConfigureBase}
               >Set base branch in Project settings</button
             >
           {/if}
@@ -71,14 +85,16 @@
           <div class="quick-comparison-row">
             <div>
               <strong
-                >{activeBaseRef ?? 'Base branch'} → {repository.currentBranch ??
-                  'Current branch'}</strong
+                >{activeBaseRef ?? "Base branch"} → {repository.currentBranch ??
+                  "Current branch"}</strong
               >
               <span>Base branch → Current branch</span>
             </div>
             {#if baseToCurrentIsActive}
-              <span class="current-comparison" role="status" aria-label="Current comparison"
-                ><Check size={13} />Current</span
+              <span
+                class="current-comparison"
+                role="status"
+                aria-label="Current comparison"><Check size={13} />Current</span
               >
             {:else if activeBaseRef && activeBaseRef === repository.currentBranch}
               <span class="comparison-unavailable">Same branch</span>
@@ -86,30 +102,41 @@
               <button
                 type="button"
                 class="compare-button"
-                aria-label={`Compare ${activeBaseRef ?? 'base branch'} → ${repository.currentBranch ?? 'current branch'}`}
-                disabled={loading || !activeBaseRef || !repository.currentBranch}
-                title={!activeBaseRef ? 'Set a base branch in Project settings.' : undefined}
-                onclick={() => activeBaseRef && onApply({ base: activeBaseRef, target: 'HEAD' })}
+                aria-label={`Compare ${activeBaseRef ?? "base branch"} → ${repository.currentBranch ?? "current branch"}`}
+                disabled={loading ||
+                  !activeBaseRef ||
+                  !repository.currentBranch}
+                title={!activeBaseRef
+                  ? "Set a base branch in Project settings."
+                  : undefined}
+                onclick={() =>
+                  activeBaseRef &&
+                  onApply({ base: activeBaseRef, target: "HEAD" })}
                 >Compare</button
               >
             {/if}
           </div>
           <div class="quick-comparison-row">
             <div>
-              <strong>{repository.currentBranch ?? 'HEAD'} → Working tree</strong>
+              <strong
+                >{repository.currentBranch ?? "HEAD"} → Working tree</strong
+              >
               <span>Current branch → Working tree</span>
             </div>
             {#if currentToWorkingTreeIsActive}
-              <span class="current-comparison" role="status" aria-label="Current comparison"
-                ><Check size={13} />Current</span
+              <span
+                class="current-comparison"
+                role="status"
+                aria-label="Current comparison"><Check size={13} />Current</span
               >
             {:else}
               <button
                 type="button"
                 class="compare-button"
-                aria-label={`Compare ${repository.currentBranch ?? 'HEAD'} → Working tree`}
+                aria-label={`Compare ${repository.currentBranch ?? "HEAD"} → Working tree`}
                 disabled={loading}
-                onclick={() => onApply({ base: 'HEAD', target: '.' })}>Compare</button
+                onclick={() => onApply({ base: "HEAD", target: "." })}
+                >Compare</button
               >
             {/if}
           </div>

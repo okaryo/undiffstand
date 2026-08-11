@@ -26,7 +26,12 @@
     },
     {
       "matchManagers": ["npm", "cargo"],
-      "matchPackageNames": ["@tauri-apps/**", "tauri", "tauri-build", "tauri-plugin-**"],
+      "matchPackageNames": [
+        "@tauri-apps/**",
+        "tauri",
+        "tauri-build",
+        "tauri-plugin-**"
+      ],
       "groupName": "Tauri packages",
       "minimumReleaseAge": "14 days"
     },

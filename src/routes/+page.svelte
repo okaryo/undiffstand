@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { getCurrentWindow } from '@tauri-apps/api/window';
-  import { relaunch } from '@tauri-apps/plugin-process';
-  import { check, type Update } from '@tauri-apps/plugin-updater';
+  import { onMount } from "svelte";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { relaunch } from "@tauri-apps/plugin-process";
+  import { check, type Update } from "@tauri-apps/plugin-updater";
   import {
     Columns2,
     GitBranch,
@@ -13,38 +13,45 @@
     RefreshCw,
     Rows3,
     Settings,
-    TextWrap
-  } from '@lucide/svelte';
-  import AiPanel from '$lib/components/ai/AiPanel.svelte';
-  import EmptyState from '$lib/components/common/EmptyState.svelte';
-  import ErrorBanner from '$lib/components/common/ErrorBanner.svelte';
-  import ResizeHandle from '$lib/components/common/ResizeHandle.svelte';
-  import UpdateAction from '$lib/components/common/UpdateAction.svelte';
-  import ComparisonDialog from '$lib/components/diff/ComparisonDialog.svelte';
-  import DiffFeed from '$lib/components/diff/DiffFeed.svelte';
-  import DiffFileList from '$lib/components/diff/DiffFileList.svelte';
-  import DiffSummaryView from '$lib/components/diff/DiffSummary.svelte';
-  import ProjectDialog from '$lib/components/project/ProjectDialog.svelte';
-  import ProjectHome from '$lib/components/project/ProjectHome.svelte';
-  import ProjectSwitcher from '$lib/components/project/ProjectSwitcher.svelte';
-  import AiSettingsDialog from '$lib/components/settings/AiSettingsDialog.svelte';
-  import { AiReviewController } from '$lib/controllers/ai-review.svelte';
-  import { DiffWorkspaceController } from '$lib/controllers/diff-workspace.svelte';
-  import { PreferencesController } from '$lib/controllers/preferences.svelte';
-  import type { InlineAnswer } from '$lib/domain/ai';
+    TextWrap,
+  } from "@lucide/svelte";
+  import AiPanel from "$lib/components/ai/AiPanel.svelte";
+  import EmptyState from "$lib/components/common/EmptyState.svelte";
+  import ErrorBanner from "$lib/components/common/ErrorBanner.svelte";
+  import ResizeHandle from "$lib/components/common/ResizeHandle.svelte";
+  import UpdateAction from "$lib/components/common/UpdateAction.svelte";
+  import ComparisonDialog from "$lib/components/diff/ComparisonDialog.svelte";
+  import DiffFeed from "$lib/components/diff/DiffFeed.svelte";
+  import DiffFileList from "$lib/components/diff/DiffFileList.svelte";
+  import DiffSummaryView from "$lib/components/diff/DiffSummary.svelte";
+  import ProjectDialog from "$lib/components/project/ProjectDialog.svelte";
+  import ProjectHome from "$lib/components/project/ProjectHome.svelte";
+  import ProjectSwitcher from "$lib/components/project/ProjectSwitcher.svelte";
+  import AiSettingsDialog from "$lib/components/settings/AiSettingsDialog.svelte";
+  import { AiReviewController } from "$lib/controllers/ai-review.svelte";
+  import { DiffWorkspaceController } from "$lib/controllers/diff-workspace.svelte";
+  import { PreferencesController } from "$lib/controllers/preferences.svelte";
+  import type { InlineAnswer } from "$lib/domain/ai";
   import {
     defaultDiffSelection,
     diffComparisonLabel,
     diffSelectionLabel,
     revisionDisplayLabel,
-    type DiffSelection
-  } from '$lib/domain/diff';
-  import { normalizeError, type AppError } from '$lib/domain/error';
-  import type { DiffViewMode, ReviewOutputLanguage } from '$lib/domain/preferences';
-  import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
-  import type { UpdateState } from '$lib/domain/update';
-  import { tauriApi } from '$lib/services/tauri';
-  import { resolveApplicationShortcut } from '$lib/shortcuts';
+    type DiffSelection,
+  } from "$lib/domain/diff";
+  import { normalizeError, type AppError } from "$lib/domain/error";
+  import type {
+    DiffViewMode,
+    ReviewOutputLanguage,
+  } from "$lib/domain/preferences";
+  import type {
+    ProjectConfig,
+    RepositoryInfo,
+    SaveProjectInput,
+  } from "$lib/domain/project";
+  import type { UpdateState } from "$lib/domain/update";
+  import { tauriApi } from "$lib/services/tauri";
+  import { resolveApplicationShortcut } from "$lib/shortcuts";
 
   let projects = $state<ProjectConfig[]>([]);
   let activeProject = $state<ProjectConfig | null>(null);
@@ -59,7 +66,7 @@
   let deleting = $state(false);
   let error = $state<AppError | null>(null);
   let workspaceError = $state<AppError | null>(null);
-  let updateState = $state<UpdateState>('unavailable');
+  let updateState = $state<UpdateState>("unavailable");
   let availableUpdate = $state<Update | null>(null);
   let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
   let unlistenUpdateFocusChange: (() => void) | null = null;
@@ -76,23 +83,23 @@
     (caught) => {
       workspaceError = caught === null ? null : normalizeError(caught);
     },
-    () => aiReview.reset()
+    () => aiReview.reset(),
   );
 
   let aiPanelExpanded = $state(false);
   let aiPanelWidthBeforeExpand = 290;
   let activeBaseRef = $derived(
-    activeProject?.baseRef && activeProject.baseRef !== 'HEAD'
+    activeProject?.baseRef && activeProject.baseRef !== "HEAD"
       ? activeProject.baseRef
-      : activeRepository?.detectedBaseRef
+      : activeRepository?.detectedBaseRef,
   );
   let baseToCurrentIsActive = $derived(
     Boolean(activeBaseRef) &&
       workspace.selection.base === activeBaseRef &&
-      workspace.selection.target === 'HEAD'
+      workspace.selection.target === "HEAD",
   );
   let currentToWorkingTreeIsActive = $derived(
-    workspace.selection.base === 'HEAD' && workspace.selection.target === '.'
+    workspace.selection.base === "HEAD" && workspace.selection.target === ".",
   );
   let autoRefreshInProgress = false;
   let lastAutoRefreshAt = 0;
@@ -104,26 +111,26 @@
   const SIDEBAR_MAX_WIDTH = 420;
   const AI_PANEL_MIN_WIDTH = 240;
   const AI_PANEL_MAX_WIDTH = 520;
-  type ResizablePanel = 'sidebar' | 'ai';
+  type ResizablePanel = "sidebar" | "ai";
 
   onMount(() => {
     if (window.innerWidth <= 1100) {
       preferences.sidebarWidth = 200;
       preferences.aiPanelWidth = 260;
     }
-    window.addEventListener('focus', refreshWorkspaceOnFocus);
+    window.addEventListener("focus", refreshWorkspaceOnFocus);
     startUpdateChecks();
     void initialize();
 
     return () => {
-      window.removeEventListener('focus', refreshWorkspaceOnFocus);
+      window.removeEventListener("focus", refreshWorkspaceOnFocus);
       stopUpdateChecks();
     };
   });
 
   function startUpdateChecks() {
     if (!isTauriRuntime()) {
-      updateState = 'unavailable';
+      updateState = "unavailable";
       return;
     }
 
@@ -140,7 +147,7 @@
         unlistenUpdateFocusChange = unlisten;
       })
       .catch((caught) => {
-        console.warn('Update focus listener setup failed', caught);
+        console.warn("Update focus listener setup failed", caught);
       });
   }
 
@@ -156,7 +163,7 @@
 
   async function checkForUpdates(options: { force?: boolean } = {}) {
     if (!isTauriRuntime()) {
-      updateState = 'unavailable';
+      updateState = "unavailable";
       return;
     }
 
@@ -164,57 +171,65 @@
 
     updateCheckInFlight = true;
     lastUpdateCheckAttemptAt = Date.now();
-    updateState = 'checking';
+    updateState = "checking";
 
     try {
       const update = await check();
       availableUpdate = update;
-      updateState = update ? 'available' : 'idle';
+      updateState = update ? "available" : "idle";
     } catch (caught) {
-      console.warn('Update check failed', caught);
-      updateState = 'error';
+      console.warn("Update check failed", caught);
+      updateState = "error";
     } finally {
       updateCheckInFlight = false;
     }
   }
 
   function shouldSkipUpdateCheck(force: boolean) {
-    if (updateCheckInFlight || updateState === 'available' || updateState === 'installing')
+    if (
+      updateCheckInFlight ||
+      updateState === "available" ||
+      updateState === "installing"
+    )
       return true;
 
-    return !force && Date.now() - lastUpdateCheckAttemptAt < UPDATE_CHECK_COOLDOWN_MS;
+    return (
+      !force && Date.now() - lastUpdateCheckAttemptAt < UPDATE_CHECK_COOLDOWN_MS
+    );
   }
 
   async function installUpdate() {
     if (!availableUpdate) return;
 
-    updateState = 'installing';
+    updateState = "installing";
 
     try {
       await availableUpdate.downloadAndInstall();
       await relaunch();
     } catch (caught) {
-      console.warn('Update installation failed', caught);
-      updateState = 'error';
+      console.warn("Update installation failed", caught);
+      updateState = "error";
     }
   }
 
   function isTauriRuntime() {
-    return '__TAURI_INTERNALS__' in window;
+    return "__TAURI_INTERNALS__" in window;
   }
 
   function panelWidthLimits(panel: ResizablePanel, workspaceWidth: number) {
-    const min = panel === 'sidebar' ? SIDEBAR_MIN_WIDTH : AI_PANEL_MIN_WIDTH;
-    const configuredMax = panel === 'sidebar' ? SIDEBAR_MAX_WIDTH : AI_PANEL_MAX_WIDTH;
+    const min = panel === "sidebar" ? SIDEBAR_MIN_WIDTH : AI_PANEL_MIN_WIDTH;
+    const configuredMax =
+      panel === "sidebar" ? SIDEBAR_MAX_WIDTH : AI_PANEL_MAX_WIDTH;
     const otherPanelWidth =
-      panel === 'sidebar'
+      panel === "sidebar"
         ? preferences.aiPanelOpen
           ? preferences.aiPanelWidth
           : 0
         : preferences.sidebarOpen
           ? preferences.sidebarWidth
           : 0;
-    const visibleHandleCount = Number(preferences.sidebarOpen) + Number(preferences.aiPanelOpen);
+    const visibleHandleCount =
+      Number(preferences.sidebarOpen) + Number(preferences.aiPanelOpen);
     const availableMax =
       workspaceWidth -
       otherPanelWidth -
@@ -224,13 +239,18 @@
     return { min, max: Math.max(min, Math.min(configuredMax, availableMax)) };
   }
 
-  function constrainedPanelWidth(panel: ResizablePanel, width: number, workspaceWidth: number) {
+  function constrainedPanelWidth(
+    panel: ResizablePanel,
+    width: number,
+    workspaceWidth: number,
+  ) {
     const { min, max } = panelWidthLimits(panel, workspaceWidth);
     return Math.round(Math.min(max, Math.max(min, width)));
   }
 
   function resetPanelWidth(panel: ResizablePanel) {
-    if (panel === 'sidebar') preferences.sidebarWidth = window.innerWidth <= 1100 ? 200 : 225;
+    if (panel === "sidebar")
+      preferences.sidebarWidth = window.innerWidth <= 1100 ? 200 : 225;
     else preferences.aiPanelWidth = window.innerWidth <= 1100 ? 260 : 290;
     preferences.queueSave();
   }
@@ -278,18 +298,21 @@
     try {
       const [loadedProjects, loadedPreferences] = await Promise.all([
         tauriApi.listProjects(),
-        tauriApi.getUserPreferences()
+        tauriApi.getUserPreferences(),
       ]);
       projects = loadedProjects;
       preferences.apply(loadedPreferences);
       const params = new URLSearchParams(window.location.search);
-      const projectId = params.get('project');
+      const projectId = params.get("project");
       if (projectId) {
         const project = projects.find((item) => item.id === projectId);
         if (project) {
-          const target = params.get('target') ?? '.';
-          const base = params.get('base') ?? params.get('compare') ?? 'HEAD';
-          await openProject(project, params.get('file') ?? undefined, { base, target });
+          const target = params.get("target") ?? ".";
+          const base = params.get("base") ?? params.get("compare") ?? "HEAD";
+          await openProject(project, params.get("file") ?? undefined, {
+            base,
+            target,
+          });
         }
       }
     } catch (caught) {
@@ -314,9 +337,11 @@
 
     lastAutoRefreshAt = now;
     autoRefreshInProgress = true;
-    void workspace.load(workspace.selectedPath, { silent: true }).finally(() => {
-      autoRefreshInProgress = false;
-    });
+    void workspace
+      .load(workspace.selectedPath, { silent: true })
+      .finally(() => {
+        autoRefreshInProgress = false;
+      });
   }
 
   async function addRepository() {
@@ -337,7 +362,10 @@
     error = null;
     try {
       const project = await tauriApi.saveProject(input);
-      projects = [project, ...projects.filter((item) => item.id !== project.id)];
+      projects = [
+        project,
+        ...projects.filter((item) => item.id !== project.id),
+      ];
       showProjectDialog = false;
       repositoryDraft = undefined;
       editingProject = undefined;
@@ -355,7 +383,11 @@
   }
 
   async function removeProject(project: ProjectConfig) {
-    if (!confirm(`Remove ${project.name} from undiffstand? The repository will not be changed.`))
+    if (
+      !confirm(
+        `Remove ${project.name} from undiffstand? The repository will not be changed.`,
+      )
+    )
       return;
     deleting = true;
     try {
@@ -377,19 +409,22 @@
   async function openProject(
     project: ProjectConfig,
     requestedFile?: string,
-    requestedSelection: DiffSelection = defaultDiffSelection()
+    requestedSelection: DiffSelection = defaultDiffSelection(),
   ) {
     loading = true;
     workspaceError = null;
     try {
       const [openedProject, repository] = await Promise.all([
         tauriApi.touchProject(project.id),
-        tauriApi.validateRepository(project.repoPath)
+        tauriApi.validateRepository(project.repoPath),
       ]);
       activeProject = openedProject;
       activeRepository = repository;
       workspace.activate(openedProject.id, requestedSelection);
-      projects = [activeProject, ...projects.filter((item) => item.id !== activeProject?.id)];
+      projects = [
+        activeProject,
+        ...projects.filter((item) => item.id !== activeProject?.id),
+      ];
       await workspace.load(requestedFile);
     } catch (caught) {
       workspaceError = normalizeError(caught);
@@ -411,38 +446,40 @@
   function handleWindowKeydown(event: KeyboardEvent) {
     const shortcut = resolveApplicationShortcut(event);
 
-    if (shortcut === 'dismiss-dialogs') {
-      if (showProjectDialog || showSettings || showComparisonDialog) event.preventDefault();
+    if (shortcut === "dismiss-dialogs") {
+      if (showProjectDialog || showSettings || showComparisonDialog)
+        event.preventDefault();
       showProjectDialog = false;
       showSettings = false;
       if (!workspace.loading) showComparisonDialog = false;
-    } else if (shortcut === 'open-settings') {
+    } else if (shortcut === "open-settings") {
       event.preventDefault();
       showSettings = true;
-    } else if (shortcut === 'refresh-change-detail' && activeProject) {
+    } else if (shortcut === "refresh-change-detail" && activeProject) {
       event.preventDefault();
       void workspace.load(workspace.selectedPath);
-    } else if (shortcut === 'toggle-changed-files' && activeProject) {
+    } else if (shortcut === "toggle-changed-files" && activeProject) {
       event.preventDefault();
       toggleSidebar();
-    } else if (shortcut === 'toggle-ai-panel' && activeProject) {
+    } else if (shortcut === "toggle-ai-panel" && activeProject) {
       event.preventDefault();
       toggleAiPanel();
     }
   }
 
   async function explainFileChange(path: string) {
-    if (activeProject) await aiReview.explainFile(activeProject.id, workspace.selection, path);
+    if (activeProject)
+      await aiReview.explainFile(activeProject.id, workspace.selection, path);
   }
 
   async function askInline(
     path: string,
-    side: 'old' | 'new',
+    side: "old" | "new",
     startLine: number,
     endLine: number,
-    question: string
+    question: string,
   ): Promise<InlineAnswer> {
-    if (!activeProject) return Promise.reject(new Error('No project is open.'));
+    if (!activeProject) return Promise.reject(new Error("No project is open."));
     return aiReview.askInline(
       activeProject.id,
       workspace.selection,
@@ -450,13 +487,17 @@
       side,
       startLine,
       endLine,
-      question
+      question,
     );
   }
 
   async function runChangeReview() {
     if (activeProject) {
-      await aiReview.review(activeProject.id, workspace.selection, workspace.reviewAvailability);
+      await aiReview.review(
+        activeProject.id,
+        workspace.selection,
+        workspace.reviewAvailability,
+      );
     }
   }
 
@@ -465,7 +506,7 @@
     activeRepository = undefined;
     workspace.reset();
     workspaceError = null;
-    history.replaceState(null, '', window.location.pathname);
+    history.replaceState(null, "", window.location.pathname);
   }
 
   async function editProject(project: ProjectConfig) {
@@ -488,8 +529,15 @@
 </script>
 
 <svelte:head>
-  <title>{activeProject ? `${activeProject.name} · undiffstand` : 'undiffstand'}</title>
-  <meta name="description" content="AI-assisted diff understanding for human reviewers." />
+  <title
+    >{activeProject
+      ? `${activeProject.name} · undiffstand`
+      : "undiffstand"}</title
+  >
+  <meta
+    name="description"
+    content="AI-assisted diff understanding for human reviewers."
+  />
 </svelte:head>
 
 <svelte:window onkeydown={handleWindowKeydown} />
@@ -498,9 +546,9 @@
   <main class="app-shell">
     <header class="topbar">
       <button class="brand compact" onclick={goHome} title="Back to projects"
-        ><span class="brand-mark"><img src="/undiffstand-icon.png" alt="" /></span><strong
-          >undiffstand</strong
-        ></button
+        ><span class="brand-mark"
+          ><img src="/undiffstand-icon.png" alt="" /></span
+        ><strong>undiffstand</strong></button
       >
       <button
         class="sidebar-toggle"
@@ -508,21 +556,29 @@
         aria-controls="changed-files-sidebar"
         aria-expanded={preferences.sidebarOpen}
         aria-label={preferences.sidebarOpen
-          ? 'Hide changed files sidebar'
-          : 'Show changed files sidebar'}
-        title={preferences.sidebarOpen ? 'Hide changed files' : 'Show changed files'}
+          ? "Hide changed files sidebar"
+          : "Show changed files sidebar"}
+        title={preferences.sidebarOpen
+          ? "Hide changed files"
+          : "Show changed files"}
         onclick={toggleSidebar}
       >
-        {#if preferences.sidebarOpen}<PanelLeftClose size={15} />{:else}<PanelLeftOpen
+        {#if preferences.sidebarOpen}<PanelLeftClose
             size={15}
-          />{/if}
+          />{:else}<PanelLeftOpen size={15} />{/if}
       </button>
       <ProjectSwitcher
         {projects}
         {activeProject}
         comparisonLabel={workspace.summary
-          ? diffComparisonLabel(workspace.summary.comparison, activeRepository?.currentBranch)
-          : diffSelectionLabel(workspace.selection, activeRepository?.currentBranch)}
+          ? diffComparisonLabel(
+              workspace.summary.comparison,
+              activeRepository?.currentBranch,
+            )
+          : diffSelectionLabel(
+              workspace.selection,
+              activeRepository?.currentBranch,
+            )}
         onEditComparison={() => (showComparisonDialog = true)}
         onEditProject={editActiveProject}
         onSelect={openProject}
@@ -530,15 +586,15 @@
       <div class="view-controls">
         <div class="view-mode-switch" role="group" aria-label="Diff layout">
           <button
-            class:active={preferences.diffMode === 'split'}
-            aria-pressed={preferences.diffMode === 'split'}
-            onclick={() => setDiffMode('split')}
+            class:active={preferences.diffMode === "split"}
+            aria-pressed={preferences.diffMode === "split"}
+            onclick={() => setDiffMode("split")}
             title="Split diff"><Columns2 size={13} />Split</button
           >
           <button
-            class:active={preferences.diffMode === 'unified'}
-            aria-pressed={preferences.diffMode === 'unified'}
-            onclick={() => setDiffMode('unified')}
+            class:active={preferences.diffMode === "unified"}
+            aria-pressed={preferences.diffMode === "unified"}
+            onclick={() => setDiffMode("unified")}
             title="Unified diff"><Rows3 size={13} />Unified</button
           >
         </div>
@@ -551,8 +607,9 @@
         >
       </div>
       <div class="top-actions">
-        <button onclick={() => workspace.load(workspace.selectedPath)} title="Refresh"
-          ><RefreshCw size={14} /></button
+        <button
+          onclick={() => workspace.load(workspace.selectedPath)}
+          title="Refresh"><RefreshCw size={14} /></button
         >
         <button
           onclick={toggleAiPanel}
@@ -563,12 +620,18 @@
           ><Settings size={14} /></button
         >
       </div>
-      <UpdateAction state={updateState} onInstall={() => void installUpdate()} />
+      <UpdateAction
+        state={updateState}
+        onInstall={() => void installUpdate()}
+      />
     </header>
 
     {#if workspaceError}
       <div class="workspace-error">
-        <ErrorBanner error={workspaceError} onDismiss={() => (workspaceError = null)} />
+        <ErrorBanner
+          error={workspaceError}
+          onDismiss={() => (workspaceError = null)}
+        />
       </div>
     {/if}
 
@@ -583,8 +646,9 @@
         <aside id="changed-files-sidebar" class="sidebar">
           <div class="pane-title">
             <span>Changed files</span>
-            {#if workspace.summary}<DiffSummaryView summary={workspace.summary} />{:else}<b>0</b
-              >{/if}
+            {#if workspace.summary}<DiffSummaryView
+                summary={workspace.summary}
+              />{:else}<b>0</b>{/if}
           </div>
           {#if workspace.summary}<DiffFileList
               files={workspace.summary.files}
@@ -599,10 +663,10 @@
           maximum={SIDEBAR_MAX_WIDTH}
           cssProperty="--sidebar-width"
           constrain={(width, workspaceWidth) =>
-            constrainedPanelWidth('sidebar', width, workspaceWidth)}
+            constrainedPanelWidth("sidebar", width, workspaceWidth)}
           onChange={(width) => (preferences.sidebarWidth = width)}
           onCommit={() => preferences.queueSave()}
-          onReset={() => resetPanelWidth('sidebar')}
+          onReset={() => resetPanelWidth("sidebar")}
         />
       {/if}
 
@@ -646,11 +710,12 @@
           maximum={AI_PANEL_MAX_WIDTH}
           direction={-1}
           cssProperty="--ai-panel-width"
-          constrain={(width, workspaceWidth) => constrainedPanelWidth('ai', width, workspaceWidth)}
+          constrain={(width, workspaceWidth) =>
+            constrainedPanelWidth("ai", width, workspaceWidth)}
           onChange={(width) => (preferences.aiPanelWidth = width)}
           onCommit={() => preferences.queueSave()}
           onStart={() => (aiPanelExpanded = false)}
-          onReset={() => resetPanelWidth('ai')}
+          onReset={() => resetPanelWidth("ai")}
         />
         <AiPanel
           availability={workspace.reviewAvailability}
@@ -808,10 +873,14 @@
     --panel-handle-width: 5px;
   }
   .workspace.withoutAi {
-    grid-template-columns: var(--sidebar-width) var(--panel-handle-width) minmax(500px, 1fr);
+    grid-template-columns: var(--sidebar-width) var(
+        --panel-handle-width
+      ) minmax(500px, 1fr);
   }
   .workspace.withoutSidebar {
-    grid-template-columns: minmax(500px, 1fr) var(--panel-handle-width) var(--ai-panel-width);
+    grid-template-columns: minmax(500px, 1fr) var(--panel-handle-width) var(
+        --ai-panel-width
+      );
   }
   .workspace.withoutSidebar.withoutAi {
     grid-template-columns: minmax(500px, 1fr);

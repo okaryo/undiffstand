@@ -2,12 +2,12 @@ import type {
   ChangeReviewAvailability,
   ChangeReviewReport,
   DiffExplanation,
-  InlineAnswer
-} from '$lib/domain/ai';
-import type { DiffSelection } from '$lib/domain/diff';
-import { normalizeError } from '$lib/domain/error';
-import { notifyReviewComplete } from '$lib/services/notification';
-import type { AppApi } from '$lib/services/api';
+  InlineAnswer,
+} from "$lib/domain/ai";
+import type { DiffSelection } from "$lib/domain/diff";
+import { normalizeError } from "$lib/domain/error";
+import { notifyReviewComplete } from "$lib/services/notification";
+import type { AppApi } from "$lib/services/api";
 
 export class AiReviewController {
   fileExplanations = $state<Record<string, DiffExplanation | undefined>>({});
@@ -21,9 +21,9 @@ export class AiReviewController {
   constructor(
     private readonly api: Pick<
       AppApi,
-      'explainFileChange' | 'askInlineQuestion' | 'runChangeReview'
+      "explainFileChange" | "askInlineQuestion" | "runChangeReview"
     >,
-    private readonly onError: (error: unknown) => void
+    private readonly onError: (error: unknown) => void,
   ) {}
 
   reset() {
@@ -42,10 +42,14 @@ export class AiReviewController {
     this.fileErrors[path] = undefined;
     this.fileExplanations[path] = undefined;
     try {
-      const explanation = await this.api.explainFileChange(projectId, { ...selection }, path);
+      const explanation = await this.api.explainFileChange(
+        projectId,
+        { ...selection },
+        path,
+      );
       if (generation !== this.generation) return;
       this.fileExplanations[path] = explanation;
-      void notifyReviewComplete('file');
+      void notifyReviewComplete("file");
     } catch (error) {
       if (generation !== this.generation) return;
       this.fileErrors[path] = normalizeError(error).message;
@@ -58,10 +62,10 @@ export class AiReviewController {
     projectId: string,
     selection: DiffSelection,
     path: string,
-    side: 'old' | 'new',
+    side: "old" | "new",
     startLine: number,
     endLine: number,
-    question: string
+    question: string,
   ): Promise<InlineAnswer> {
     const generation = this.generation;
     const answer = await this.api.askInlineQuestion(
@@ -72,20 +76,20 @@ export class AiReviewController {
         side,
         startLine,
         endLine,
-        question
-      }
+        question,
+      },
     );
     if (generation !== this.generation) {
-      throw new Error('The comparison changed before Codex answered.');
+      throw new Error("The comparison changed before Codex answered.");
     }
-    void notifyReviewComplete('inline');
+    void notifyReviewComplete("inline");
     return answer;
   }
 
   async review(
     projectId: string,
     selection: DiffSelection,
-    availability?: ChangeReviewAvailability
+    availability?: ChangeReviewAvailability,
   ) {
     if (!availability?.available || this.loading) return;
     const generation = this.generation;
@@ -93,10 +97,12 @@ export class AiReviewController {
     this.report = undefined;
     this.onError(null);
     try {
-      const report = await this.api.runChangeReview(projectId, { ...selection });
+      const report = await this.api.runChangeReview(projectId, {
+        ...selection,
+      });
       if (generation !== this.generation) return;
       this.report = report;
-      void notifyReviewComplete('change');
+      void notifyReviewComplete("change");
     } catch (error) {
       if (generation !== this.generation) return;
       this.onError(error);

@@ -5,9 +5,9 @@
     ChevronRight,
     FolderGit2,
     GitCompareArrows,
-    Settings
-  } from '@lucide/svelte';
-  import type { ProjectConfig } from '$lib/domain/project';
+    Settings,
+  } from "@lucide/svelte";
+  import type { ProjectConfig } from "$lib/domain/project";
 
   let {
     projects,
@@ -15,7 +15,7 @@
     comparisonLabel,
     onEditComparison,
     onEditProject,
-    onSelect
+    onSelect,
   }: {
     projects: ProjectConfig[];
     activeProject: ProjectConfig;
@@ -51,7 +51,7 @@
   }
 
   function handleWindowKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape') open = false;
+    if (event.key === "Escape") open = false;
   }
 </script>
 

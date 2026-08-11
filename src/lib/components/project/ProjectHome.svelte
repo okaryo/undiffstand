@@ -5,13 +5,13 @@
     GitBranch,
     LoaderCircle,
     Pencil,
-    Settings
-  } from '@lucide/svelte';
-  import ErrorBanner from '$lib/components/common/ErrorBanner.svelte';
-  import UpdateAction from '$lib/components/common/UpdateAction.svelte';
-  import type { AppError } from '$lib/domain/error';
-  import type { ProjectConfig } from '$lib/domain/project';
-  import type { UpdateState } from '$lib/domain/update';
+    Settings,
+  } from "@lucide/svelte";
+  import ErrorBanner from "$lib/components/common/ErrorBanner.svelte";
+  import UpdateAction from "$lib/components/common/UpdateAction.svelte";
+  import type { AppError } from "$lib/domain/error";
+  import type { ProjectConfig } from "$lib/domain/project";
+  import type { UpdateState } from "$lib/domain/update";
 
   let {
     projects,
@@ -23,7 +23,7 @@
     updateState,
     onInstallUpdate,
     onOpenSettings,
-    onDismissError
+    onDismissError,
   }: {
     projects: ProjectConfig[];
     loading?: boolean;
@@ -41,9 +41,10 @@
     const date = new Date(value);
     return Number.isNaN(date.valueOf())
       ? value
-      : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
-          date
-        );
+      : new Intl.DateTimeFormat(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(date);
   }
 </script>
 
@@ -68,7 +69,9 @@
   <section class="projects-section">
     {#if error}<ErrorBanner {error} onDismiss={onDismissError} />{/if}
     {#if loading}
-      <div class="loading-state"><LoaderCircle class="spin" size={20} />Loading projects…</div>
+      <div class="loading-state">
+        <LoaderCircle class="spin" size={20} />Loading projects…
+      </div>
     {:else if projects.length}
       <div class="section-heading">
         <h1>Continue reviewing</h1>
@@ -82,7 +85,8 @@
               <div class="project-info">
                 <h3>{project.name}</h3>
                 <p>{project.repoPath}</p>
-                <span><GitBranch size={11} />Current branch → working tree</span>
+                <span><GitBranch size={11} />Current branch → working tree</span
+                >
               </div>
             </button>
             <div class="project-meta">
@@ -99,7 +103,9 @@
       </div>
     {:else}
       <div class="empty-projects">
-        <div class="empty-project-icon"><FolderGit2 size={28} strokeWidth={1.5} /></div>
+        <div class="empty-project-icon">
+          <FolderGit2 size={28} strokeWidth={1.5} />
+        </div>
         <h1>Add your first project</h1>
         <p>Choose a local Git repository to start reviewing its changes.</p>
         <button onclick={onAdd}><CirclePlus size={16} />Add Project</button>

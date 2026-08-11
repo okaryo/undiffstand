@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { ArrowRight, GitCompareArrows } from '@lucide/svelte';
-  import type { DiffSelection } from '$lib/domain/diff';
-  import type { GitCommitSummary } from '$lib/domain/project';
-  import RevisionSelect from './RevisionSelect.svelte';
+  import { ArrowRight, GitCompareArrows } from "@lucide/svelte";
+  import type { DiffSelection } from "$lib/domain/diff";
+  import type { GitCommitSummary } from "$lib/domain/project";
+  import RevisionSelect from "./RevisionSelect.svelte";
 
   let {
     selection,
@@ -12,7 +12,7 @@
     recentCommits = [],
     currentBranch,
     loading = false,
-    onApply
+    onApply,
   }: {
     selection: DiffSelection;
     recentBranches?: string[];
@@ -24,9 +24,9 @@
     onApply: (selection: DiffSelection) => void | Promise<void>;
   } = $props();
 
-  let base = $state('HEAD');
-  let target = $state('.');
-  let initializedKey = '';
+  let base = $state("HEAD");
+  let target = $state(".");
+  let initializedKey = "";
 
   $effect(() => {
     const key = `${selection.base}\0${selection.target}`;
@@ -72,7 +72,7 @@
     onChange={(value) => (target = value)}
   />
   <button type="submit" disabled={loading || !base || !target}
-    >{loading ? 'Applying…' : 'Apply'}</button
+    >{loading ? "Applying…" : "Apply"}</button
   >
 </form>
 

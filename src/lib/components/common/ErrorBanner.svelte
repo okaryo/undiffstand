@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { TriangleAlert, X } from '@lucide/svelte';
-  import type { AppError } from '$lib/domain/error';
+  import { TriangleAlert, X } from "@lucide/svelte";
+  import type { AppError } from "$lib/domain/error";
 
-  let { error, onDismiss }: { error: AppError; onDismiss?: () => void } = $props();
+  let { error, onDismiss }: { error: AppError; onDismiss?: () => void } =
+    $props();
 </script>
 
 <div class="banner" role="alert">
@@ -12,7 +13,9 @@
     {#if error.detail}<span>{error.detail}</span>{/if}
   </div>
   {#if onDismiss}
-    <button aria-label="Dismiss error" onclick={onDismiss}><X size={15} /></button>
+    <button aria-label="Dismiss error" onclick={onDismiss}
+      ><X size={15} /></button
+    >
   {/if}
 </div>
 

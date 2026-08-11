@@ -6,13 +6,17 @@
     ChevronRight,
     Copy,
     LoaderCircle,
-    RotateCw
-  } from '@lucide/svelte';
-  import AiAnswer from '$lib/components/ai/AiAnswer.svelte';
-  import type { ChangeReviewFinding, DiffExplanation, InlineAnswer } from '$lib/domain/ai';
-  import type { DiffFileSummary, FileDiff } from '$lib/domain/diff';
-  import DiffFileStatusIcon from './DiffFileStatusIcon.svelte';
-  import DiffViewer from './DiffViewer.svelte';
+    RotateCw,
+  } from "@lucide/svelte";
+  import AiAnswer from "$lib/components/ai/AiAnswer.svelte";
+  import type {
+    ChangeReviewFinding,
+    DiffExplanation,
+    InlineAnswer,
+  } from "$lib/domain/ai";
+  import type { DiffFileSummary, FileDiff } from "$lib/domain/diff";
+  import DiffFileStatusIcon from "./DiffFileStatusIcon.svelte";
+  import DiffViewer from "./DiffViewer.svelte";
 
   let {
     file,
@@ -34,7 +38,7 @@
     onCopy,
     onLoad,
     onExplain,
-    onAskInline
+    onAskInline,
   }: {
     file: DiffFileSummary;
     path: string;
@@ -45,7 +49,7 @@
     collapsed?: boolean;
     copied?: boolean;
     rendered?: boolean;
-    mode: 'split' | 'unified';
+    mode: "split" | "unified";
     wrap: boolean;
     explanation?: DiffExplanation;
     aiLoading?: boolean;
@@ -56,10 +60,10 @@
     onLoad: () => void;
     onExplain: () => void;
     onAskInline: (
-      side: 'old' | 'new',
+      side: "old" | "new",
       startLine: number,
       endLine: number,
-      question: string
+      question: string,
     ) => Promise<InlineAnswer>;
   } = $props();
 </script>
@@ -68,11 +72,13 @@
   <button
     class="collapse-button"
     aria-expanded={!collapsed}
-    aria-label={`${collapsed ? 'Expand' : 'Collapse'} diff for ${path}`}
-    title={collapsed ? 'Expand file diff' : 'Collapse file diff'}
+    aria-label={`${collapsed ? "Expand" : "Collapse"} diff for ${path}`}
+    title={collapsed ? "Expand file diff" : "Collapse file diff"}
     onclick={onToggle}
   >
-    {#if collapsed}<ChevronRight size={14} />{:else}<ChevronDown size={14} />{/if}
+    {#if collapsed}<ChevronRight size={14} />{:else}<ChevronDown
+        size={14}
+      />{/if}
   </button>
   <DiffFileStatusIcon status={file.status} />
   <div class="file-path" title={path}>
@@ -80,7 +86,7 @@
     <button
       class="copy-path"
       aria-label={`Copy path ${path}`}
-      title={copied ? 'Copied' : 'Copy path'}
+      title={copied ? "Copied" : "Copy path"}
       onclick={onCopy}
     >
       {#if copied}<Check size={13} />{:else}<Copy size={13} />{/if}
@@ -92,19 +98,21 @@
   </span>
   <button
     class="explain-file"
-    disabled={aiLoading || file.status === 'binary'}
+    disabled={aiLoading || file.status === "binary"}
     aria-label={`Explain changes in ${path}`}
     title="Explain this file's changes"
     onclick={onExplain}
-    >{#if aiLoading}<LoaderCircle class="spin" size={13} />{:else}<Bot size={13} />{/if}<span
-      >Explain</span
-    ></button
+    >{#if aiLoading}<LoaderCircle class="spin" size={13} />{:else}<Bot
+        size={13}
+      />{/if}<span>Explain</span></button
   >
 </header>
 
 {#if explanation || aiLoading || aiError}
   <div class="file-ai">
-    <div class="file-ai-title"><Bot size={13} /><strong>Change explanation</strong></div>
+    <div class="file-ai-title">
+      <Bot size={13} /><strong>Change explanation</strong>
+    </div>
     {#if aiLoading && !explanation}<div class="file-ai-loading">
         <LoaderCircle class="spin" size={14} />Explaining this file's changes…
       </div>{/if}

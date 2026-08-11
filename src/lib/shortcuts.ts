@@ -1,22 +1,25 @@
 export type ApplicationShortcut =
-  | 'dismiss-dialogs'
-  | 'open-settings'
-  | 'refresh-change-detail'
-  | 'toggle-changed-files'
-  | 'toggle-ai-panel';
+  | "dismiss-dialogs"
+  | "open-settings"
+  | "refresh-change-detail"
+  | "toggle-changed-files"
+  | "toggle-ai-panel";
 
-export function resolveApplicationShortcut(event: KeyboardEvent): ApplicationShortcut | undefined {
-  if (event.key === 'Escape') return 'dismiss-dialogs';
-  if (event.repeat || !event.metaKey || event.ctrlKey || event.shiftKey) return undefined;
+export function resolveApplicationShortcut(
+  event: KeyboardEvent,
+): ApplicationShortcut | undefined {
+  if (event.key === "Escape") return "dismiss-dialogs";
+  if (event.repeat || !event.metaKey || event.ctrlKey || event.shiftKey)
+    return undefined;
 
-  if (matchesKey(event, 'Comma', ',')) {
-    return event.altKey ? undefined : 'open-settings';
+  if (matchesKey(event, "Comma", ",")) {
+    return event.altKey ? undefined : "open-settings";
   }
-  if (matchesKey(event, 'KeyR', 'r')) {
-    return event.altKey ? undefined : 'refresh-change-detail';
+  if (matchesKey(event, "KeyR", "r")) {
+    return event.altKey ? undefined : "refresh-change-detail";
   }
-  if (matchesKey(event, 'KeyB', 'b')) {
-    return event.altKey ? 'toggle-ai-panel' : 'toggle-changed-files';
+  if (matchesKey(event, "KeyB", "b")) {
+    return event.altKey ? "toggle-ai-panel" : "toggle-changed-files";
   }
 
   return undefined;

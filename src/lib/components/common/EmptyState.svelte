@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { Component } from 'svelte';
+  import type { Component } from "svelte";
 
   let {
     icon,
     title,
     message,
     compact = false,
-    fill = false
+    fill = false,
   }: {
     icon: Component;
     title: string;

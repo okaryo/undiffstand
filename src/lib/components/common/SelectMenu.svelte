@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Check, ChevronDown } from '@lucide/svelte';
+  import { Check, ChevronDown } from "@lucide/svelte";
 
   let {
     id,
@@ -8,7 +8,7 @@
     options,
     disabled = false,
     fluid = false,
-    onChange
+    onChange,
   }: {
     id: string;
     value: string;
@@ -25,14 +25,18 @@
   let menu = $state<HTMLDivElement>();
 
   let menuId = $derived(`${id}-options`);
-  let selectedOption = $derived(options.find((option) => option.value === value));
+  let selectedOption = $derived(
+    options.find((option) => option.value === value),
+  );
 
   $effect(() => {
     if (disabled) open = false;
   });
 
   function selectedIndex() {
-    const index = options.findIndex((option) => option.value === value && !option.disabled);
+    const index = options.findIndex(
+      (option) => option.value === value && !option.disabled,
+    );
     return index >= 0 ? index : options.findIndex((option) => !option.disabled);
   }
 
@@ -64,13 +68,13 @@
   }
 
   function handleTriggerKeydown(event: KeyboardEvent) {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       if (!open) openMenu();
-      else moveActive(event.key === 'ArrowDown' ? 1 : -1);
+      else moveActive(event.key === "ArrowDown" ? 1 : -1);
       return;
     }
-    if (open && (event.key === 'Enter' || event.key === ' ')) {
+    if (open && (event.key === "Enter" || event.key === " ")) {
       event.preventDefault();
       const option = options[activeIndex];
       if (option) select(option.value);
@@ -89,7 +93,7 @@
   }
 
   function handleWindowKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape' && open) {
+    if (event.key === "Escape" && open) {
       event.preventDefault();
       event.stopImmediatePropagation();
       closeMenu({ restoreFocus: true });
@@ -110,7 +114,9 @@
     aria-haspopup="listbox"
     aria-expanded={open}
     aria-controls={menuId}
-    aria-activedescendant={open && activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined}
+    aria-activedescendant={open && activeIndex >= 0
+      ? `${id}-option-${activeIndex}`
+      : undefined}
     {disabled}
     onclick={() => (open ? closeMenu() : openMenu())}
     onkeydown={handleTriggerKeydown}
@@ -120,7 +126,13 @@
   </button>
 
   {#if open}
-    <div bind:this={menu} id={menuId} class="menu" role="listbox" aria-label={`${label} options`}>
+    <div
+      bind:this={menu}
+      id={menuId}
+      class="menu"
+      role="listbox"
+      aria-label={`${label} options`}
+    >
       {#each options as option, index (option.value)}
         <button
           id={`${id}-option-${index}`}

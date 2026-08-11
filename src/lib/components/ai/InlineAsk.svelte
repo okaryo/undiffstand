@@ -1,23 +1,23 @@
 <script lang="ts">
-  import { Bot, LoaderCircle, Send, X } from '@lucide/svelte';
-  import type { InlineAnswer } from '$lib/domain/ai';
-  import { normalizeError } from '$lib/domain/error';
+  import { Bot, LoaderCircle, Send, X } from "@lucide/svelte";
+  import type { InlineAnswer } from "$lib/domain/ai";
+  import { normalizeError } from "$lib/domain/error";
 
   let {
     side,
     startLine,
     endLine,
     onAsk,
-    onClose
+    onClose,
   }: {
-    side: 'old' | 'new';
+    side: "old" | "new";
     startLine: number;
     endLine: number;
     onAsk: (question: string) => Promise<InlineAnswer>;
     onClose: () => void;
   } = $props();
 
-  let question = $state('');
+  let question = $state("");
   let answer = $state<InlineAnswer>();
   let loading = $state(false);
   let error = $state<string>();
@@ -37,7 +37,7 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       void ask();
     }
@@ -46,7 +46,11 @@
 
 <div class="inline-ask">
   <header>
-    <div><Bot size={15} /><strong>Ask about {side} lines {startLine}–{endLine}</strong></div>
+    <div>
+      <Bot size={15} /><strong
+        >Ask about {side} lines {startLine}–{endLine}</strong
+      >
+    </div>
     <button aria-label="Close inline question" title="Close" onclick={onClose}
       ><X size={15} /></button
     >
@@ -54,7 +58,7 @@
   {#if answer}
     <div class="answer">
       <p>{answer.answer}</p>
-      {#if answer.caveats.length}<small>{answer.caveats.join(' ')}</small>{/if}
+      {#if answer.caveats.length}<small>{answer.caveats.join(" ")}</small>{/if}
     </div>
   {:else}
     <textarea
@@ -67,7 +71,9 @@
     <div class="actions">
       <span>⌘↵ to ask · single response</span>
       <button class="ask" disabled={!question.trim() || loading} onclick={ask}>
-        {#if loading}<LoaderCircle class="spin" size={14} /> Asking…{:else}<Send size={14} /> Ask Codex{/if}
+        {#if loading}<LoaderCircle class="spin" size={14} /> Asking…{:else}<Send
+            size={14}
+          /> Ask Codex{/if}
       </button>
     </div>
   {/if}

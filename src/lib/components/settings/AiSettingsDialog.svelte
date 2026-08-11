@@ -1,12 +1,15 @@
 <script lang="ts">
-  import { Bot, Settings, X } from '@lucide/svelte';
-  import SelectMenu from '$lib/components/common/SelectMenu.svelte';
-  import { reviewOutputLanguageOptions, type ReviewOutputLanguage } from '$lib/domain/preferences';
+  import { Bot, Settings, X } from "@lucide/svelte";
+  import SelectMenu from "$lib/components/common/SelectMenu.svelte";
+  import {
+    reviewOutputLanguageOptions,
+    type ReviewOutputLanguage,
+  } from "$lib/domain/preferences";
 
   let {
     outputLanguage,
     onOutputLanguageChange,
-    onClose
+    onClose,
   }: {
     outputLanguage: ReviewOutputLanguage;
     onOutputLanguageChange: (language: ReviewOutputLanguage) => void;
@@ -19,13 +22,20 @@
   role="presentation"
   onclick={(event) => event.target === event.currentTarget && onClose()}
 >
-  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="settings-title"
+  >
     <header>
       <div>
         <Settings size={17} />
         <h2 id="settings-title">AI settings</h2>
       </div>
-      <button aria-label="Close AI settings" onclick={onClose}><X size={17} /></button>
+      <button aria-label="Close AI settings" onclick={onClose}
+        ><X size={17} /></button
+      >
     </header>
     <div class="content">
       <div class="language-setting">
@@ -35,30 +45,36 @@
           label="Review output language"
           value={outputLanguage}
           options={[...reviewOutputLanguageOptions]}
-          onChange={(language) => onOutputLanguageChange(language as ReviewOutputLanguage)}
+          onChange={(language) =>
+            onOutputLanguageChange(language as ReviewOutputLanguage)}
         />
-        <p>Used for Inline Ask, file change explanations, and Change Review reports.</p>
+        <p>
+          Used for Inline Ask, file change explanations, and Change Review
+          reports.
+        </p>
       </div>
       <div>
         <span>Runtime</span><strong>Codex CLI</strong>
         <p>
-          Inline and file explanations use <code>codex exec</code>. Change Review uses Codex's
-          native
+          Inline and file explanations use <code>codex exec</code>. Change
+          Review uses Codex's native
           <code>review</code> target when the selected comparison is compatible.
         </p>
       </div>
       <div>
         <span>Authentication</span><strong>codex login</strong>
         <p>
-          Saved Codex CLI authentication and your local Codex configuration are reused. undiffstand
-          removes API-key environment variables from the child process.
+          Saved Codex CLI authentication and your local Codex configuration are
+          reused. undiffstand removes API-key environment variables from the
+          child process.
         </p>
       </div>
       <div class="privacy">
         <Bot size={15} />
         <p>
-          Codex receives the active comparison or selected changed lines according to your local
-          configuration. Results are kept only for this app session and may be wrong.
+          Codex receives the active comparison or selected changed lines
+          according to your local configuration. Results are kept only for this
+          app session and may be wrong.
         </p>
       </div>
     </div>

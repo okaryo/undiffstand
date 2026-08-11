@@ -1,16 +1,16 @@
 <script lang="ts">
-  import { File, FileDiff, FilePlus, FileX } from '@lucide/svelte';
-  import type { DiffStatus } from '$lib/domain/diff';
+  import { File, FileDiff, FilePlus, FileX } from "@lucide/svelte";
+  import type { DiffStatus } from "$lib/domain/diff";
 
   let { status, size = 14 }: { status: DiffStatus; size?: number } = $props();
 </script>
 
 <span class="file-icon {status}" aria-hidden="true">
-  {#if status === 'added'}
+  {#if status === "added"}
     <FilePlus {size} />
-  {:else if status === 'modified'}
+  {:else if status === "modified"}
     <FileDiff {size} />
-  {:else if status === 'deleted'}
+  {:else if status === "deleted"}
     <FileX {size} />
   {:else}
     <File {size} />

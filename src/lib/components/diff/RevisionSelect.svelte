@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { Check, ChevronDown, ChevronRight } from '@lucide/svelte';
-  import { revisionDisplayLabel } from '$lib/domain/diff';
-  import type { GitCommitSummary } from '$lib/domain/project';
+  import { Check, ChevronDown, ChevronRight } from "@lucide/svelte";
+  import { revisionDisplayLabel } from "$lib/domain/diff";
+  import type { GitCommitSummary } from "$lib/domain/project";
 
   let {
     value,
@@ -13,7 +13,7 @@
     remoteBranches = [],
     recentCommits = [],
     disabled = false,
-    onChange
+    onChange,
   }: {
     value: string;
     label: string;
@@ -35,13 +35,13 @@
 
   let menuId = $derived(`revision-select-${label.toLowerCase()}-options`);
   let visibleRecentBranches = $derived(
-    recentBranches.filter((branch) => branch !== currentBranch).slice(0, 5)
+    recentBranches.filter((branch) => branch !== currentBranch).slice(0, 5),
   );
   let visibleRecentCommits = $derived(recentCommits.slice(0, 10));
 
   function isKnownRevision(candidate: string) {
     return (
-      candidate === 'HEAD' ||
+      candidate === "HEAD" ||
       visibleRecentBranches.includes(candidate) ||
       localBranches.includes(candidate) ||
       remoteBranches.includes(candidate) ||
@@ -50,8 +50,9 @@
   }
 
   function displayValue(candidate: string) {
-    if (candidate === '.') return 'Working tree';
-    if (candidate === 'HEAD') return revisionDisplayLabel(candidate, currentBranch);
+    if (candidate === ".") return "Working tree";
+    if (candidate === "HEAD")
+      return revisionDisplayLabel(candidate, currentBranch);
     const commit = visibleRecentCommits.find((item) => item.sha === candidate);
     return commit ? `${commit.shortSha} — ${commit.subject}` : candidate;
   }
@@ -74,7 +75,7 @@
   }
 
   function handleWindowKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape' && open) {
+    if (event.key === "Escape" && open) {
       open = false;
       trigger.focus();
     }
@@ -115,15 +116,21 @@
   </button>
 
   {#if open}
-    <div bind:this={menu} id={menuId} class="menu" role="listbox" aria-label={`${label} revisions`}>
+    <div
+      bind:this={menu}
+      id={menuId}
+      class="menu"
+      role="listbox"
+      aria-label={`${label} revisions`}
+    >
       {#if allowWorkingTree}
         <section aria-label="Workspace">
           <h3>Workspace</h3>
-          {@render option('.', 'Working tree')}
+          {@render option(".", "Working tree")}
         </section>
       {/if}
 
-      {#if !isKnownRevision(value) && value !== '.'}
+      {#if !isKnownRevision(value) && value !== "."}
         <section aria-label="Selected">
           <h3>Selected</h3>
           {@render option(value, value)}
@@ -132,7 +139,7 @@
 
       <section aria-label="Current">
         <h3>Current</h3>
-        {@render option('HEAD', displayValue('HEAD'))}
+        {@render option("HEAD", displayValue("HEAD"))}
       </section>
 
       {#if visibleRecentBranches.length}
@@ -152,7 +159,9 @@
             aria-expanded={localOpen}
             onclick={() => (localOpen = !localOpen)}
           >
-            {#if localOpen}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}
+            {#if localOpen}<ChevronDown size={12} />{:else}<ChevronRight
+                size={12}
+              />{/if}
             <span>Local branches</span>
             <small>{localBranches.length}</small>
           </button>
@@ -172,7 +181,9 @@
             aria-expanded={remoteOpen}
             onclick={() => (remoteOpen = !remoteOpen)}
           >
-            {#if remoteOpen}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}
+            {#if remoteOpen}<ChevronDown size={12} />{:else}<ChevronRight
+                size={12}
+              />{/if}
             <span>Remote branches</span>
             <small>{remoteBranches.length}</small>
           </button>
@@ -188,7 +199,10 @@
         <section aria-label="Recent commits">
           <h3>Recent commits</h3>
           {#each visibleRecentCommits as commit (commit.sha)}
-            {@render option(commit.sha, `${commit.shortSha} — ${commit.subject}`)}
+            {@render option(
+              commit.sha,
+              `${commit.shortSha} — ${commit.subject}`,
+            )}
           {/each}
         </section>
       {/if}

@@ -1,20 +1,20 @@
-import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { sveltekit } from "@sveltejs/kit/vite";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [sveltekit()],
   resolve: {
-    conditions: ['browser']
+    conditions: ["browser"],
   },
   clearScreen: false,
   server: {
     port: 1420,
-    strictPort: true
+    strictPort: true,
   },
-  envPrefix: ['VITE_', 'TAURI_ENV_'],
+  envPrefix: ["VITE_", "TAURI_ENV_"],
   test: {
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.ts']
-  }
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+    include: ["src/**/*.test.ts"],
+  },
 });

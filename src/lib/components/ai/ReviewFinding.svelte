@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { ShieldAlert, TriangleAlert } from '@lucide/svelte';
-  import type { ChangeReviewFinding } from '$lib/domain/ai';
+  import { ShieldAlert, TriangleAlert } from "@lucide/svelte";
+  import type { ChangeReviewFinding } from "$lib/domain/ai";
 
   let { findings }: { findings: ChangeReviewFinding[] } = $props();
 </script>
@@ -9,7 +9,7 @@
   {#each findings as finding, index (index)}
     <article class="finding {finding.severity}">
       <header>
-        {#if finding.severity === 'critical' || finding.severity === 'high'}<ShieldAlert
+        {#if finding.severity === "critical" || finding.severity === "high"}<ShieldAlert
             size={14}
           />{:else}<TriangleAlert size={14} />{/if}
         <strong>{finding.title}</strong><span>{finding.severity}</span>

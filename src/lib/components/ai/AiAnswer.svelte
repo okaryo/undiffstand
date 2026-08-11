@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { CircleAlert, Lightbulb } from '@lucide/svelte';
-  import type { DiffExplanation, SourceReference } from '$lib/domain/ai';
+  import { CircleAlert, Lightbulb } from "@lucide/svelte";
+  import type { DiffExplanation, SourceReference } from "$lib/domain/ai";
 
   let { explanation }: { explanation?: DiffExplanation } = $props();
 </script>
@@ -16,10 +16,14 @@
     {#if explanation.keyChanges.length}<section>
         <h4>Key changes</h4>
         <ul>
-          {#each explanation.keyChanges as item, index (index)}<li>{item}</li>{/each}
+          {#each explanation.keyChanges as item, index (index)}<li>
+              {item}
+            </li>{/each}
         </ul>
       </section>{/if}
-    {#if explanation.references.length}{@render References(explanation.references)}{/if}
+    {#if explanation.references.length}{@render References(
+        explanation.references,
+      )}{/if}
     {#if explanation.caveats.length}{@render Caveats(explanation.caveats)}{/if}
   </div>
 {/if}
@@ -30,7 +34,9 @@
     <div class="references">
       {#each references as reference, index (index)}
         <div>
-          <span>{reference.path}</span><code>L{reference.startLine}–{reference.endLine}</code>
+          <span>{reference.path}</span><code
+            >L{reference.startLine}–{reference.endLine}</code
+          >
         </div>
       {/each}
     </div>

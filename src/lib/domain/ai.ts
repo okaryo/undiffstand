@@ -2,7 +2,7 @@ export type SourceReference = {
   path: string;
   startLine: number;
   endLine: number;
-  side?: 'old' | 'new';
+  side?: "old" | "new";
 };
 
 export type DiffExplanation = {
@@ -15,7 +15,7 @@ export type DiffExplanation = {
 
 export type InlineQuestion = {
   path: string;
-  side: 'old' | 'new';
+  side: "old" | "new";
   startLine: number;
   endLine: number;
   question: string;
@@ -27,7 +27,8 @@ export type InlineAnswer = {
   caveats: string[];
 };
 
-export type ChangeReviewTarget = { kind: 'uncommitted' } | { kind: 'base'; baseBranch: string };
+export type ChangeReviewTarget =
+  { kind: "uncommitted" } | { kind: "base"; baseBranch: string };
 
 export type ChangeReviewAvailability = {
   available: boolean;
@@ -47,11 +48,11 @@ export type ChangeReviewGroup = {
 export type ChangeReviewFinding = {
   title: string;
   body: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
+  severity: "critical" | "high" | "medium" | "low";
   path: string;
   startLine: number;
   endLine: number;
-  side?: 'old' | 'new';
+  side?: "old" | "new";
 };
 
 export type ChangeReviewReport = {

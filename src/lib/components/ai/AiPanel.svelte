@@ -7,9 +7,12 @@
     Maximize2,
     Minimize2,
     ShieldAlert,
-    TriangleAlert
-  } from '@lucide/svelte';
-  import type { ChangeReviewAvailability, ChangeReviewReport } from '$lib/domain/ai';
+    TriangleAlert,
+  } from "@lucide/svelte";
+  import type {
+    ChangeReviewAvailability,
+    ChangeReviewReport,
+  } from "$lib/domain/ai";
 
   let {
     availability,
@@ -17,7 +20,7 @@
     loading = false,
     expanded = false,
     onReview,
-    onToggleExpanded
+    onToggleExpanded,
   }: {
     availability?: ChangeReviewAvailability;
     report?: ChangeReviewReport;
@@ -37,24 +40,33 @@
   <header class="panel-header">
     <div><Bot size={15} /><strong>Change Review</strong></div>
     <button
-      aria-label={expanded ? 'Restore review panel width' : 'Expand review panel'}
-      title={expanded ? 'Restore width' : 'Expand panel'}
+      aria-label={expanded
+        ? "Restore review panel width"
+        : "Expand review panel"}
+      title={expanded ? "Restore width" : "Expand panel"}
       onclick={onToggleExpanded}
-      >{#if expanded}<Minimize2 size={14} />{:else}<Maximize2 size={14} />{/if}</button
+      >{#if expanded}<Minimize2 size={14} />{:else}<Maximize2
+          size={14}
+        />{/if}</button
     >
   </header>
 
   <div class="action-card">
     <div>
       <strong>Review changes</strong>
-      <p class="description">Codex reviews the selected changes and highlights potential issues.</p>
-      <p class="review-scope">
-        Scope: {availability?.scopeLabel ?? 'Checking the selected comparison…'}
+      <p class="description">
+        Codex reviews the selected changes and highlights potential issues.
       </p>
-      {#if availability && !availability.available}<small>{availability.reason}</small>{/if}
+      <p class="review-scope">
+        Scope: {availability?.scopeLabel ?? "Checking the selected comparison…"}
+      </p>
+      {#if availability && !availability.available}<small
+          >{availability.reason}</small
+        >{/if}
     </div>
     <button onclick={onReview} disabled={loading || !availability?.available}>
-      {#if loading}<LoaderCircle class="spin" size={16} /> Reviewing…{:else}Run review{/if}
+      {#if loading}<LoaderCircle class="spin" size={16} /> Reviewing…{:else}Run
+        review{/if}
     </button>
   </div>
 
@@ -73,17 +85,23 @@
               {#each report.groups as group (group.id)}
                 <article class="group">
                   <button onclick={() => toggleGroup(group.id)}>
-                    {#if openGroups[group.id] ?? true}<ChevronDown size={14} />{:else}<ChevronRight
+                    {#if openGroups[group.id] ?? true}<ChevronDown
                         size={14}
-                      />{/if}
-                    <strong>{group.title}</strong><span>{group.files.length}</span>
+                      />{:else}<ChevronRight size={14} />{/if}
+                    <strong>{group.title}</strong><span
+                      >{group.files.length}</span
+                    >
                   </button>
                   {#if openGroups[group.id] ?? true}<div>
                       <p>{group.summary}</p>
                       {#if group.keyPoints.length}<ul>
-                          {#each group.keyPoints as point, index (index)}<li>{point}</li>{/each}
+                          {#each group.keyPoints as point, index (index)}<li>
+                              {point}
+                            </li>{/each}
                         </ul>{/if}
-                      {#if group.files.length}<small>{group.files.join(' · ')}</small>{/if}
+                      {#if group.files.length}<small
+                          >{group.files.join(" · ")}</small
+                        >{/if}
                     </div>{/if}
                 </article>
               {/each}
@@ -95,13 +113,17 @@
               {#each report.findings as finding, index (index)}
                 <article class="finding {finding.severity}">
                   <div>
-                    {#if finding.severity === 'critical' || finding.severity === 'high'}<ShieldAlert
+                    {#if finding.severity === "critical" || finding.severity === "high"}<ShieldAlert
                         size={13}
                       />{:else}<TriangleAlert size={13} />{/if}
-                    <strong>{finding.title}</strong><span>{finding.severity}</span>
+                    <strong>{finding.title}</strong><span
+                      >{finding.severity}</span
+                    >
                   </div>
                   <p>{finding.body}</p>
-                  <code>{finding.path}:L{finding.startLine}–{finding.endLine}</code>
+                  <code
+                    >{finding.path}:L{finding.startLine}–{finding.endLine}</code
+                  >
                 </article>
               {/each}
             </div>{:else}<p class="muted">
@@ -111,7 +133,9 @@
         {#if report.caveats.length}<section class="caveats">
             <h3>Caveats</h3>
             <ul>
-              {#each report.caveats as caveat, index (index)}<li>{caveat}</li>{/each}
+              {#each report.caveats as caveat, index (index)}<li>
+                  {caveat}
+                </li>{/each}
             </ul>
           </section>{/if}
       </article>
@@ -119,7 +143,8 @@
   </div>
 
   <footer>
-    Uses the local Codex CLI in a read-only sandbox. Results are not saved by undiffstand.
+    Uses the local Codex CLI in a read-only sandbox. Results are not saved by
+    undiffstand.
   </footer>
 </aside>
 

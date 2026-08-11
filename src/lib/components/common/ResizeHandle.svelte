@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy } from "svelte";
 
   let {
     label,
@@ -12,7 +12,7 @@
     onChange,
     onCommit,
     onStart = () => {},
-    onReset
+    onReset,
   }: {
     label: string;
     value: number;
@@ -39,8 +39,8 @@
   >();
   let pendingClientX: number | undefined;
   let animationFrame: number | undefined;
-  let previousCursor = '';
-  let previousUserSelect = '';
+  let previousCursor = "";
+  let previousUserSelect = "";
 
   onDestroy(stopResize);
 
@@ -55,15 +55,15 @@
       startWidth: value,
       currentWidth: value,
       workspaceWidth: workspace.getBoundingClientRect().width,
-      workspace
+      workspace,
     };
     previousCursor = document.body.style.cursor;
     previousUserSelect = document.body.style.userSelect;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    window.addEventListener('pointermove', resize);
-    window.addEventListener('pointerup', stopResize);
-    window.addEventListener('pointercancel', stopResize);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", resize);
+    window.addEventListener("pointerup", stopResize);
+    window.addEventListener("pointercancel", stopResize);
   }
 
   function resize(event: PointerEvent) {
@@ -77,7 +77,8 @@
   function flushResize() {
     animationFrame = undefined;
     if (!active || pendingClientX === undefined) return;
-    const requestedWidth = active.startWidth + (pendingClientX - active.startX) * direction;
+    const requestedWidth =
+      active.startWidth + (pendingClientX - active.startX) * direction;
     pendingClientX = undefined;
     active.currentWidth = constrain(requestedWidth, active.workspaceWidth);
     active.workspace.style.setProperty(cssProperty, `${active.currentWidth}px`);
@@ -96,23 +97,23 @@
     pendingClientX = undefined;
     document.body.style.cursor = previousCursor;
     document.body.style.userSelect = previousUserSelect;
-    window.removeEventListener('pointermove', resize);
-    window.removeEventListener('pointerup', stopResize);
-    window.removeEventListener('pointercancel', stopResize);
+    window.removeEventListener("pointermove", resize);
+    window.removeEventListener("pointerup", stopResize);
+    window.removeEventListener("pointercancel", stopResize);
   }
 
   function resizeWithKeyboard(event: KeyboardEvent) {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     const workspace = (event.currentTarget as HTMLElement).parentElement;
     if (!workspace) return;
 
     event.preventDefault();
     const workspaceWidth = workspace.getBoundingClientRect().width;
-    const movement = event.key === 'ArrowRight' ? 10 : -10;
+    const movement = event.key === "ArrowRight" ? 10 : -10;
     const requestedWidth =
-      event.key === 'Home'
+      event.key === "Home"
         ? Number.NEGATIVE_INFINITY
-        : event.key === 'End'
+        : event.key === "End"
           ? Number.POSITIVE_INFINITY
           : value + movement * direction;
     onChange(constrain(requestedWidth, workspaceWidth));
@@ -155,7 +156,7 @@
     left: 50%;
     width: 1px;
     background: transparent;
-    content: '';
+    content: "";
     transform: translateX(-50%);
     transition: background 120ms ease;
   }

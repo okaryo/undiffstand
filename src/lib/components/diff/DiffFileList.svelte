@@ -1,14 +1,27 @@
 <script lang="ts">
-  import { ChevronDown, ChevronRight, Folder, FolderOpen, Search } from '@lucide/svelte';
-  import { displayPath, sortDiffFilesByTreeOrder, type DiffFileSummary } from '$lib/domain/diff';
-  import DiffFileStatusIcon from './DiffFileStatusIcon.svelte';
+  import {
+    ChevronDown,
+    ChevronRight,
+    Folder,
+    FolderOpen,
+    Search,
+  } from "@lucide/svelte";
+  import {
+    displayPath,
+    sortDiffFilesByTreeOrder,
+    type DiffFileSummary,
+  } from "$lib/domain/diff";
+  import DiffFileStatusIcon from "./DiffFileStatusIcon.svelte";
 
   let {
     files,
     selectedPath,
-    onSelect
-  }: { files: DiffFileSummary[]; selectedPath?: string; onSelect: (path: string) => void } =
-    $props();
+    onSelect,
+  }: {
+    files: DiffFileSummary[];
+    selectedPath?: string;
+    onSelect: (path: string) => void;
+  } = $props();
 
   type DirectoryNode = {
     name: string;
@@ -18,42 +31,65 @@
   };
 
   type TreeRow =
-    | { kind: 'directory'; name: string; path: string; depth: number; expanded: boolean }
-    | { kind: 'file'; name: string; path: string; depth: number; file: DiffFileSummary };
+    | {
+        kind: "directory";
+        name: string;
+        path: string;
+        depth: number;
+        expanded: boolean;
+      }
+    | {
+        kind: "file";
+        name: string;
+        path: string;
+        depth: number;
+        file: DiffFileSummary;
+      };
 
-  let query = $state('');
+  let query = $state("");
   let expandedDirectories = $state<Record<string, boolean>>({});
 
   const filteredFiles = $derived(
     sortDiffFilesByTreeOrder(
-      files.filter((file) => displayPath(file).toLowerCase().includes(query.trim().toLowerCase()))
-    )
+      files.filter((file) =>
+        displayPath(file).toLowerCase().includes(query.trim().toLowerCase()),
+      ),
+    ),
   );
-  const rows = $derived(buildRows(filteredFiles, expandedDirectories, query.trim().length > 0));
+  const rows = $derived(
+    buildRows(filteredFiles, expandedDirectories, query.trim().length > 0),
+  );
 
   function buildRows(
     sourceFiles: DiffFileSummary[],
     expanded: Record<string, boolean>,
-    expandAll: boolean
+    expandAll: boolean,
   ): TreeRow[] {
     const root: DirectoryNode = {
-      name: '',
-      path: '',
+      name: "",
+      path: "",
       directories: new Map(),
-      files: []
+      files: [],
     };
 
     for (const file of sourceFiles) {
       const path = displayPath(file);
-      const parts = path.split('/');
+      const parts = path.split("/");
       parts.pop();
       let directory = root;
 
       for (const part of parts) {
-        const directoryPath = directory.path ? `${directory.path}/${part}` : part;
+        const directoryPath = directory.path
+          ? `${directory.path}/${part}`
+          : part;
         let child = directory.directories.get(part);
         if (!child) {
-          child = { name: part, path: directoryPath, directories: new Map(), files: [] };
+          child = {
+            name: part,
+            path: directoryPath,
+            directories: new Map(),
+            files: [],
+          };
           directory.directories.set(part, child);
         }
         directory = child;
@@ -68,11 +104,11 @@
       for (const child of directory.directories.values()) {
         const isExpanded = expandAll || (expanded[child.path] ?? true);
         result.push({
-          kind: 'directory',
+          kind: "directory",
           name: child.name,
           path: child.path,
           depth,
-          expanded: isExpanded
+          expanded: isExpanded,
         });
         if (isExpanded) visit(child, depth + 1);
       }
@@ -80,11 +116,11 @@
       for (const file of directory.files) {
         const path = displayPath(file);
         result.push({
-          kind: 'file',
-          name: path.split('/').at(-1) ?? path,
+          kind: "file",
+          name: path.split("/").at(-1) ?? path,
           path,
           depth,
-          file
+          file,
         });
       }
     }
@@ -100,30 +136,38 @@
 
 <div class="search">
   <Search size={13} />
-  <input bind:value={query} placeholder="Filter changed files" aria-label="Filter changed files" />
+  <input
+    bind:value={query}
+    placeholder="Filter changed files"
+    aria-label="Filter changed files"
+  />
 </div>
 <nav class="tree" aria-label="Changed files">
-  {#each rows as row (row.kind === 'directory' ? `directory:${row.path}` : `file:${row.path}`)}
-    {#if row.kind === 'directory'}
+  {#each rows as row (row.kind === "directory" ? `directory:${row.path}` : `file:${row.path}`)}
+    {#if row.kind === "directory"}
       <button
         class="directory-row"
         aria-expanded={row.expanded}
-        aria-label={`${row.expanded ? 'Collapse' : 'Expand'} ${row.path}`}
+        aria-label={`${row.expanded ? "Collapse" : "Expand"} ${row.path}`}
         style={`--depth: ${row.depth}`}
         onclick={() => toggleDirectory(row.path)}
         title={row.path}
       >
         <span class="chevron">
-          {#if row.expanded}<ChevronDown size={13} />{:else}<ChevronRight size={13} />{/if}
+          {#if row.expanded}<ChevronDown size={13} />{:else}<ChevronRight
+              size={13}
+            />{/if}
         </span>
-        {#if row.expanded}<FolderOpen size={14} />{:else}<Folder size={14} />{/if}
+        {#if row.expanded}<FolderOpen size={14} />{:else}<Folder
+            size={14}
+          />{/if}
         <strong>{row.name}</strong>
       </button>
     {:else}
       <button
         class="file-row"
         class:active={selectedPath === row.path}
-        aria-current={selectedPath === row.path ? 'true' : undefined}
+        aria-current={selectedPath === row.path ? "true" : undefined}
         style={`--depth: ${row.depth}`}
         onclick={() => onSelect(row.path)}
         title={row.path}

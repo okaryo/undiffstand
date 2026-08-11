@@ -1,2 +1,2 @@
 export type UpdateState =
-  'unavailable' | 'checking' | 'idle' | 'available' | 'installing' | 'error';
+  "unavailable" | "checking" | "idle" | "available" | "installing" | "error";
