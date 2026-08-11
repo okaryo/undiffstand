@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AlertCircle, Lightbulb } from '@lucide/svelte';
+  import { CircleAlert, Lightbulb } from '@lucide/svelte';
   import type { DiffExplanation, SourceReference } from '$lib/domain/ai';
 
   let { explanation }: { explanation?: DiffExplanation } = $props();
@@ -39,7 +39,7 @@
 
 {#snippet Caveats(caveats: string[])}
   <section class="caveats">
-    <h4><AlertCircle size={13} /> Caveats</h4>
+    <h4><CircleAlert size={13} /> Caveats</h4>
     <ul>
       {#each caveats as caveat}<li>{caveat}</li>{/each}
     </ul>

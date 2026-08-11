@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { AlertTriangle, X } from '@lucide/svelte';
+  import { TriangleAlert, X } from '@lucide/svelte';
   import type { AppError } from '$lib/domain/error';
 
   let { error, onDismiss }: { error: AppError; onDismiss?: () => void } = $props();
 </script>
 
 <div class="banner" role="alert">
-  <AlertTriangle size={17} />
+  <TriangleAlert size={17} />
   <div>
     <strong>{error.message}</strong>
     {#if error.detail}<span>{error.detail}</span>{/if}

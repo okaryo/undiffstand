@@ -32,7 +32,7 @@
   import { onMount } from 'svelte';
   import { DiffModeEnum, DiffViewWithMultiSelect, SplitSide } from '@git-diff-view/svelte';
   import '@git-diff-view/svelte/styles/diff-view-pure.css';
-  import { Binary, FileWarning } from '@lucide/svelte';
+  import { Binary, FileExclamationPoint } from '@lucide/svelte';
   import type { FileDiff } from '$lib/domain/diff';
   import type { ChangeReviewFinding, InlineAnswer } from '$lib/domain/ai';
   import InlineAsk from '$lib/components/ai/InlineAsk.svelte';
@@ -138,7 +138,7 @@
   />
 {:else if diff.hunks.length === 0}
   <EmptyState
-    icon={FileWarning}
+    icon={FileExclamationPoint}
     title="No text hunks"
     message="This change does not contain a renderable text hunk."
   />

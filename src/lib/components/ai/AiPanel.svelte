@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    AlertTriangle,
     Bot,
     ChevronDown,
     ChevronRight,
@@ -8,7 +7,8 @@
     Maximize2,
     Minimize2,
     ShieldAlert,
-    Sparkles
+    Sparkles,
+    TriangleAlert
   } from '@lucide/svelte';
   import SelectMenu from '$lib/components/common/SelectMenu.svelte';
   import type { ChangeReviewAvailability, ChangeReviewReport } from '$lib/domain/ai';
@@ -118,7 +118,7 @@
                   <div>
                     {#if finding.severity === 'critical' || finding.severity === 'high'}<ShieldAlert
                         size={13}
-                      />{:else}<AlertTriangle size={13} />{/if}
+                      />{:else}<TriangleAlert size={13} />{/if}
                     <strong>{finding.title}</strong><span>{finding.severity}</span>
                   </div>
                   <p>{finding.body}</p>

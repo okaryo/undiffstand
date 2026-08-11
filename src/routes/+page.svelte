@@ -10,7 +10,7 @@
     RefreshCw,
     Rows3,
     Settings,
-    WrapText
+    TextWrap
   } from '@lucide/svelte';
   import AiPanel from '$lib/components/ai/AiPanel.svelte';
   import EmptyState from '$lib/components/common/EmptyState.svelte';
@@ -505,7 +505,7 @@
               class:active={preferences.wrapLines}
               aria-pressed={preferences.wrapLines}
               onclick={toggleLineWrapping}
-              title="Wrap long lines"><WrapText size={13} /></button
+              title="Wrap long lines"><TextWrap size={13} /></button
             >
           </div>
         </div>
