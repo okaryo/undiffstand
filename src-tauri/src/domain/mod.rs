@@ -56,7 +56,7 @@ pub enum ReviewOutputLanguage {
     Japanese,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangeDetailPreferences {
     #[serde(default)]
@@ -65,16 +65,6 @@ pub struct ChangeDetailPreferences {
     pub ai_panel: AiPanelPreferences,
     #[serde(default)]
     pub diff: DiffPreferences,
-}
-
-impl Default for ChangeDetailPreferences {
-    fn default() -> Self {
-        Self {
-            changed_files_panel: ChangedFilesPanelPreferences::default(),
-            ai_panel: AiPanelPreferences::default(),
-            diff: DiffPreferences::default(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
