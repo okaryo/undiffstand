@@ -1,6 +1,6 @@
 [package]
 name = "undiffstand"
-version = "0.1.0"
+version = "0.1.1"
 description = "AI-assisted diff understanding for human reviewers."
 authors = ["okaryo"]
 edition = "2021"
