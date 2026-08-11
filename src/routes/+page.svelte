@@ -431,6 +431,29 @@
         onEditComparison={() => (showComparisonDialog = true)}
         onSelect={openProject}
       />
+      <div class="view-controls">
+        <div class="view-mode-switch" role="group" aria-label="Diff layout">
+          <button
+            class:active={preferences.diffMode === 'split'}
+            aria-pressed={preferences.diffMode === 'split'}
+            onclick={() => setDiffMode('split')}
+            title="Split diff"><Columns2 size={13} />Split</button
+          >
+          <button
+            class:active={preferences.diffMode === 'unified'}
+            aria-pressed={preferences.diffMode === 'unified'}
+            onclick={() => setDiffMode('unified')}
+            title="Unified diff"><Rows3 size={13} />Unified</button
+          >
+        </div>
+        <button
+          class="wrap-control"
+          class:active={preferences.wrapLines}
+          aria-pressed={preferences.wrapLines}
+          onclick={toggleLineWrapping}
+          title="Wrap long lines"><TextWrap size={13} /></button
+        >
+      </div>
       <div class="top-actions">
         <button onclick={() => workspace.load(workspace.selectedPath)} title="Refresh"
           ><RefreshCw size={14} /></button
@@ -460,7 +483,9 @@
       {#if preferences.sidebarOpen}
         <aside id="changed-files-sidebar" class="sidebar">
           <div class="pane-title">
-            <span>Changed files</span><b>{workspace.summary?.files.length ?? 0}</b>
+            <span>Changed files</span>
+            {#if workspace.summary}<DiffSummaryView summary={workspace.summary} />{:else}<b>0</b
+              >{/if}
           </div>
           {#if workspace.summary}<DiffFileList
               files={workspace.summary.files}
@@ -483,32 +508,6 @@
       {/if}
 
       <section class="content-pane">
-        <div class="content-toolbar">
-          {#if workspace.summary}<DiffSummaryView summary={workspace.summary} />{/if}
-          <div class="view-controls">
-            <div class="view-mode-switch" role="group" aria-label="Diff layout">
-              <button
-                class:active={preferences.diffMode === 'split'}
-                aria-pressed={preferences.diffMode === 'split'}
-                onclick={() => setDiffMode('split')}
-                title="Split diff"><Columns2 size={13} />Split</button
-              >
-              <button
-                class:active={preferences.diffMode === 'unified'}
-                aria-pressed={preferences.diffMode === 'unified'}
-                onclick={() => setDiffMode('unified')}
-                title="Unified diff"><Rows3 size={13} />Unified</button
-              >
-            </div>
-            <button
-              class="wrap-control"
-              class:active={preferences.wrapLines}
-              aria-pressed={preferences.wrapLines}
-              onclick={toggleLineWrapping}
-              title="Wrap long lines"><TextWrap size={13} /></button
-            >
-          </div>
-        </div>
         <div class="viewer-scroll">
           {#if workspace.loading}<div class="loading-state">
               <LoaderCircle class="spin" size={20} />Loading changes…
@@ -654,7 +653,7 @@
   }
   .topbar {
     display: grid;
-    grid-template-columns: auto auto minmax(220px, 1fr) auto;
+    grid-template-columns: auto auto minmax(220px, 1fr) auto auto;
     align-items: center;
     gap: 8px;
     padding: 0 11px;
@@ -750,26 +749,18 @@
   }
   .content-pane {
     display: grid;
-    grid-template-rows: 39px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     min-width: 0;
     min-height: 0;
     overflow: hidden;
     background: #0b1016;
   }
-  .content-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-width: 0;
-    padding: 0 10px 0 13px;
-    background: #0e151d;
-    border-bottom: 1px solid var(--border);
-  }
   .view-controls {
     display: flex;
     align-items: center;
     gap: 7px;
-    margin-left: 12px;
+    padding-right: 6px;
+    border-right: 1px solid var(--border);
   }
   .view-mode-switch {
     display: flex;

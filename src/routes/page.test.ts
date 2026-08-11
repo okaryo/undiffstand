@@ -195,6 +195,23 @@ describe('change details auto-refresh', () => {
     expect(feedPaths).toEqual(treePaths);
   });
 
+  it('keeps diff controls in the top bar and change totals in the file sidebar', async () => {
+    history.replaceState(null, '', '/?project=alpha');
+    const { container } = render(Page);
+
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+
+    const topbarControls = container.querySelector('.topbar .view-controls');
+    expect(topbarControls).toContainElement(screen.getByTitle('Split diff'));
+    expect(topbarControls).toContainElement(screen.getByTitle('Unified diff'));
+    expect(topbarControls).toContainElement(screen.getByTitle('Wrap long lines'));
+    expect(container.querySelector('.content-toolbar')).not.toBeInTheDocument();
+    expect(
+      await screen.findByLabelText('1 changed file, 2 additions, 1 deletion')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('12345678')).not.toBeInTheDocument();
+  });
+
   it('coalesces repeated focus events', async () => {
     history.replaceState(null, '', '/?project=alpha');
     render(Page);
