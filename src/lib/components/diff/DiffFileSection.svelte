@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    Bot,
     Check,
     ChevronDown,
     ChevronRight,
@@ -96,7 +97,7 @@
     aria-label={`Explain changes in ${path}`}
     title="Explain this file's changes"
     onclick={onExplain}
-    >{#if aiLoading}<LoaderCircle class="spin" size={13} />{:else}<Sparkles size={13} />{/if}<span
+    >{#if aiLoading}<LoaderCircle class="spin" size={13} />{:else}<Bot size={13} />{/if}<span
       >Explain</span
     ></button
   >
