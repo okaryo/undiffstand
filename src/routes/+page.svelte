@@ -873,9 +873,9 @@
     --panel-handle-width: 5px;
   }
   .workspace.withoutAi {
-    grid-template-columns: var(--sidebar-width) var(
-        --panel-handle-width
-      ) minmax(500px, 1fr);
+    grid-template-columns:
+      var(--sidebar-width) var(--panel-handle-width)
+      minmax(500px, 1fr);
   }
   .workspace.withoutSidebar {
     grid-template-columns: minmax(500px, 1fr) var(--panel-handle-width) var(

@@ -253,11 +253,9 @@ export class DiffWorkspaceController {
   }
 
   private scrollTo(path: string, smooth: boolean) {
-    document
-      .getElementById(diffAnchorId(path))
-      ?.scrollIntoView({
-        behavior: smooth ? "smooth" : "auto",
-        block: "start",
-      });
+    document.getElementById(diffAnchorId(path))?.scrollIntoView({
+      behavior: smooth ? "smooth" : "auto",
+      block: "start",
+    });
   }
 }
