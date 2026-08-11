@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import {
     Bot,
+    Check,
     CirclePlus,
     Columns2,
     FolderGit2,
@@ -93,6 +94,19 @@
   let sidebarWidth = $state(225);
   let aiPanelWidth = $state(290);
   let reviewOutputLanguage = $state<ReviewOutputLanguage>('english');
+  let activeBaseRef = $derived(
+    activeProject?.baseRef && activeProject.baseRef !== 'HEAD'
+      ? activeProject.baseRef
+      : activeRepository?.detectedBaseRef
+  );
+  let baseToCurrentIsActive = $derived(
+    Boolean(activeBaseRef) &&
+      diffSelection.base === activeBaseRef &&
+      diffSelection.target === 'HEAD'
+  );
+  let currentToWorkingTreeIsActive = $derived(
+    diffSelection.base === 'HEAD' && diffSelection.target === '.'
+  );
   let preferencesLoaded = false;
   let preferencesSaving = false;
   let preferencesSaveRequested = false;
@@ -589,6 +603,11 @@
     showComparisonDialog = false;
   }
 
+  async function configureBaseBranch() {
+    showComparisonDialog = false;
+    await editActiveProject();
+  }
+
   function handleWindowKeydown(event: KeyboardEvent) {
     const shortcut = resolveApplicationShortcut(event);
 
@@ -1068,16 +1087,79 @@
         >
       </header>
       <div class="comparison-dialog-content">
-        <DiffSelector
-          selection={diffSelection}
-          recentBranches={activeRepository?.recentBranches ?? []}
-          localBranches={activeRepository?.localBranches ?? []}
-          remoteBranches={activeRepository?.remoteBranches ?? []}
-          recentCommits={activeRepository?.recentCommits ?? []}
-          currentBranch={activeRepository?.currentBranch}
-          loading={contentLoading}
-          onApply={applyDiffSelection}
-        />
+        <section class="comparison-editor" aria-label="Comparison">
+          <DiffSelector
+            selection={diffSelection}
+            recentBranches={activeRepository?.recentBranches ?? []}
+            localBranches={activeRepository?.localBranches ?? []}
+            remoteBranches={activeRepository?.remoteBranches ?? []}
+            recentCommits={activeRepository?.recentCommits ?? []}
+            currentBranch={activeRepository?.currentBranch}
+            loading={contentLoading}
+            onApply={applyDiffSelection}
+          />
+        </section>
+        <section class="quick-comparisons" aria-labelledby="quick-comparisons-title">
+          <div class="comparison-section-heading">
+            <div>
+              <h3 id="quick-comparisons-title">Quick comparisons</h3>
+              <p>Apply a common comparison immediately.</p>
+            </div>
+            {#if !activeBaseRef}
+              <button type="button" class="settings-link" onclick={configureBaseBranch}
+                >Set base branch in Project settings</button
+              >
+            {/if}
+          </div>
+          <div class="quick-comparison-list">
+            <div class="quick-comparison-row">
+              <div>
+                <strong
+                  >{activeBaseRef ?? 'Base branch'} → {activeRepository?.currentBranch ??
+                    'Current branch'}</strong
+                >
+                <span>Base branch → Current branch</span>
+              </div>
+              {#if baseToCurrentIsActive}
+                <span class="current-comparison" role="status" aria-label="Current comparison"
+                  ><Check size={13} />Current</span
+                >
+              {:else if activeBaseRef && activeBaseRef === activeRepository?.currentBranch}
+                <span class="comparison-unavailable">Same branch</span>
+              {:else}
+                <button
+                  type="button"
+                  class="compare-button"
+                  aria-label={`Compare ${activeBaseRef ?? 'base branch'} → ${activeRepository?.currentBranch ?? 'current branch'}`}
+                  disabled={contentLoading || !activeBaseRef || !activeRepository?.currentBranch}
+                  title={!activeBaseRef ? 'Set a base branch in Project settings.' : undefined}
+                  onclick={() =>
+                    activeBaseRef && applyDiffSelection({ base: activeBaseRef, target: 'HEAD' })}
+                  >Compare</button
+                >
+              {/if}
+            </div>
+            <div class="quick-comparison-row">
+              <div>
+                <strong>{activeRepository?.currentBranch ?? 'HEAD'} → Working tree</strong>
+                <span>Current branch → Working tree</span>
+              </div>
+              {#if currentToWorkingTreeIsActive}
+                <span class="current-comparison" role="status" aria-label="Current comparison"
+                  ><Check size={13} />Current</span
+                >
+              {:else}
+                <button
+                  type="button"
+                  class="compare-button"
+                  aria-label={`Compare ${activeRepository?.currentBranch ?? 'HEAD'} → Working tree`}
+                  disabled={contentLoading}
+                  onclick={() => applyDiffSelection({ base: 'HEAD', target: '.' })}>Compare</button
+                >
+              {/if}
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   </div>
@@ -1678,10 +1760,123 @@
     cursor: default;
   }
   .comparison-dialog-content {
+    display: grid;
+    gap: 20px;
     padding: 20px;
+  }
+  .comparison-dialog-content h3 {
+    margin: 0;
+    color: #87939e;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .comparison-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .comparison-section-heading > div {
+    display: grid;
+    gap: 4px;
+  }
+  .comparison-section-heading p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .quick-comparisons {
+    display: grid;
+    gap: 10px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+  }
+  .quick-comparison-list {
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+  }
+  .quick-comparison-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+    min-height: 54px;
+    padding: 9px 11px;
+    background: #0b1118;
+  }
+  .quick-comparison-row + .quick-comparison-row {
+    border-top: 1px solid var(--border);
+  }
+  .quick-comparison-row > div {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+  }
+  .quick-comparison-row strong {
+    overflow: hidden;
+    color: #c3ccd4;
+    font: 12px var(--mono);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .quick-comparison-row > div > span {
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .compare-button {
+    min-width: 70px;
+    height: 29px;
+    padding: 0 10px;
+    color: var(--accent-bright);
+    background: rgba(87, 184, 142, 0.08);
+    border: 1px solid rgba(87, 184, 142, 0.35);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .compare-button:hover {
+    color: #07120e;
+    background: var(--accent-bright);
+    border-color: var(--accent-bright);
+  }
+  .compare-button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .current-comparison {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 7px;
+    color: #8fb7d9;
+    background: rgba(91, 137, 176, 0.14);
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 650;
+  }
+  .comparison-unavailable {
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .settings-link {
+    padding: 0;
+    color: var(--accent-bright);
+    background: none;
+    border: 0;
+    font-size: 11px;
+    cursor: pointer;
   }
   .comparison-dialog-content :global(.selector) {
     justify-content: center;
+  }
+  @media (max-width: 680px) {
+    .comparison-dialog-content :global(.selector) {
+      flex-wrap: wrap;
+    }
   }
   .settings-content {
     display: grid;

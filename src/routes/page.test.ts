@@ -242,6 +242,69 @@ describe('change details auto-refresh', () => {
     );
   });
 
+  it('applies quick comparisons using the configured base and current branch', async () => {
+    tauriApi.getDiffSummary.mockImplementation(
+      async (_projectId: string, selection: { base: string; target: string }) => ({
+        ...summary,
+        selection,
+        comparison: {
+          fromLabel: selection.base,
+          toLabel: selection.target === '.' ? 'working tree' : selection.target,
+          fromSha: summary.comparison.fromSha,
+          toSha: selection.target === '.' ? undefined : summary.comparison.fromSha
+        }
+      })
+    );
+    history.replaceState(null, '', '/?project=alpha');
+    render(Page);
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Change comparison. Current: feature → working tree' })
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Change comparison' });
+    const comparisonForm = within(dialog).getByRole('form', { name: 'Choose changes to review' });
+    const quickComparisons = within(dialog).getByRole('region', { name: 'Quick comparisons' });
+    expect(
+      comparisonForm.compareDocumentPosition(quickComparisons) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      within(quickComparisons).getByRole('status', { name: 'Current comparison' })
+    ).toHaveTextContent('Current');
+    expect(
+      within(quickComparisons).queryByRole('button', {
+        name: 'Compare feature → Working tree'
+      })
+    ).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: /main → feature/ }));
+
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenLastCalledWith('alpha', {
+        base: 'main',
+        target: 'HEAD'
+      })
+    );
+    expect(new URLSearchParams(location.search).get('base')).toBe('main');
+    expect(new URLSearchParams(location.search).get('target')).toBe('HEAD');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Change comparison' })).not.toBeInTheDocument()
+    );
+
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Change comparison. Current: main → feature' })
+    );
+    await fireEvent.click(screen.getByRole('button', { name: /feature → Working tree/ }));
+
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenLastCalledWith('alpha', {
+        base: 'HEAD',
+        target: '.'
+      })
+    );
+    expect(new URLSearchParams(location.search).has('base')).toBe(false);
+    expect(new URLSearchParams(location.search).has('target')).toBe(false);
+  });
+
   it('disables Change Review and explains an unsupported comparison', async () => {
     tauriApi.getChangeReviewAvailability.mockResolvedValue({
       available: false,

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { FolderGit2, X } from '@lucide/svelte';
+  import SelectMenu from '$lib/components/common/SelectMenu.svelte';
   import type { ProjectConfig, RepositoryInfo, SaveProjectInput } from '$lib/domain/project';
 
   let {
@@ -21,19 +22,31 @@
   } = $props();
 
   let name = $state('');
+  let baseRef = $state('');
   let initialized = false;
   const repoPath = $derived(project?.repoPath ?? repository?.repoPath ?? '');
+  const branchOptions = $derived([
+    ...(!baseRef ? [{ value: '', label: 'Select a branch', disabled: true }] : []),
+    ...[...new Set([...(repository?.localBranches ?? []), ...(repository?.remoteBranches ?? [])])]
+      .filter((branch) => branch === baseRef || !branch.endsWith('/HEAD'))
+      .map((branch) => ({ value: branch, label: branch }))
+  ]);
 
   $effect(() => {
     if (!initialized) {
       name = project?.name ?? repository?.suggestedName ?? '';
+      baseRef =
+        project?.baseRef && project.baseRef !== 'HEAD'
+          ? project.baseRef
+          : (repository?.detectedBaseRef ?? '');
       initialized = true;
     }
   });
 
   function submit(event: SubmitEvent) {
     event.preventDefault();
-    onSave({ id: project?.id, name: name.trim(), repoPath, baseRef: 'HEAD' });
+    if (!baseRef) return;
+    onSave({ id: project?.id, name: name.trim(), repoPath, baseRef });
   }
 </script>
 
@@ -65,6 +78,27 @@
         <span>Repository</span>
         <input value={repoPath} readonly />
       </label>
+      <label>
+        <span>Base branch</span>
+        <span class="base-ref-control">
+          <SelectMenu
+            id="project-base-branch"
+            value={baseRef}
+            label="Base branch"
+            options={branchOptions}
+            fluid
+            disabled={saving || deleting}
+            onChange={(value) => (baseRef = value)}
+          />
+        </span>
+        {#if repository?.detectedBaseRef}
+          <small>Automatically detected. Used by quick comparisons.</small>
+        {:else if !baseRef}
+          <small class="warning">Base branch could not be detected. Select it to continue.</small>
+        {:else}
+          <small>Used by quick comparisons.</small>
+        {/if}
+      </label>
       <footer>
         {#if project && onDelete}
           <button class="danger" type="button" disabled={saving || deleting} onclick={onDelete}>
@@ -72,7 +106,11 @@
           </button>
         {/if}
         <button class="secondary" type="button" onclick={onClose}>Cancel</button>
-        <button class="primary" type="submit" disabled={saving || deleting || !name.trim()}>
+        <button
+          class="primary"
+          type="submit"
+          disabled={saving || deleting || !name.trim() || !baseRef}
+        >
           {saving ? 'Saving…' : project ? 'Save settings' : 'Add project'}
         </button>
       </footer>
@@ -151,6 +189,22 @@
     color: #c9d2dc;
     font-size: 12px;
     font-weight: 550;
+  }
+  .base-ref-control {
+    display: block;
+  }
+  .base-ref-control :global(.select-menu .trigger) {
+    height: 38px;
+    padding: 0 11px;
+    background: #0b1118;
+  }
+  label small {
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+  label small.warning {
+    color: #d5a85c;
   }
   input {
     width: 100%;

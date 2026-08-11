@@ -112,6 +112,9 @@ pub fn detect_base_ref(repo: &Path) -> AppResult<(Option<String>, Vec<String>)> 
         if local_branches.iter().any(|branch| branch == local_name) {
             return Ok((Some(local_name.to_owned()), local_branches));
         }
+        if ref_exists(repo, &reference)? {
+            return Ok((Some(reference), local_branches));
+        }
     }
 
     for candidate in ["main", "master"] {
@@ -119,10 +122,7 @@ pub fn detect_base_ref(repo: &Path) -> AppResult<(Option<String>, Vec<String>)> 
             return Ok((Some(candidate.to_owned()), local_branches));
         }
     }
-    let detected = current_branch(repo)?
-        .filter(|branch| local_branches.contains(branch))
-        .or_else(|| local_branches.first().cloned());
-    Ok((detected, local_branches))
+    Ok((None, local_branches))
 }
 
 fn list_local_branches(repo: &Path) -> AppResult<Vec<String>> {
@@ -790,6 +790,65 @@ mod tests {
             .status()
             .unwrap();
         assert!(status.success(), "git command failed: {args:?}");
+    }
+
+    fn initialize_repository(repo: &Path, branch: &str) {
+        git(repo, &["init", "-b", branch]);
+        git(repo, &["config", "user.email", "test@example.com"]);
+        git(repo, &["config", "user.name", "undiffstand test"]);
+        fs::write(repo.join("README.md"), "initial\n").unwrap();
+        git(repo, &["add", "README.md"]);
+        git(repo, &["commit", "-m", "initial"]);
+    }
+
+    #[test]
+    fn base_ref_detection_prefers_origin_head() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        initialize_repository(repo, "main");
+        git(repo, &["branch", "develop"]);
+        git(
+            repo,
+            &["update-ref", "refs/remotes/origin/develop", "develop"],
+        );
+        git(
+            repo,
+            &[
+                "symbolic-ref",
+                "refs/remotes/origin/HEAD",
+                "refs/remotes/origin/develop",
+            ],
+        );
+
+        let (detected, _) = detect_base_ref(repo).unwrap();
+
+        assert_eq!(detected.as_deref(), Some("develop"));
+    }
+
+    #[test]
+    fn base_ref_detection_prefers_main_then_master() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        initialize_repository(repo, "master");
+        git(repo, &["branch", "main"]);
+
+        let (with_main, _) = detect_base_ref(repo).unwrap();
+        assert_eq!(with_main.as_deref(), Some("main"));
+
+        git(repo, &["branch", "-D", "main"]);
+        let (with_master, _) = detect_base_ref(repo).unwrap();
+        assert_eq!(with_master.as_deref(), Some("master"));
+    }
+
+    #[test]
+    fn base_ref_detection_does_not_guess_an_arbitrary_branch() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        initialize_repository(repo, "feature");
+
+        let (detected, _) = detect_base_ref(repo).unwrap();
+
+        assert_eq!(detected, None);
     }
 
     #[test]
