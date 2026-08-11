@@ -489,6 +489,11 @@ describe('change details auto-refresh', () => {
     );
     expect(screen.getByTitle('Unified diff')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTitle('Wrap long lines')).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.queryByRole('combobox', { name: 'Review output language' })
+    ).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByTitle('AI settings'));
     expect(screen.getByRole('combobox', { name: 'Review output language' })).toHaveTextContent(
       '日本語'
     );
@@ -522,6 +527,7 @@ describe('change details auto-refresh', () => {
     render(Page);
     await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
 
+    await fireEvent.click(screen.getByTitle('AI settings'));
     await fireEvent.click(screen.getByRole('combobox', { name: 'Review output language' }));
     await fireEvent.click(
       within(screen.getByRole('listbox', { name: 'Review output language options' })).getByRole(
@@ -559,12 +565,10 @@ describe('change details auto-refresh', () => {
     expect(screen.queryByRole('separator', { name: 'Resize AI panel' })).not.toBeInTheDocument();
 
     await fireEvent.keyDown(window, { key: ',', code: 'Comma', metaKey: true });
-    await waitFor(() =>
-      expect(screen.getByRole('dialog', { name: 'Project settings' })).toBeInTheDocument()
-    );
+    expect(screen.getByRole('dialog', { name: 'AI settings' })).toBeInTheDocument();
 
     await fireEvent.keyDown(window, { key: 'Escape' });
-    expect(screen.queryByRole('dialog', { name: 'Project settings' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'AI settings' })).not.toBeInTheDocument();
 
     await waitFor(() =>
       expect(tauriApi.saveUserPreferences).toHaveBeenLastCalledWith({
@@ -575,6 +579,19 @@ describe('change details auto-refresh', () => {
           diff: { mode: 'split', wrapLongLines: false }
         }
       })
+    );
+  });
+
+  it('opens project settings from the project switcher', async () => {
+    history.replaceState(null, '', '/?project=alpha');
+    render(Page);
+    await waitFor(() => expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1));
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Switch project. Current: Alpha' }));
+    await fireEvent.click(screen.getByRole('menuitem', { name: 'Project settings' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: 'Project settings' })).toBeInTheDocument()
     );
   });
 

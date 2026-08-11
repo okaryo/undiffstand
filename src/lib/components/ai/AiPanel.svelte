@@ -9,28 +9,22 @@
     ShieldAlert,
     TriangleAlert
   } from '@lucide/svelte';
-  import SelectMenu from '$lib/components/common/SelectMenu.svelte';
   import type { ChangeReviewAvailability, ChangeReviewReport } from '$lib/domain/ai';
-  import { reviewOutputLanguageOptions, type ReviewOutputLanguage } from '$lib/domain/preferences';
 
   let {
     availability,
     report,
     loading = false,
     expanded = false,
-    outputLanguage = 'english',
     onReview,
-    onToggleExpanded,
-    onOutputLanguageChange
+    onToggleExpanded
   }: {
     availability?: ChangeReviewAvailability;
     report?: ChangeReviewReport;
     loading?: boolean;
     expanded?: boolean;
-    outputLanguage?: ReviewOutputLanguage;
     onReview: () => void;
     onToggleExpanded: () => void;
-    onOutputLanguageChange: (language: ReviewOutputLanguage) => void;
   } = $props();
 
   let openGroups = $state<Record<string, boolean>>({});
@@ -58,18 +52,6 @@
         Scope: {availability?.scopeLabel ?? 'Checking the selected comparison…'}
       </p>
       {#if availability && !availability.available}<small>{availability.reason}</small>{/if}
-      <label class="output-language">
-        <span>Output</span>
-        <SelectMenu
-          id="review-output-language-panel"
-          label="Review output language"
-          value={outputLanguage}
-          options={[...reviewOutputLanguageOptions]}
-          disabled={loading}
-          fluid
-          onChange={(language) => onOutputLanguageChange(language as ReviewOutputLanguage)}
-        />
-      </label>
     </div>
     <button onclick={onReview} disabled={loading || !availability?.available}>
       {#if loading}<LoaderCircle class="spin" size={16} /> Reviewing…{:else}Run review{/if}
@@ -217,16 +199,6 @@
     color: #c5a864;
     font-size: 12px;
     line-height: 1.45;
-  }
-  .output-language {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    max-width: 245px;
-    gap: 7px;
-    margin-top: 9px;
-    color: var(--muted);
-    font-size: 12px;
   }
   .action-card > button {
     justify-self: start;

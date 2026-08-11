@@ -1,5 +1,12 @@
 <script lang="ts">
-  import { Check, ChevronDown, ChevronRight, FolderGit2, GitCompareArrows } from '@lucide/svelte';
+  import {
+    Check,
+    ChevronDown,
+    ChevronRight,
+    FolderGit2,
+    GitCompareArrows,
+    Settings
+  } from '@lucide/svelte';
   import type { ProjectConfig } from '$lib/domain/project';
 
   let {
@@ -7,12 +14,14 @@
     activeProject,
     comparisonLabel,
     onEditComparison,
+    onEditProject,
     onSelect
   }: {
     projects: ProjectConfig[];
     activeProject: ProjectConfig;
     comparisonLabel: string;
     onEditComparison: () => void;
+    onEditProject: () => void | Promise<void>;
     onSelect: (project: ProjectConfig) => void | Promise<void>;
   } = $props();
 
@@ -23,6 +32,11 @@
   function selectProject(project: ProjectConfig) {
     open = false;
     if (project.id !== activeProject.id) onSelect(project);
+  }
+
+  function editProject() {
+    open = false;
+    onEditProject();
   }
 
   function handleWindowClick(event: MouseEvent) {
@@ -91,6 +105,12 @@
             >{/if}
         </button>
       {/each}
+      <div class="menu-actions">
+        <button type="button" role="menuitem" onclick={editProject}>
+          <span class="project-icon"><Settings size={15} /></span>
+          <span class="project-details"><strong>Project settings</strong></span>
+        </button>
+      </div>
     </div>
   {/if}
 </div>
@@ -225,6 +245,11 @@
 
   .menu button.active {
     background: rgba(87, 184, 142, 0.1);
+  }
+  .menu-actions {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
   }
   .selected-check {
     color: var(--accent-bright);

@@ -322,8 +322,7 @@
       if (!workspace.loading) showComparisonDialog = false;
     } else if (shortcut === 'open-settings') {
       event.preventDefault();
-      if (activeProject) void editActiveProject();
-      else showSettings = true;
+      showSettings = true;
     } else if (shortcut === 'refresh-change-detail' && activeProject) {
       event.preventDefault();
       void workspace.load(workspace.selectedPath);
@@ -429,6 +428,7 @@
           ? diffComparisonLabel(workspace.summary.comparison, activeRepository?.currentBranch)
           : diffSelectionLabel(workspace.selection, activeRepository?.currentBranch)}
         onEditComparison={() => (showComparisonDialog = true)}
+        onEditProject={editActiveProject}
         onSelect={openProject}
       />
       <div class="view-controls">
@@ -463,7 +463,9 @@
           class:active={preferences.aiPanelOpen}
           title="Toggle AI panel"><PanelRight size={14} /></button
         >
-        <button onclick={editActiveProject} title="Project settings"><Settings size={14} /></button>
+        <button onclick={() => (showSettings = true)} title="AI settings"
+          ><Settings size={14} /></button
+        >
       </div>
     </header>
 
@@ -558,10 +560,8 @@
           report={aiReview.report}
           loading={aiReview.loading}
           expanded={aiPanelExpanded}
-          outputLanguage={preferences.reviewOutputLanguage}
           onReview={runChangeReview}
           onToggleExpanded={toggleAiPanelExpanded}
-          onOutputLanguageChange={setReviewOutputLanguage}
         />
       {/if}
     </div>

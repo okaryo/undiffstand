@@ -28,6 +28,7 @@ describe('ProjectSwitcher', () => {
       activeProject: projects[0],
       comparisonLabel: 'main → working tree',
       onEditComparison: vi.fn(),
+      onEditProject: vi.fn(),
       onSelect
     });
 
@@ -51,6 +52,7 @@ describe('ProjectSwitcher', () => {
       activeProject: projects[0],
       comparisonLabel: 'main → working tree',
       onEditComparison: vi.fn(),
+      onEditProject: vi.fn(),
       onSelect: vi.fn()
     });
 
@@ -66,6 +68,7 @@ describe('ProjectSwitcher', () => {
       activeProject: projects[0],
       comparisonLabel: 'main → working tree',
       onEditComparison: vi.fn(),
+      onEditProject: vi.fn(),
       onSelect: vi.fn()
     });
 
@@ -82,6 +85,7 @@ describe('ProjectSwitcher', () => {
       activeProject: projects[0],
       comparisonLabel: 'main → working tree',
       onEditComparison,
+      onEditProject: vi.fn(),
       onSelect: vi.fn()
     });
 
@@ -98,6 +102,7 @@ describe('ProjectSwitcher', () => {
       activeProject: projects[0],
       comparisonLabel: 'main → working tree',
       onEditComparison: vi.fn(),
+      onEditProject: vi.fn(),
       onSelect: vi.fn()
     });
 
@@ -108,5 +113,23 @@ describe('ProjectSwitcher', () => {
     expect(comparisonTrigger).toContainElement(
       container.querySelector('.lucide-git-compare-arrows')
     );
+  });
+
+  it('opens the active project settings and closes the project list', async () => {
+    const onEditProject = vi.fn();
+    render(ProjectSwitcher, {
+      projects,
+      activeProject: projects[0],
+      comparisonLabel: 'main → working tree',
+      onEditComparison: vi.fn(),
+      onEditProject,
+      onSelect: vi.fn()
+    });
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Switch project. Current: Alpha' }));
+    await fireEvent.click(screen.getByRole('menuitem', { name: 'Project settings' }));
+
+    expect(onEditProject).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('menu', { name: 'Projects' })).not.toBeInTheDocument();
   });
 });
