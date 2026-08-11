@@ -1,0 +1,38 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["every weekend"],
+  "timezone": "Asia/Tokyo",
+  "automerge": false,
+  "rangeStrategy": "bump",
+  "dependencyDashboard": false,
+  "packageRules": [
+    {
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "groupName": "npm devDependencies",
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["dependencies"],
+      "groupName": "npm dependencies",
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "matchManagers": ["cargo"],
+      "groupName": "Cargo dependencies",
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "matchManagers": ["npm", "cargo"],
+      "matchPackageNames": ["@tauri-apps/**", "tauri", "tauri-build", "tauri-plugin-**"],
+      "groupName": "Tauri packages",
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    }
+  ]
+}
