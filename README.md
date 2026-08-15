@@ -21,7 +21,7 @@ undiffstand is a read-only desktop app that helps human reviewers understand loc
 - pnpm
 - Rust stable
 - Git available on `PATH`
-- Codex CLI available on `PATH` and authenticated with `codex login` (for AI features)
+- Codex CLI installed and authenticated with `codex login` (for AI features)
 - Tauri 2 platform prerequisites
 
 ## Development
@@ -43,6 +43,8 @@ pnpm tauri dev
 ```
 
 undiffstand runs `codex exec --ephemeral --sandbox read-only` in an isolated temporary directory and reuses the CLI's saved authentication, model, and local configuration. This avoids loading repository-specific agent instructions into the analysis process. `OPENAI_API_KEY` and `CODEX_API_KEY` are removed from the Codex child process so undiffstand does not use API-key authentication. The selected file diff is provided only when an AI explanation is requested.
+
+The app looks for Codex CLI on `PATH` first. On macOS, it also checks `/opt/homebrew/bin/codex`, `/usr/local/bin/codex`, and `~/.local/bin/codex` so launches from Finder or the Dock can use common Codex installations.
 
 ## Validation
 
