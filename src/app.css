@@ -47,3 +47,14 @@ button {
 ::selection {
   background: rgba(87, 184, 142, 0.3);
 }
+::highlight(undiffstand-diff-search-match) {
+  color: inherit;
+  background: rgba(218, 177, 62, 0.46);
+}
+
+::highlight(undiffstand-diff-search-active) {
+  color: inherit;
+  background: #e3a82f;
+  text-decoration: underline;
+  text-decoration-color: rgba(35, 25, 4, 0.65);
+}

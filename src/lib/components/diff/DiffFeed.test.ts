@@ -155,4 +155,42 @@ describe("DiffFeed deferred rendering", () => {
     expect(onActive).toHaveBeenCalledWith("src/file-9.ts");
     unmount();
   });
+
+  it("prioritizes and activates a search match in a deferred file", async () => {
+    const files = createFiles(9);
+    const ninthPath = files[8].newPath as string;
+    const onLoad = vi.fn();
+    const onActive = vi.fn();
+    const { container, unmount } = render(DiffFeed, {
+      props: {
+        files,
+        diffs: { [ninthPath]: createDiff(files[8]) },
+        loadingPaths: {},
+        errors: {},
+        mode: "split",
+        wrap: false,
+        searchQuery: "value",
+        searchMatch: {
+          id: `${ninthPath}:0:new::1:6`,
+          path: ninthPath,
+          side: "new",
+          newLine: 1,
+          column: 6,
+          length: 5,
+        },
+        onLoad,
+        onActive,
+      },
+    });
+
+    expect(onLoad).toHaveBeenCalledWith(ninthPath);
+    expect(onActive).toHaveBeenCalledWith(ninthPath);
+
+    await vi.advanceTimersByTimeAsync(32);
+    await tick();
+    expect(
+      container.querySelector(`[data-diff-path="${ninthPath}"] .diff-host`),
+    ).toBeInTheDocument();
+    unmount();
+  });
 });

@@ -23,6 +23,7 @@
   import ComparisonDialog from "$lib/components/diff/ComparisonDialog.svelte";
   import DiffFeed from "$lib/components/diff/DiffFeed.svelte";
   import DiffFileList from "$lib/components/diff/DiffFileList.svelte";
+  import DiffSearchBar from "$lib/components/diff/DiffSearchBar.svelte";
   import DiffSummaryView from "$lib/components/diff/DiffSummary.svelte";
   import ProjectDialog from "$lib/components/project/ProjectDialog.svelte";
   import ProjectHome from "$lib/components/project/ProjectHome.svelte";
@@ -39,6 +40,10 @@
     revisionDisplayLabel,
     type DiffSelection,
   } from "$lib/domain/diff";
+  import {
+    findDiffSearchMatches,
+    type DiffSearchMatch,
+  } from "$lib/domain/diff-search";
   import { normalizeError, type AppError } from "$lib/domain/error";
   import type {
     DiffViewMode,
@@ -87,6 +92,47 @@
   );
 
   let aiPanelExpanded = $state(false);
+  let diffSearchOpen = $state(false);
+  let diffSearchQuery = $state("");
+  let activeDiffSearchMatchId = $state<string>();
+  let diffSearchFocusVersion = $state(0);
+  const diffSearchMatches = $derived(
+    workspace.summary
+      ? findDiffSearchMatches(
+          workspace.summary.files,
+          workspace.diffs,
+          diffSearchQuery,
+        )
+      : [],
+  );
+  const diffSearchMatchCounts = $derived.by(() => {
+    const counts: Record<string, number> = {};
+    for (const match of diffSearchMatches)
+      counts[match.path] = (counts[match.path] ?? 0) + 1;
+    return counts;
+  });
+  const activeDiffSearchIndex = $derived(
+    activeDiffSearchMatchId
+      ? diffSearchMatches.findIndex(
+          (match) => match.id === activeDiffSearchMatchId,
+        )
+      : -1,
+  );
+  const activeDiffSearchMatch = $derived<DiffSearchMatch | undefined>(
+    activeDiffSearchIndex >= 0
+      ? diffSearchMatches[activeDiffSearchIndex]
+      : undefined,
+  );
+  const diffSearchPending = $derived(
+    Boolean(diffSearchQuery.trim()) &&
+      Boolean(
+        workspace.summary?.files.some((file) => {
+          if (file.status === "binary") return false;
+          const path = file.newPath ?? file.oldPath ?? "Unknown file";
+          return !workspace.diffs[path] && !workspace.errors[path];
+        }),
+      ),
+  );
   let aiPanelWidthBeforeExpand = 290;
   let activeBaseRef = $derived(
     activeProject?.baseRef && activeProject.baseRef !== "HEAD"
@@ -411,6 +457,7 @@
     requestedFile?: string,
     requestedSelection: DiffSelection = defaultDiffSelection(),
   ) {
+    resetDiffSearch();
     loading = true;
     workspaceError = null;
     try {
@@ -434,6 +481,7 @@
   }
 
   async function applyDiffSelection(selection: DiffSelection) {
+    resetDiffSearch();
     await workspace.applySelection(selection);
     showComparisonDialog = false;
   }
@@ -447,6 +495,11 @@
     const shortcut = resolveApplicationShortcut(event);
 
     if (shortcut === "dismiss-dialogs") {
+      if (diffSearchOpen) {
+        event.preventDefault();
+        closeDiffSearch();
+        return;
+      }
       if (showProjectDialog || showSettings || showComparisonDialog)
         event.preventDefault();
       showProjectDialog = false;
@@ -455,6 +508,15 @@
     } else if (shortcut === "open-settings") {
       event.preventDefault();
       showSettings = true;
+    } else if (
+      shortcut === "find-in-changes" &&
+      activeProject &&
+      !showProjectDialog &&
+      !showSettings &&
+      !showComparisonDialog
+    ) {
+      event.preventDefault();
+      openDiffSearch();
     } else if (shortcut === "refresh-change-detail" && activeProject) {
       event.preventDefault();
       void workspace.load(workspace.selectedPath);
@@ -465,6 +527,44 @@
       event.preventDefault();
       toggleAiPanel();
     }
+  }
+
+  function openDiffSearch() {
+    diffSearchOpen = true;
+    diffSearchFocusVersion += 1;
+  }
+
+  function closeDiffSearch() {
+    diffSearchOpen = false;
+    activeDiffSearchMatchId = undefined;
+  }
+
+  function resetDiffSearch() {
+    diffSearchOpen = false;
+    diffSearchQuery = "";
+    activeDiffSearchMatchId = undefined;
+  }
+
+  function updateDiffSearchQuery(query: string) {
+    diffSearchQuery = query;
+    activeDiffSearchMatchId = undefined;
+    if (!query.trim() || !workspace.summary) return;
+    for (const file of workspace.summary.files) {
+      if (file.status !== "binary")
+        workspace.queue(file.newPath ?? file.oldPath ?? "Unknown file");
+    }
+  }
+
+  function moveDiffSearch(direction: 1 | -1) {
+    if (diffSearchMatches.length === 0) return;
+    const nextIndex =
+      activeDiffSearchIndex === -1
+        ? direction === 1
+          ? 0
+          : diffSearchMatches.length - 1
+        : (activeDiffSearchIndex + direction + diffSearchMatches.length) %
+          diffSearchMatches.length;
+    activeDiffSearchMatchId = diffSearchMatches[nextIndex]?.id;
   }
 
   async function explainFileChange(path: string) {
@@ -502,6 +602,7 @@
   }
 
   function goHome() {
+    resetDiffSearch();
     activeProject = null;
     activeRepository = undefined;
     workspace.reset();
@@ -653,6 +754,7 @@
           {#if workspace.summary}<DiffFileList
               files={workspace.summary.files}
               selectedPath={workspace.selectedPath}
+              matchCounts={diffSearchOpen ? diffSearchMatchCounts : {}}
               onSelect={(path) => workspace.select(path)}
             />{/if}
         </aside>
@@ -671,6 +773,19 @@
       {/if}
 
       <section class="content-pane">
+        {#if diffSearchOpen}
+          <DiffSearchBar
+            query={diffSearchQuery}
+            current={activeDiffSearchIndex + 1}
+            total={diffSearchMatches.length}
+            pending={diffSearchPending}
+            focusVersion={diffSearchFocusVersion}
+            onQuery={updateDiffSearchQuery}
+            onNext={() => moveDiffSearch(1)}
+            onPrevious={() => moveDiffSearch(-1)}
+            onClose={closeDiffSearch}
+          />
+        {/if}
         <div class="viewer-scroll">
           {#if workspace.loading}<div class="loading-state">
               <LoaderCircle class="spin" size={20} />Loading changes…
@@ -687,6 +802,8 @@
               fileAiLoading={aiReview.fileLoading}
               fileAiErrors={aiReview.fileErrors}
               findings={aiReview.report?.findings ?? []}
+              searchQuery={diffSearchOpen ? diffSearchQuery.trim() : ""}
+              searchMatch={diffSearchOpen ? activeDiffSearchMatch : undefined}
               onLoad={(path) => workspace.queue(path)}
               onActive={(path) => workspace.setActive(path)}
               onExplainFile={explainFileChange}
@@ -916,6 +1033,7 @@
     font-size: 12px;
   }
   .content-pane {
+    position: relative;
     display: grid;
     grid-template-rows: minmax(0, 1fr);
     min-width: 0;

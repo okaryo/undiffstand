@@ -10,6 +10,7 @@ describe("resolveApplicationShortcut", () => {
     [{ key: "Escape" }, "dismiss-dialogs"],
     [{ key: ",", code: "Comma", metaKey: true }, "open-settings"],
     [{ key: "r", code: "KeyR", metaKey: true }, "refresh-change-detail"],
+    [{ key: "f", code: "KeyF", metaKey: true }, "find-in-changes"],
     [{ key: "b", code: "KeyB", metaKey: true }, "toggle-changed-files"],
     [
       { key: "∫", code: "KeyB", metaKey: true, altKey: true },

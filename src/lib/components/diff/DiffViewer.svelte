@@ -9,6 +9,47 @@
 
   let highlighterPromise: Promise<DiffHighlighter> | undefined;
   const languagePromises = new SvelteMap<string, Promise<void>>();
+  const viewerSearchRanges = new SvelteMap<
+    object,
+    { matches: Range[]; active: Range[] }
+  >();
+
+  function updateGlobalSearchHighlights() {
+    if (
+      typeof CSS === "undefined" ||
+      !("highlights" in CSS) ||
+      typeof Highlight === "undefined"
+    )
+      return;
+    const matches = [...viewerSearchRanges.values()].flatMap(
+      (ranges) => ranges.matches,
+    );
+    const active = [...viewerSearchRanges.values()].flatMap(
+      (ranges) => ranges.active,
+    );
+    CSS.highlights.set(
+      "undiffstand-diff-search-match",
+      new Highlight(...matches),
+    );
+    CSS.highlights.set(
+      "undiffstand-diff-search-active",
+      new Highlight(...active),
+    );
+  }
+
+  function setViewerSearchRanges(
+    id: object,
+    matches: Range[],
+    active: Range[],
+  ) {
+    viewerSearchRanges.set(id, { matches, active });
+    updateGlobalSearchHighlights();
+  }
+
+  function removeViewerSearchRanges(id: object) {
+    viewerSearchRanges.delete(id);
+    updateGlobalSearchHighlights();
+  }
 
   async function loadHighlighter(language: string) {
     highlighterPromise ??= getDiffViewHighlighter();
@@ -30,7 +71,7 @@
 </script>
 
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
   import {
     DiffModeEnum,
     DiffViewWithMultiSelect,
@@ -39,6 +80,7 @@
   import "@git-diff-view/svelte/styles/diff-view-pure.css";
   import { Binary, FileExclamationPoint } from "@lucide/svelte";
   import type { FileDiff } from "$lib/domain/diff";
+  import type { DiffSearchMatch } from "$lib/domain/diff-search";
   import type { ChangeReviewFinding, InlineAnswer } from "$lib/domain/ai";
   import InlineAsk from "$lib/components/ai/InlineAsk.svelte";
   import ReviewFinding from "$lib/components/ai/ReviewFinding.svelte";
@@ -49,12 +91,16 @@
     mode,
     wrap,
     findings = [],
+    searchQuery = "",
+    searchMatch,
     onAskInline,
   }: {
     diff: FileDiff;
     mode: "split" | "unified";
     wrap: boolean;
     findings?: ChangeReviewFinding[];
+    searchQuery?: string;
+    searchMatch?: DiffSearchMatch;
     onAskInline?: (
       side: "old" | "new",
       startLine: number,
@@ -63,6 +109,7 @@
     ) => Promise<InlineAnswer>;
   } = $props();
   let highlighter = $state<DiffHighlighter>();
+  let diffHost = $state<HTMLElement>();
   let widgetState = $state<{ side: SplitSide; lineNumber: number }>();
   let diffInstance:
     | {
@@ -70,6 +117,9 @@
         setPreselectedLines: (lines: { old: number[]; new: number[] }) => void;
       }
     | undefined;
+  const viewerSearchId = {};
+  let searchUpdateVersion = 0;
+  let lastScrolledMatchId: string | undefined;
   const language = $derived(
     (
       (diff.file.newPath ?? diff.file.oldPath ?? "").split(".").at(-1) ?? "txt"
@@ -141,6 +191,136 @@
     diffInstance?.setPreselectedLines({ old: [], new: [] });
   }
 
+  function scheduleSearchHighlightUpdate() {
+    const version = ++searchUpdateVersion;
+    void tick().then(() => {
+      if (version === searchUpdateVersion)
+        updateSearchHighlights(searchQuery, searchMatch);
+    });
+  }
+
+  function updateSearchHighlights(
+    query: string,
+    activeMatch?: DiffSearchMatch,
+  ) {
+    if (!diffHost || !query) {
+      setViewerSearchRanges(viewerSearchId, [], []);
+      return;
+    }
+
+    const normalizedQuery = query.toLowerCase();
+    const matchRanges: Range[] = [];
+    for (const root of diffHost.querySelectorAll<HTMLElement>(
+      ".diff-line-content-raw, .diff-line-syntax-raw",
+    )) {
+      const content = root.textContent ?? "";
+      const normalizedContent = content.toLowerCase();
+      let start = normalizedContent.indexOf(normalizedQuery);
+      while (start !== -1) {
+        const range = createTextRange(root, start, normalizedQuery.length);
+        if (range) matchRanges.push(range);
+        start = normalizedContent.indexOf(
+          normalizedQuery,
+          start + normalizedQuery.length,
+        );
+      }
+    }
+
+    const activeRoot = activeMatch
+      ? findMatchContentRoot(activeMatch)
+      : undefined;
+    const activeRange = activeRoot
+      ? createTextRange(
+          activeRoot,
+          activeMatch?.column ?? 0,
+          activeMatch?.length ?? 0,
+        )
+      : undefined;
+    setViewerSearchRanges(
+      viewerSearchId,
+      matchRanges,
+      activeRange ? [activeRange] : [],
+    );
+
+    if (activeRoot && activeMatch && lastScrolledMatchId !== activeMatch.id) {
+      lastScrolledMatchId = activeMatch.id;
+      activeRoot.scrollIntoView?.({ block: "center", inline: "nearest" });
+    }
+  }
+
+  function findMatchContentRoot(match: DiffSearchMatch) {
+    if (!diffHost) return undefined;
+
+    if (mode === "split") {
+      const side = match.side === "old" ? "old" : "new";
+      const lineNumber = side === "old" ? match.oldLine : match.newLine;
+      const lineNumberElement = diffHost.querySelector(
+        `.diff-line-${side}-num [data-line-num="${lineNumber}"]`,
+      );
+      return lineNumberElement
+        ?.closest(".diff-line")
+        ?.querySelector<HTMLElement>(
+          `.diff-line-${side}-content :is(.diff-line-content-raw, .diff-line-syntax-raw)`,
+        );
+    }
+
+    const side = match.side === "old" ? "old" : "new";
+    const lineNumber = side === "old" ? match.oldLine : match.newLine;
+    const lineNumberElement = diffHost.querySelector(
+      `[data-line-${side}-num="${lineNumber}"]`,
+    );
+    return lineNumberElement
+      ?.closest(".diff-line")
+      ?.querySelector<HTMLElement>(
+        ".diff-line-content :is(.diff-line-content-raw, .diff-line-syntax-raw)",
+      );
+  }
+
+  function createTextRange(root: HTMLElement, start: number, length: number) {
+    if (length <= 0) return undefined;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let offset = 0;
+    let startNode: Text | undefined;
+    let startOffset = 0;
+    let endNode: Text | undefined;
+    let endOffset = 0;
+
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text;
+      const nextOffset = offset + node.data.length;
+      if (!startNode && start < nextOffset) {
+        startNode = node;
+        startOffset = start - offset;
+      }
+      if (start + length <= nextOffset) {
+        endNode = node;
+        endOffset = start + length - offset;
+        break;
+      }
+      offset = nextOffset;
+    }
+
+    if (!startNode || !endNode) return undefined;
+    const range = document.createRange();
+    range.setStart(startNode, startOffset);
+    range.setEnd(endNode, endOffset);
+    return range;
+  }
+
+  $effect(() => {
+    void searchQuery;
+    void searchMatch;
+    void highlighter;
+    void mode;
+    void wrap;
+    scheduleSearchHighlightUpdate();
+  });
+
+  onDestroy(() => {
+    searchUpdateVersion += 1;
+    removeViewerSearchRanges(viewerSearchId);
+  });
+
   onMount(() => {
     let mounted = true;
 
@@ -174,7 +354,7 @@
   {#if diff.truncated}<div class="warning">
       This large diff was truncated for responsive display.
     </div>{/if}
-  <div class="diff-host">
+  <div class="diff-host" bind:this={diffHost}>
     <DiffViewWithMultiSelect
       data={diffData}
       diffViewMode={mode === "split"
