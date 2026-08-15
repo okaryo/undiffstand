@@ -41,6 +41,11 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape" && !event.isComposing && !question.trim()) {
+      event.preventDefault();
+      onClose();
+      return;
+    }
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       void ask();
