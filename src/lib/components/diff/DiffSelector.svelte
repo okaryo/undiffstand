@@ -71,9 +71,7 @@
     disabled={loading}
     onChange={(value) => (target = value)}
   />
-  <button type="submit" disabled={loading || !base || !target}
-    >{loading ? "Applying…" : "Apply"}</button
-  >
+  <button type="submit" disabled={loading || !base || !target}>Apply</button>
 </form>
 
 <style>

@@ -389,6 +389,45 @@ describe("change details auto-refresh", () => {
     );
   });
 
+  it("closes the comparison dialog while the selected changes load", async () => {
+    let finishLoading: (value: DiffSummary) => void = () => {};
+    tauriApi.getDiffSummary
+      .mockResolvedValueOnce(summary)
+      .mockImplementationOnce(
+        () =>
+          new Promise<DiffSummary>((resolve) => {
+            finishLoading = resolve;
+          }),
+      );
+    history.replaceState(null, "", "/?project=alpha");
+    render(Page);
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1),
+    );
+
+    await fireEvent.click(
+      screen.getByRole("button", {
+        name: "Change comparison. Current: feature → working tree",
+      }),
+    );
+    await fireEvent.click(
+      screen.getByRole("button", { name: "Compare main → feature" }),
+    );
+
+    expect(
+      screen.queryByRole("dialog", { name: "Change comparison" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Loading changes…")).toBeInTheDocument();
+
+    finishLoading({
+      ...summary,
+      selection: { base: "main", target: "HEAD" },
+    });
+    await waitFor(() =>
+      expect(screen.queryByText("Loading changes…")).not.toBeInTheDocument(),
+    );
+  });
+
   it("applies quick comparisons using the configured base and current branch", async () => {
     tauriApi.getDiffSummary.mockImplementation(
       async (

@@ -481,9 +481,9 @@
   }
 
   async function applyDiffSelection(selection: DiffSelection) {
+    showComparisonDialog = false;
     resetDiffSearch();
     await workspace.applySelection(selection);
-    showComparisonDialog = false;
   }
 
   async function configureBaseBranch() {
