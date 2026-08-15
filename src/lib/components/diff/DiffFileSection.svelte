@@ -15,6 +15,7 @@
     InlineAnswer,
   } from "$lib/domain/ai";
   import type { DiffFileSummary, FileDiff } from "$lib/domain/diff";
+  import type { DiffSearchMatch } from "$lib/domain/diff-search";
   import DiffFileStatusIcon from "./DiffFileStatusIcon.svelte";
   import DiffViewer from "./DiffViewer.svelte";
 
@@ -34,6 +35,8 @@
     aiLoading = false,
     aiError,
     findings = [],
+    searchQuery = "",
+    searchMatch,
     onToggle,
     onCopy,
     onLoad,
@@ -55,6 +58,8 @@
     aiLoading?: boolean;
     aiError?: string;
     findings?: ChangeReviewFinding[];
+    searchQuery?: string;
+    searchMatch?: DiffSearchMatch;
     onToggle: () => void;
     onCopy: () => void;
     onLoad: () => void;
@@ -124,7 +129,15 @@
 {#if !collapsed}
   <div class="diff-body">
     {#if rendered && diff}
-      <DiffViewer {diff} {mode} {wrap} {findings} {onAskInline} />
+      <DiffViewer
+        {diff}
+        {mode}
+        {wrap}
+        {findings}
+        {searchQuery}
+        {searchMatch}
+        {onAskInline}
+      />
     {:else if error}
       <div class="file-error">
         <span>{error}</span>

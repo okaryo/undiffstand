@@ -6,6 +6,7 @@
     DiffExplanation,
     InlineAnswer,
   } from "$lib/domain/ai";
+  import type { DiffSearchMatch } from "$lib/domain/diff-search";
   import {
     diffAnchorId,
     displayPath,
@@ -26,6 +27,8 @@
     fileAiLoading = {},
     fileAiErrors = {},
     findings = [],
+    searchQuery = "",
+    searchMatch,
     onLoad,
     onActive,
     onExplainFile = () => {},
@@ -42,6 +45,8 @@
     fileAiLoading?: Record<string, boolean | undefined>;
     fileAiErrors?: Record<string, string | undefined>;
     findings?: ChangeReviewFinding[];
+    searchQuery?: string;
+    searchMatch?: DiffSearchMatch;
     onLoad: (path: string) => void;
     onActive: (path: string) => void;
     onExplainFile?: (path: string) => void;
@@ -111,6 +116,14 @@
   $effect(() => {
     const path = activePath;
     if (path) requestFileRender(path, true);
+  });
+
+  $effect(() => {
+    const match = searchMatch;
+    if (!match) return;
+    if (collapsed[match.path]) collapsed[match.path] = false;
+    requestFileRender(match.path, true);
+    if (match.path !== activePath) onActive(match.path);
   });
 
   $effect(() => {
@@ -315,6 +328,8 @@
         aiLoading={fileAiLoading[path]}
         aiError={fileAiErrors[path]}
         findings={findings.filter((finding) => finding.path === path)}
+        {searchQuery}
+        searchMatch={searchMatch?.path === path ? searchMatch : undefined}
         onToggle={() => toggleCollapsed(path)}
         onCopy={() => copyPath(path)}
         onLoad={() => onLoad(path)}

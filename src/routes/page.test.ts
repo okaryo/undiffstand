@@ -855,6 +855,42 @@ describe("change details auto-refresh", () => {
     );
   });
 
+  it("finds diff text with Cmd+F without filtering changed files", async () => {
+    history.replaceState(null, "", "/?project=alpha&file=src%2Fexample.ts");
+    render(Page);
+    await waitFor(() => expect(tauriApi.getFileDiffs).toHaveBeenCalled());
+
+    const shortcut = new KeyboardEvent("keydown", {
+      key: "f",
+      code: "KeyF",
+      metaKey: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(shortcut);
+
+    expect(shortcut.defaultPrevented).toBe(true);
+    const input = await screen.findByRole("searchbox", {
+      name: "Find in changes",
+    });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    await fireEvent.input(input, { target: { value: "ANSWER" } });
+    await waitFor(() => expect(screen.getByText("0 / 2")).toBeInTheDocument());
+    expect(screen.getByText("example.ts")).toBeInTheDocument();
+    expect(screen.getByTitle("2 matches")).toBeInTheDocument();
+
+    await fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+
+    await fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+
+    await fireEvent.keyDown(input, { key: "Escape" });
+    expect(
+      screen.queryByRole("searchbox", { name: "Find in changes" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("leaves Cmd+R to the browser from the project list", async () => {
     render(Page);
     await waitFor(() => expect(tauriApi.listProjects).toHaveBeenCalledOnce());

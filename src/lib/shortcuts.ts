@@ -1,6 +1,7 @@
 export type ApplicationShortcut =
   | "dismiss-dialogs"
   | "open-settings"
+  | "find-in-changes"
   | "refresh-change-detail"
   | "toggle-changed-files"
   | "toggle-ai-panel";
@@ -17,6 +18,9 @@ export function resolveApplicationShortcut(
   }
   if (matchesKey(event, "KeyR", "r")) {
     return event.altKey ? undefined : "refresh-change-detail";
+  }
+  if (matchesKey(event, "KeyF", "f")) {
+    return event.altKey ? undefined : "find-in-changes";
   }
   if (matchesKey(event, "KeyB", "b")) {
     return event.altKey ? "toggle-ai-panel" : "toggle-changed-files";

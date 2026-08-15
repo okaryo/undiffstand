@@ -16,10 +16,12 @@
   let {
     files,
     selectedPath,
+    matchCounts = {},
     onSelect,
   }: {
     files: DiffFileSummary[];
     selectedPath?: string;
+    matchCounts?: Record<string, number | undefined>;
     onSelect: (path: string) => void;
   } = $props();
 
@@ -174,6 +176,11 @@
       >
         <DiffFileStatusIcon status={row.file.status} />
         <strong>{row.name}</strong>
+        {#if matchCounts[row.path]}
+          <span class="match-count" title={`${matchCounts[row.path]} matches`}
+            >{matchCounts[row.path]}</span
+          >
+        {/if}
       </button>
     {/if}
   {/each}
@@ -243,12 +250,22 @@
     white-space: nowrap;
   }
   .file-row {
-    grid-template-columns: 14px minmax(0, 1fr);
+    grid-template-columns: 14px minmax(0, 1fr) auto;
     gap: 7px;
     padding-left: calc(16px + var(--depth) * 13px);
   }
   .file-row.active {
     color: var(--text);
     background: rgba(87, 184, 142, 0.11);
+  }
+  .match-count {
+    min-width: 17px;
+    padding: 1px 5px;
+    color: #d5b76a;
+    text-align: center;
+    background: rgba(218, 177, 62, 0.12);
+    border-radius: 8px;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
   }
 </style>
