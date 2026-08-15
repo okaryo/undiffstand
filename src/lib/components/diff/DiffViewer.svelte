@@ -11,8 +11,9 @@
   const languagePromises = new SvelteMap<string, Promise<void>>();
   const viewerSearchRanges = new SvelteMap<
     object,
-    { matches: Range[]; active: Range[] }
+    { query: string; matches: Range[]; active: Range[] }
   >();
+  let currentSearchHighlightQuery = "";
 
   function updateGlobalSearchHighlights() {
     if (
@@ -21,28 +22,33 @@
       typeof Highlight === "undefined"
     )
       return;
-    const matches = [...viewerSearchRanges.values()].flatMap(
-      (ranges) => ranges.matches,
+    const currentRanges = [...viewerSearchRanges.values()].filter(
+      (ranges) => ranges.query === currentSearchHighlightQuery,
     );
-    const active = [...viewerSearchRanges.values()].flatMap(
-      (ranges) => ranges.active,
-    );
-    CSS.highlights.set(
+    replaceSearchHighlight(
       "undiffstand-diff-search-match",
-      new Highlight(...matches),
+      currentRanges.flatMap((ranges) => ranges.matches),
     );
-    CSS.highlights.set(
+    replaceSearchHighlight(
       "undiffstand-diff-search-active",
-      new Highlight(...active),
+      currentRanges.flatMap((ranges) => ranges.active),
     );
+  }
+
+  function replaceSearchHighlight(name: string, ranges: Range[]) {
+    CSS.highlights.get(name)?.clear();
+    CSS.highlights.delete(name);
+    if (ranges.length > 0) CSS.highlights.set(name, new Highlight(...ranges));
   }
 
   function setViewerSearchRanges(
     id: object,
+    query: string,
     matches: Range[],
     active: Range[],
   ) {
-    viewerSearchRanges.set(id, { matches, active });
+    currentSearchHighlightQuery = query;
+    viewerSearchRanges.set(id, { query, matches, active });
     updateGlobalSearchHighlights();
   }
 
@@ -204,7 +210,7 @@
     activeMatch?: DiffSearchMatch,
   ) {
     if (!diffHost || !query) {
-      setViewerSearchRanges(viewerSearchId, [], []);
+      setViewerSearchRanges(viewerSearchId, query, [], []);
       return;
     }
 
@@ -238,6 +244,7 @@
       : undefined;
     setViewerSearchRanges(
       viewerSearchId,
+      query,
       matchRanges,
       activeRange ? [activeRange] : [],
     );

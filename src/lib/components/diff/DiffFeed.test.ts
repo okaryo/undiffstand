@@ -61,6 +61,17 @@ function createDiff(file: DiffFileSummary): FileDiff {
   };
 }
 
+function createBooleanDiff(file: DiffFileSummary): FileDiff {
+  return {
+    file,
+    oldContent: "const truth = false;\n",
+    newContent: "const truth = true;\n",
+    hunks: ["@@ -1 +1 @@\n-const truth = false;\n+const truth = true;\n"],
+    unifiedDiff: `diff --git a/${file.oldPath} b/${file.newPath}\n--- a/${file.oldPath}\n+++ b/${file.newPath}\n@@ -1 +1 @@\n-const truth = false;\n+const truth = true;\n`,
+    truncated: false,
+  };
+}
+
 describe("DiffFeed deferred rendering", () => {
   const originalGetContext = HTMLCanvasElement.prototype.getContext;
 
@@ -191,6 +202,51 @@ describe("DiffFeed deferred rendering", () => {
     expect(
       container.querySelector(`[data-diff-path="${ninthPath}"] .diff-host`),
     ).toBeInTheDocument();
+    unmount();
+  });
+
+  it("removes prefix highlights as the search query changes", async () => {
+    class HighlightMock extends Set<AbstractRange> {
+      constructor(...ranges: AbstractRange[]) {
+        super(ranges);
+      }
+    }
+    const highlights = new Map<string, HighlightMock>();
+    vi.stubGlobal("Highlight", HighlightMock);
+    vi.stubGlobal("CSS", { highlights });
+    const files = createFiles(2);
+    const diffs = Object.fromEntries(
+      files.map((file) => [file.newPath as string, createBooleanDiff(file)]),
+    );
+    const props = {
+      files,
+      diffs,
+      loadingPaths: {},
+      errors: {},
+      mode: "split" as const,
+      wrap: false,
+      searchQuery: "t",
+      onLoad: vi.fn(),
+      onActive: vi.fn(),
+    };
+    const { rerender, unmount } = render(DiffFeed, { props });
+
+    await vi.advanceTimersByTimeAsync(64);
+    await tick();
+    const prefixHighlights = highlights.get("undiffstand-diff-search-match");
+    expect(
+      [...(prefixHighlights ?? [])].some((range) => range.toString() === "t"),
+    ).toBe(true);
+    await rerender({ ...props, searchQuery: "tr" });
+    await rerender({ ...props, searchQuery: "true" });
+    await tick();
+
+    expect(prefixHighlights?.size).toBe(0);
+    const renderedHighlights = highlights.get("undiffstand-diff-search-match");
+    expect(renderedHighlights).toBeDefined();
+    expect(
+      [...(renderedHighlights ?? [])].map((range) => range.toString()),
+    ).toEqual(["true", "true"]);
     unmount();
   });
 });
