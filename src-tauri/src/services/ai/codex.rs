@@ -10,10 +10,15 @@ use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use std::{
+    env,
+    ffi::OsStr,
     io::Write,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 const MAX_AI_INPUT_CHARS: usize = 180_000;
 const MAX_ERROR_DETAIL_CHARS: usize = 2_000;
@@ -53,7 +58,7 @@ impl CodexProvider {
             serde_json::to_writer(schema_file.as_file_mut(), &schema).map_err(AppError::unknown)?;
             schema_file.as_file_mut().flush().map_err(AppError::unknown)?;
 
-            let mut command = Command::new("codex");
+            let mut command = codex_command()?;
             command.current_dir(repository.as_deref().unwrap_or(analysis_dir.path()));
             command.args(["exec", "--ephemeral"]);
             if repository.is_none() {
@@ -142,7 +147,7 @@ impl CodexProvider {
         let native_repository = repository.clone();
         let native_target = target.clone();
         let native_review = tauri::async_runtime::spawn_blocking(move || {
-            let mut command = Command::new("codex");
+            let mut command = codex_command()?;
             command
                 .current_dir(&native_repository)
                 .args(native_review_args(&native_target));
@@ -200,12 +205,84 @@ fn native_review_args(target: &ChangeReviewTarget) -> Vec<String> {
     args
 }
 
+fn codex_command() -> AppResult<Command> {
+    resolve_codex_path().map(Command::new)
+}
+
+fn resolve_codex_path() -> AppResult<PathBuf> {
+    let path = env::var_os("PATH");
+    resolve_codex_path_from(path.as_deref(), standard_codex_paths()).ok_or_else(codex_not_found)
+}
+
+fn resolve_codex_path_from(
+    path: Option<&OsStr>,
+    fallback_paths: impl IntoIterator<Item = PathBuf>,
+) -> Option<PathBuf> {
+    path.into_iter()
+        .flat_map(env::split_paths)
+        .map(|directory| directory.join(codex_executable_name()))
+        .chain(fallback_paths)
+        .find(|candidate| is_executable_file(candidate))
+}
+
+fn standard_codex_paths() -> Vec<PathBuf> {
+    #[cfg(unix)]
+    return standard_codex_paths_unix();
+
+    #[cfg(not(unix))]
+    Vec::new()
+}
+
+#[cfg(unix)]
+fn standard_codex_paths_unix() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+
+    #[cfg(target_os = "macos")]
+    paths.extend([
+        PathBuf::from("/opt/homebrew/bin/codex"),
+        PathBuf::from("/usr/local/bin/codex"),
+    ]);
+
+    if let Some(home) = env::var_os("HOME") {
+        paths.push(PathBuf::from(home).join(".local/bin/codex"));
+    }
+
+    paths
+}
+
+fn codex_executable_name() -> &'static str {
+    if cfg!(windows) {
+        "codex.exe"
+    } else {
+        "codex"
+    }
+}
+
+fn is_executable_file(path: &Path) -> bool {
+    let Ok(metadata) = path.metadata() else {
+        return false;
+    };
+    if !metadata.is_file() {
+        return false;
+    }
+
+    #[cfg(unix)]
+    return metadata.permissions().mode() & 0o111 != 0;
+
+    #[cfg(not(unix))]
+    true
+}
+
+fn codex_not_found() -> AppError {
+    AppError::new(
+        "CODEX_NOT_FOUND",
+        "Codex CLI is not installed or is not available on PATH.",
+    )
+}
+
 fn codex_start_error(error: std::io::Error) -> AppError {
     if error.kind() == std::io::ErrorKind::NotFound {
-        AppError::new(
-            "CODEX_NOT_FOUND",
-            "Codex CLI is not installed or is not available on PATH.",
-        )
+        codex_not_found()
     } else {
         AppError::new("CODEX_EXEC_FAILED", "Codex CLI could not be started.")
             .with_detail(error.to_string())
@@ -372,6 +449,21 @@ impl AiProvider for CodexProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
+
+    fn executable_at(directory: &Path) -> PathBuf {
+        let path = directory.join(codex_executable_name());
+        std::fs::write(&path, []).unwrap();
+
+        #[cfg(unix)]
+        {
+            let mut permissions = std::fs::metadata(&path).unwrap().permissions();
+            permissions.set_mode(0o755);
+            std::fs::set_permissions(&path, permissions).unwrap();
+        }
+
+        path
+    }
 
     #[test]
     fn tail_limits_unicode_by_character() {
@@ -409,6 +501,33 @@ mod tests {
                 "--base",
                 "main"
             ]
+        );
+    }
+
+    #[test]
+    fn codex_resolution_prefers_the_current_path() {
+        let path_directory = TempDir::new().unwrap();
+        let fallback_directory = TempDir::new().unwrap();
+        let path_executable = executable_at(path_directory.path());
+        let fallback_executable = executable_at(fallback_directory.path());
+        let path = env::join_paths([path_directory.path()]).unwrap();
+
+        assert_eq!(
+            resolve_codex_path_from(Some(&path), [fallback_executable]),
+            Some(path_executable)
+        );
+    }
+
+    #[test]
+    fn codex_resolution_uses_a_fallback_when_path_has_no_codex() {
+        let path_directory = TempDir::new().unwrap();
+        let fallback_directory = TempDir::new().unwrap();
+        let fallback_executable = executable_at(fallback_directory.path());
+        let path = env::join_paths([path_directory.path()]).unwrap();
+
+        assert_eq!(
+            resolve_codex_path_from(Some(&path), [fallback_executable.clone()]),
+            Some(fallback_executable)
         );
     }
 }

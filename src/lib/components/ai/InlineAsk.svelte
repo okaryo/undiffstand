@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { Bot, LoaderCircle, Send, X } from "@lucide/svelte";
   import type { InlineAnswer } from "$lib/domain/ai";
   import { normalizeError } from "$lib/domain/error";
@@ -21,6 +22,9 @@
   let answer = $state<InlineAnswer>();
   let loading = $state(false);
   let error = $state<string>();
+  let questionInput = $state<HTMLTextAreaElement>();
+
+  onMount(() => questionInput?.focus());
 
   async function ask() {
     const value = question.trim();
@@ -37,6 +41,11 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape" && !event.isComposing && !question.trim()) {
+      event.preventDefault();
+      onClose();
+      return;
+    }
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       void ask();
@@ -62,6 +71,7 @@
     </div>
   {:else}
     <textarea
+      bind:this={questionInput}
       bind:value={question}
       onkeydown={handleKeydown}
       placeholder="Ask Codex about these changed lines…"
