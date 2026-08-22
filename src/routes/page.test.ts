@@ -610,6 +610,66 @@ describe("change details auto-refresh", () => {
     );
   });
 
+  it("changes comparison during loading and ignores the stale response", async () => {
+    let finishInitial: (value: DiffSummary) => void = () => {};
+    let finishComparison: (value: DiffSummary) => void = () => {};
+    tauriApi.getDiffSummary
+      .mockImplementationOnce(
+        () =>
+          new Promise<DiffSummary>((resolve) => {
+            finishInitial = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<DiffSummary>((resolve) => {
+            finishComparison = resolve;
+          }),
+      );
+    history.replaceState(null, "", "/?project=alpha");
+    render(Page);
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1),
+    );
+
+    await fireEvent.click(
+      screen.getByRole("button", {
+        name: "Change comparison. Current: feature → working tree",
+      }),
+    );
+    const compare = screen.getByRole("button", {
+      name: "Compare main → feature",
+    });
+    expect(compare).toBeEnabled();
+    await fireEvent.click(compare);
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(2),
+    );
+
+    finishInitial(summary);
+    await Promise.resolve();
+    expect(screen.getByText("Loading changes…")).toBeInTheDocument();
+
+    finishComparison({
+      ...summary,
+      selection: { base: "main", target: "HEAD" },
+      comparison: {
+        ...summary.comparison,
+        fromLabel: "main",
+        toLabel: "HEAD",
+        toSha: summary.comparison.fromSha,
+      },
+    });
+    await waitFor(() =>
+      expect(screen.queryByText("Loading changes…")).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "Change comparison. Current: main → feature",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("applies quick comparisons using the configured base and current branch", async () => {
     tauriApi.getDiffSummary.mockImplementation(
       async (

@@ -69,6 +69,8 @@
   let loading = $state(true);
   let saving = $state(false);
   let deleting = $state(false);
+  let comparisonGeneration = 0;
+  let comparisonSaveQueue: Promise<void> = Promise.resolve();
   let error = $state<AppError | null>(null);
   let workspaceError = $state<AppError | null>(null);
   let updateState = $state<UpdateState>("unavailable");
@@ -535,18 +537,35 @@
     showComparisonDialog = false;
     resetDiffSearch();
     if (!activeProject) return;
+    const projectId = activeProject.id;
+    const generation = ++comparisonGeneration;
+    const save = comparisonSaveQueue.then(() =>
+      tauriApi.saveProjectComparison(projectId, selection),
+    );
+    comparisonSaveQueue = save.then(
+      () => undefined,
+      () => undefined,
+    );
     try {
-      const updatedProject = await tauriApi.saveProjectComparison(
-        activeProject.id,
-        selection,
-      );
+      const [updatedProject] = await Promise.all([
+        save,
+        workspace.applySelection(selection),
+      ]);
+      if (
+        generation !== comparisonGeneration ||
+        activeProject?.id !== projectId
+      )
+        return;
       activeProject = updatedProject;
       projects = projects.map((project) =>
         project.id === updatedProject.id ? updatedProject : project,
       );
-      await workspace.applySelection(selection);
     } catch (caught) {
-      workspaceError = normalizeError(caught);
+      if (
+        generation === comparisonGeneration &&
+        activeProject?.id === projectId
+      )
+        workspaceError = normalizeError(caught);
     }
   }
 
@@ -568,7 +587,7 @@
         event.preventDefault();
       showProjectDialog = false;
       showSettings = false;
-      if (!workspace.loading) showComparisonDialog = false;
+      showComparisonDialog = false;
     } else if (shortcut === "open-settings") {
       event.preventDefault();
       showSettings = true;
@@ -941,7 +960,6 @@
     selection={workspace.selection}
     repository={activeRepository}
     {activeBaseRef}
-    loading={workspace.loading}
     {baseToCurrentIsActive}
     {currentToWorkingTreeIsActive}
     onApply={applyDiffSelection}
