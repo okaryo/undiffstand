@@ -383,11 +383,59 @@
 
     lastAutoRefreshAt = now;
     autoRefreshInProgress = true;
-    void workspace
-      .load(workspace.selectedPath, { silent: true })
-      .finally(() => {
-        autoRefreshInProgress = false;
-      });
+    const project = activeProject;
+    const repository = activeRepository;
+    void refreshActiveWorkspace(project, repository).finally(() => {
+      autoRefreshInProgress = false;
+    });
+  }
+
+  async function refreshActiveWorkspace(
+    project: ProjectConfig,
+    previousRepository: RepositoryInfo | undefined,
+  ) {
+    try {
+      const refreshedRepository = await tauriApi.validateRepository(
+        project.repoPath,
+      );
+      if (activeProject?.id !== project.id) return;
+
+      const selectionHasDeletedBranch = hasDeletedSelectedBranch(
+        workspace.selection,
+        previousRepository,
+        refreshedRepository,
+      );
+      activeRepository = refreshedRepository;
+
+      if (selectionHasDeletedBranch)
+        await workspace.applySelection(defaultDiffSelection());
+      else await workspace.load(workspace.selectedPath, { silent: true });
+    } catch (caught) {
+      if (activeProject?.id === project.id)
+        workspaceError = normalizeError(caught);
+    }
+  }
+
+  function hasDeletedSelectedBranch(
+    selection: DiffSelection,
+    previousRepository: RepositoryInfo | undefined,
+    refreshedRepository: RepositoryInfo,
+  ) {
+    if (!previousRepository) return false;
+
+    const previousBranches = new Set([
+      ...previousRepository.localBranches,
+      ...previousRepository.remoteBranches,
+    ]);
+    const refreshedBranches = new Set([
+      ...refreshedRepository.localBranches,
+      ...refreshedRepository.remoteBranches,
+    ]);
+
+    return [selection.base, selection.target].some(
+      (revision) =>
+        previousBranches.has(revision) && !refreshedBranches.has(revision),
+    );
   }
 
   async function addRepository() {

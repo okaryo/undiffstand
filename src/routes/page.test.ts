@@ -177,11 +177,87 @@ describe("change details auto-refresh", () => {
       expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(2),
     );
     await waitFor(() => expect(tauriApi.getFileDiffs).toHaveBeenCalledTimes(2));
+    expect(tauriApi.validateRepository).toHaveBeenCalledTimes(2);
 
     expect(new URLSearchParams(location.search).get("file")).toBe(
       "src/example.ts",
     );
     expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("returns to the default comparison when a selected branch was deleted", async () => {
+    tauriApi.getDiffSummary.mockImplementation(
+      async (
+        _projectId: string,
+        selection: { base: string; target: string },
+      ) => ({
+        ...summary,
+        selection,
+        comparison: {
+          fromLabel: selection.base,
+          toLabel: selection.target === "." ? "working tree" : selection.target,
+          fromSha: summary.comparison.fromSha,
+          toSha:
+            selection.target === "." ? undefined : summary.comparison.fromSha,
+        },
+      }),
+    );
+    tauriApi.validateRepository
+      .mockResolvedValueOnce({
+        repoPath: project.repoPath,
+        suggestedName: project.name,
+        detectedBaseRef: "main",
+        currentBranch: "feature",
+        recentBranches: ["main"],
+        localBranches: ["feature", "main"],
+        remoteBranches: ["origin/main"],
+        recentCommits: [],
+      })
+      .mockResolvedValueOnce({
+        repoPath: project.repoPath,
+        suggestedName: project.name,
+        detectedBaseRef: null,
+        currentBranch: "feature",
+        recentBranches: [],
+        localBranches: ["feature"],
+        remoteBranches: ["origin/main"],
+        recentCommits: [],
+      });
+    history.replaceState(null, "", "/?project=alpha&base=main&target=HEAD");
+    render(Page);
+
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenLastCalledWith("alpha", {
+        base: "main",
+        target: "HEAD",
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText("Loading changes…")).not.toBeInTheDocument(),
+    );
+
+    await fireEvent.focus(window);
+
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenLastCalledWith("alpha", {
+        base: "HEAD",
+        target: ".",
+      }),
+    );
+    expect(new URLSearchParams(location.search).has("base")).toBe(false);
+    expect(new URLSearchParams(location.search).has("target")).toBe(false);
+    expect(
+      screen.getByRole("button", {
+        name: "Change comparison. Current: feature → working tree",
+      }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(tauriApi.getFileDiffs).toHaveBeenLastCalledWith(
+        "alpha",
+        { base: "HEAD", target: "." },
+        ["src/example.ts"],
+      ),
+    );
   });
 
   it("does not reload from the project list", async () => {
