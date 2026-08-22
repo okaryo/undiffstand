@@ -253,6 +253,7 @@
     grid-template-columns: 14px minmax(0, 1fr) auto;
     gap: 7px;
     padding-left: calc(16px + var(--depth) * 13px);
+    color: #c8d1dc;
   }
   .file-row.active {
     color: var(--text);
