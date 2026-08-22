@@ -351,7 +351,7 @@
     title="Binary file changed"
     message="Text diff is unavailable for this file."
   />
-{:else if diff.hunks.length === 0}
+{:else if !/^@@ /m.test(diff.unifiedDiff)}
   <EmptyState
     icon={FileExclamationPoint}
     title="No text hunks"

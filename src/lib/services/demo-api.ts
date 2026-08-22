@@ -110,9 +110,6 @@ function diffFor(path: string): FileDiff {
     return {
       file: summary.files[1],
       newContent: content,
-      hunks: [
-        `@@ -0,0 +1,8 @@\n+export async function buildContext(diff: string) {\n+  const lines = diff.split('\\n');\n+  return {\n+    summary: \`Reviewing \${lines.length} diff lines\`,\n+    references: lines.filter((line) => line.startsWith('+'))\n+  };\n+}\n+`,
-      ],
       unifiedDiff: `diff --git a/${path} b/${path}\nnew file mode 100644\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,8 @@\n+export async function buildContext(diff: string) {\n+  const lines = diff.split('\\n');\n+  return {\n+    summary: \`Reviewing \${lines.length} diff lines\`,\n+    references: lines.filter((line) => line.startsWith('+'))\n+  };\n+}\n+`,
       truncated: false,
     };
@@ -126,9 +123,6 @@ function diffFor(path: string): FileDiff {
     file: summary.files[0],
     oldContent,
     newContent,
-    hunks: [
-      `@@ -1,3 +1,12 @@\n+import { buildContext } from '../lib/context';\n+\n+export type Review = {\n+  summary: string;\n+  evidence: string[];\n+};\n+\n export async function review(diff: string) {\n-  return summarize(diff);\n+  const context = await buildContext(diff);\n+  return { summary: context.summary, evidence: context.references };\n }\n`,
-    ],
     unifiedDiff: `diff --git a/src/services/review.ts b/src/services/review.ts\n--- a/src/services/review.ts\n+++ b/src/services/review.ts\n@@ -1,3 +1,12 @@\n+import { buildContext } from '../lib/context';\n+\n+export type Review = {\n+  summary: string;\n+  evidence: string[];\n+};\n+\n export async function review(diff: string) {\n-  return summarize(diff);\n+  const context = await buildContext(diff);\n+  return { summary: context.summary, evidence: context.references };\n }\n`,
     truncated: false,
   };

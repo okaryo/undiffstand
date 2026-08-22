@@ -89,7 +89,6 @@ const fileDiff: FileDiff = {
   file: summary.files[0],
   oldContent: "const answer = 41;\n",
   newContent: "const answer = 42;\n",
-  hunks: ["@@ -1 +1 @@\n-const answer = 41;\n+const answer = 42;\n"],
   unifiedDiff:
     "diff --git a/src/example.ts b/src/example.ts\n--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1 +1 @@\n-const answer = 41;\n+const answer = 42;\n",
   truncated: false,

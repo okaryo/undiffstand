@@ -244,7 +244,6 @@ pub struct FileDiff {
     pub old_content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_content: Option<String>,
-    pub hunks: Vec<String>,
     pub unified_diff: String,
     pub truncated: bool,
 }

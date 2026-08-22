@@ -55,7 +55,6 @@ function createDiff(file: DiffFileSummary): FileDiff {
     file,
     oldContent: "const value = 1;\n",
     newContent: "const value = 2;\n",
-    hunks: ["@@ -1 +1 @@\n-const value = 1;\n+const value = 2;\n"],
     unifiedDiff: `diff --git a/${file.oldPath} b/${file.newPath}\n--- a/${file.oldPath}\n+++ b/${file.newPath}\n@@ -1 +1 @@\n-const value = 1;\n+const value = 2;\n`,
     truncated: false,
   };
@@ -66,7 +65,6 @@ function createBooleanDiff(file: DiffFileSummary): FileDiff {
     file,
     oldContent: "const truth = false;\n",
     newContent: "const truth = true;\n",
-    hunks: ["@@ -1 +1 @@\n-const truth = false;\n+const truth = true;\n"],
     unifiedDiff: `diff --git a/${file.oldPath} b/${file.newPath}\n--- a/${file.oldPath}\n+++ b/${file.newPath}\n@@ -1 +1 @@\n-const truth = false;\n+const truth = true;\n`,
     truncated: false,
   };
