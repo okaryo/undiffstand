@@ -7,6 +7,8 @@ pub struct ProjectConfig {
     pub name: String,
     pub repo_path: String,
     pub base_ref: String,
+    #[serde(default)]
+    pub comparison: DiffSelection,
     pub last_opened_at: String,
 }
 
@@ -363,6 +365,20 @@ mod tests {
 
         assert_eq!(config.schema_version, 1);
         assert_eq!(config.preferences, UserPreferences::default());
+    }
+
+    #[test]
+    fn project_without_comparison_uses_default_diff_selection() {
+        let project: ProjectConfig = serde_json::from_value(json!({
+            "id": "alpha",
+            "name": "Alpha",
+            "repoPath": "/repos/alpha",
+            "baseRef": "main",
+            "lastOpenedAt": "2026-08-08T10:00:00Z"
+        }))
+        .expect("legacy project should deserialize");
+
+        assert_eq!(project.comparison, DiffSelection::default());
     }
 
     #[test]

@@ -1,8 +1,11 @@
+import type { DiffSelection } from "$lib/domain/diff";
+
 export type ProjectConfig = {
   id: string;
   name: string;
   repoPath: string;
   baseRef: string;
+  comparison: DiffSelection;
   lastOpenedAt: string;
 };
 

@@ -13,6 +13,7 @@ import Page from "./+page.svelte";
 const tauriApi = vi.hoisted(() => ({
   listProjects: vi.fn(),
   touchProject: vi.fn(),
+  saveProjectComparison: vi.fn(),
   getDiffSummary: vi.fn(),
   getFileDiffs: vi.fn(),
   validateRepository: vi.fn(),
@@ -47,6 +48,7 @@ const project: ProjectConfig = {
   name: "Alpha",
   repoPath: "/repos/alpha",
   baseRef: "main",
+  comparison: { base: "HEAD", target: "." },
   lastOpenedAt: "2026-08-08T10:00:00Z",
 };
 
@@ -100,7 +102,16 @@ describe("change details auto-refresh", () => {
     })) as unknown as typeof HTMLCanvasElement.prototype.getContext;
     history.replaceState(null, "", "/");
     tauriApi.listProjects.mockResolvedValue([project]);
-    tauriApi.touchProject.mockResolvedValue(project);
+    tauriApi.touchProject.mockImplementation(async (_projectId, selection) => ({
+      ...project,
+      comparison: selection ?? project.comparison,
+    }));
+    tauriApi.saveProjectComparison.mockImplementation(
+      async (_projectId, selection) => ({
+        ...project,
+        comparison: selection,
+      }),
+    );
     tauriApi.validateRepository.mockResolvedValue({
       repoPath: project.repoPath,
       suggestedName: project.name,
@@ -244,8 +255,14 @@ describe("change details auto-refresh", () => {
         target: ".",
       }),
     );
-    expect(new URLSearchParams(location.search).has("base")).toBe(false);
-    expect(new URLSearchParams(location.search).has("target")).toBe(false);
+    await waitFor(() => {
+      expect(new URLSearchParams(location.search).has("base")).toBe(false);
+      expect(new URLSearchParams(location.search).has("target")).toBe(false);
+    });
+    expect(tauriApi.saveProjectComparison).toHaveBeenCalledWith("alpha", {
+      base: "HEAD",
+      target: ".",
+    });
     expect(
       screen.getByRole("button", {
         name: "Change comparison. Current: feature → working tree",
@@ -267,6 +284,75 @@ describe("change details auto-refresh", () => {
     await fireEvent.focus(window);
 
     expect(tauriApi.getDiffSummary).not.toHaveBeenCalled();
+  });
+
+  it("shows each project's saved comparison on the project list", async () => {
+    tauriApi.listProjects.mockResolvedValue([
+      {
+        ...project,
+        comparison: { base: "main", target: "feature" },
+      },
+    ]);
+
+    render(Page);
+
+    expect(await screen.findByText("main → feature")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Current branch → working tree"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("restores the project's saved comparison when it is opened", async () => {
+    const savedProject = {
+      ...project,
+      comparison: { base: "main", target: "feature" },
+    };
+    tauriApi.listProjects.mockResolvedValue([savedProject]);
+    tauriApi.touchProject.mockResolvedValue(savedProject);
+    history.replaceState(null, "", "/?project=alpha");
+
+    render(Page);
+
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenCalledWith("alpha", {
+        base: "main",
+        target: "feature",
+      }),
+    );
+    await waitFor(() =>
+      expect(tauriApi.getFileDiffs).toHaveBeenCalledWith(
+        "alpha",
+        { base: "main", target: "feature" },
+        ["src/example.ts"],
+      ),
+    );
+  });
+
+  it("uses the fallback comparison returned when a saved ref no longer exists", async () => {
+    tauriApi.listProjects.mockResolvedValue([
+      {
+        ...project,
+        comparison: { base: "deleted-branch", target: "HEAD" },
+      },
+    ]);
+    tauriApi.touchProject.mockResolvedValue(project);
+    history.replaceState(null, "", "/?project=alpha");
+
+    render(Page);
+
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenCalledWith("alpha", {
+        base: "HEAD",
+        target: ".",
+      }),
+    );
+    await waitFor(() =>
+      expect(tauriApi.getFileDiffs).toHaveBeenCalledWith(
+        "alpha",
+        { base: "HEAD", target: "." },
+        ["src/example.ts"],
+      ),
+    );
   });
 
   it("keeps the rendered diff visible while an automatic refresh is pending", async () => {
@@ -456,6 +542,10 @@ describe("change details auto-refresh", () => {
         target: "feature",
       }),
     );
+    expect(tauriApi.saveProjectComparison).toHaveBeenCalledWith("alpha", {
+      base: "main",
+      target: "feature",
+    });
     expect(new URLSearchParams(location.search).get("base")).toBe("main");
     expect(new URLSearchParams(location.search).get("target")).toBe("feature");
     await waitFor(() =>

@@ -101,6 +101,10 @@ fn resolve_diff(repo: &Path, selection: &DiffSelection) -> AppResult<ResolvedDif
     }
 }
 
+pub fn validate_diff_selection(repo: &Path, selection: &DiffSelection) -> AppResult<()> {
+    resolve_diff(repo, selection).map(|_| ())
+}
+
 pub fn change_review_availability(
     repo: &Path,
     selection: &DiffSelection,
@@ -617,6 +621,29 @@ mod tests {
         assert!(summary.files.is_empty());
         assert_eq!(summary.comparison.from_label, "HEAD");
         assert_eq!(summary.comparison.to_label, "working tree");
+    }
+
+    #[test]
+    fn diff_selection_validation_rejects_a_deleted_ref() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        git(repo, &["init", "-b", "main"]);
+        git(repo, &["config", "user.email", "test@example.com"]);
+        git(repo, &["config", "user.name", "undiffstand test"]);
+        fs::write(repo.join("base.txt"), "base\n").unwrap();
+        git(repo, &["add", "base.txt"]);
+        git(repo, &["commit", "-m", "base"]);
+
+        let error = validate_diff_selection(
+            repo,
+            &DiffSelection {
+                base: "deleted-branch".to_owned(),
+                target: "HEAD".to_owned(),
+            },
+        )
+        .expect_err("a deleted ref should be rejected");
+
+        assert_eq!(error.code, "INVALID_DIFF_TARGET");
     }
 
     #[test]

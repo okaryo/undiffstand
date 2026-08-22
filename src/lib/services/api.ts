@@ -18,7 +18,14 @@ export interface AppApi {
   validateRepository(path: string): Promise<RepositoryInfo>;
   listProjects(): Promise<ProjectConfig[]>;
   saveProject(input: SaveProjectInput): Promise<ProjectConfig>;
-  touchProject(projectId: string): Promise<ProjectConfig>;
+  touchProject(
+    projectId: string,
+    selection?: DiffSelection,
+  ): Promise<ProjectConfig>;
+  saveProjectComparison(
+    projectId: string,
+    selection: DiffSelection,
+  ): Promise<ProjectConfig>;
   removeProject(projectId: string): Promise<void>;
   getUserPreferences(): Promise<UserPreferences>;
   saveUserPreferences(preferences: UserPreferences): Promise<UserPreferences>;

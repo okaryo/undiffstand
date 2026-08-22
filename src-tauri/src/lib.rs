@@ -16,6 +16,7 @@ pub fn run() {
             commands::project::list_projects,
             commands::project::save_project,
             commands::project::touch_project,
+            commands::project::save_project_comparison,
             commands::project::remove_project,
             commands::preferences::get_user_preferences,
             commands::preferences::save_user_preferences,

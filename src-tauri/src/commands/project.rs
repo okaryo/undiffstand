@@ -1,5 +1,5 @@
 use crate::{
-    domain::{ProjectConfig, RepositoryInfo, SaveProjectInput},
+    domain::{DiffSelection, ProjectConfig, RepositoryInfo, SaveProjectInput},
     error::{AppError, AppResult},
     services::{config_service, git_service},
 };
@@ -36,11 +36,18 @@ pub fn save_project<R: Runtime>(
     }
     let mut config = config_service::load(&app)?;
     let id = input.id.unwrap_or_else(|| Uuid::new_v4().to_string());
+    let comparison = config
+        .projects
+        .iter()
+        .find(|project| project.id == id)
+        .map(|project| project.comparison.clone())
+        .unwrap_or_default();
     let project = ProjectConfig {
         id: id.clone(),
         name: name.to_owned(),
         repo_path: repo.to_string_lossy().into_owned(),
         base_ref: input.base_ref.trim().to_owned(),
+        comparison,
         last_opened_at: Utc::now().to_rfc3339(),
     };
     if let Some(index) = config.projects.iter().position(|item| item.id == id) {
@@ -57,6 +64,7 @@ pub fn save_project<R: Runtime>(
 pub fn touch_project<R: Runtime>(
     app: AppHandle<R>,
     project_id: String,
+    selection: Option<DiffSelection>,
 ) -> AppResult<ProjectConfig> {
     let mut config = config_service::load(&app)?;
     let project = config
@@ -69,9 +77,45 @@ pub fn touch_project<R: Runtime>(
                 "The selected project no longer exists.",
             )
         })?;
+    let requested_selection = selection.unwrap_or_else(|| project.comparison.clone());
+    let repo = git_service::canonical_repository(Path::new(&project.repo_path))?;
+    if let Err(error) = git_service::validate_diff_selection(&repo, &requested_selection) {
+        if error.code == "INVALID_DIFF_TARGET" {
+            project.comparison = DiffSelection::default();
+        } else {
+            return Err(error);
+        }
+    } else {
+        project.comparison = requested_selection;
+    }
     project.last_opened_at = Utc::now().to_rfc3339();
     let result = project.clone();
     config.active_project_id = Some(project_id);
+    config_service::save(&app, &config)?;
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn save_project_comparison<R: Runtime>(
+    app: AppHandle<R>,
+    project_id: String,
+    selection: DiffSelection,
+) -> AppResult<ProjectConfig> {
+    let mut config = config_service::load(&app)?;
+    let project = config
+        .projects
+        .iter_mut()
+        .find(|project| project.id == project_id)
+        .ok_or_else(|| {
+            AppError::new(
+                "PROJECT_NOT_FOUND",
+                "The selected project no longer exists.",
+            )
+        })?;
+    let repo = git_service::canonical_repository(Path::new(&project.repo_path))?;
+    git_service::validate_diff_selection(&repo, &selection)?;
+    project.comparison = selection;
+    let result = project.clone();
     config_service::save(&app, &config)?;
     Ok(result)
 }

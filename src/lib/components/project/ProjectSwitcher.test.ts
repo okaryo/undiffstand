@@ -9,6 +9,7 @@ const projects: ProjectConfig[] = [
     name: "Alpha",
     repoPath: "/repos/alpha",
     baseRef: "main",
+    comparison: { base: "HEAD", target: "." },
     lastOpenedAt: "2026-08-08T10:00:00Z",
   },
   {
@@ -16,6 +17,7 @@ const projects: ProjectConfig[] = [
     name: "Beta",
     repoPath: "/repos/beta",
     baseRef: "develop",
+    comparison: { base: "develop", target: "feature" },
     lastOpenedAt: "2026-08-07T10:00:00Z",
   },
 ];
