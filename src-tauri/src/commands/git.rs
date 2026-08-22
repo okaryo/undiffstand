@@ -6,7 +6,7 @@ use crate::{
 use std::path::Path;
 use tauri::{AppHandle, Runtime};
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_diff_summary<R: Runtime>(
     app: AppHandle<R>,
     project_id: String,
@@ -16,7 +16,7 @@ pub fn get_diff_summary<R: Runtime>(
     git_service::diff_summary(Path::new(&project.repo_path), &selection)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_file_diffs<R: Runtime>(
     app: AppHandle<R>,
     project_id: String,

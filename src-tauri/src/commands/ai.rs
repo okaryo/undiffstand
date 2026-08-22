@@ -71,7 +71,7 @@ pub async fn ask_inline_question<R: Runtime>(
         .await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_change_review_availability<R: Runtime>(
     app: AppHandle<R>,
     project_id: String,
