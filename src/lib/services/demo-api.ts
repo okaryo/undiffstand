@@ -1,3 +1,4 @@
+import type { ChangeReviewAvailability } from "$lib/domain/ai";
 import type { DiffSelection, DiffSummary, FileDiff } from "$lib/domain/diff";
 import { defaultUserPreferences } from "$lib/domain/preferences";
 import type { ProjectConfig } from "$lib/domain/project";
@@ -76,15 +77,39 @@ function summaryFor(selection: DiffSelection): DiffSummary {
   };
 }
 
+function reviewAvailabilityFor(
+  selection: DiffSelection,
+): ChangeReviewAvailability {
+  if (selection.base === "HEAD" && selection.target === ".") {
+    return {
+      available: true,
+      target: { kind: "uncommitted" },
+      scopeLabel: "feature/undiffstand → working tree",
+    };
+  }
+  if (
+    selection.base === "main" &&
+    ["HEAD", "feature/undiffstand"].includes(selection.target)
+  ) {
+    return {
+      available: true,
+      target: { kind: "base", baseBranch: "main" },
+      scopeLabel: `main → ${selection.target}`,
+    };
+  }
+  return {
+    available: false,
+    reason: "Change Review requires the target to be the current branch.",
+    scopeLabel: `${selection.base} → ${selection.target}`,
+  };
+}
+
 function diffFor(path: string): FileDiff {
   if (path === "src/lib/context.ts") {
     const content = contents[path];
     return {
       file: summary.files[1],
       newContent: content,
-      hunks: [
-        `@@ -0,0 +1,8 @@\n+export async function buildContext(diff: string) {\n+  const lines = diff.split('\\n');\n+  return {\n+    summary: \`Reviewing \${lines.length} diff lines\`,\n+    references: lines.filter((line) => line.startsWith('+'))\n+  };\n+}\n+`,
-      ],
       unifiedDiff: `diff --git a/${path} b/${path}\nnew file mode 100644\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,8 @@\n+export async function buildContext(diff: string) {\n+  const lines = diff.split('\\n');\n+  return {\n+    summary: \`Reviewing \${lines.length} diff lines\`,\n+    references: lines.filter((line) => line.startsWith('+'))\n+  };\n+}\n+`,
       truncated: false,
     };
@@ -98,9 +123,6 @@ function diffFor(path: string): FileDiff {
     file: summary.files[0],
     oldContent,
     newContent,
-    hunks: [
-      `@@ -1,3 +1,12 @@\n+import { buildContext } from '../lib/context';\n+\n+export type Review = {\n+  summary: string;\n+  evidence: string[];\n+};\n+\n export async function review(diff: string) {\n-  return summarize(diff);\n+  const context = await buildContext(diff);\n+  return { summary: context.summary, evidence: context.references };\n }\n`,
-    ],
     unifiedDiff: `diff --git a/src/services/review.ts b/src/services/review.ts\n--- a/src/services/review.ts\n+++ b/src/services/review.ts\n@@ -1,3 +1,12 @@\n+import { buildContext } from '../lib/context';\n+\n+export type Review = {\n+  summary: string;\n+  evidence: string[];\n+};\n+\n export async function review(diff: string) {\n-  return summarize(diff);\n+  const context = await buildContext(diff);\n+  return { summary: context.summary, evidence: context.references };\n }\n`,
     truncated: false,
   };
@@ -165,7 +187,10 @@ export const demoApi: AppApi = {
     userPreferences = structuredClone(preferences);
     return structuredClone(userPreferences);
   },
-  getDiffSummary: async (_projectId, selection) => summaryFor(selection),
+  getDiffWorkspace: async (_projectId, selection) => ({
+    summary: summaryFor(selection),
+    reviewAvailability: reviewAvailabilityFor(selection),
+  }),
   getFileDiffs: async (_projectId, _selection, paths) => paths.map(diffFor),
   explainFileChange: async (_projectId, _selection, path) => ({
     summary:
@@ -193,30 +218,6 @@ export const demoApi: AppApi = {
     ],
     caveats: ["This answer is inferred from the displayed diff."],
   }),
-  getChangeReviewAvailability: async (_projectId, selection) => {
-    if (selection.base === "HEAD" && selection.target === ".") {
-      return {
-        available: true,
-        target: { kind: "uncommitted" },
-        scopeLabel: "feature/undiffstand → working tree",
-      };
-    }
-    if (
-      selection.base === "main" &&
-      ["HEAD", "feature/undiffstand"].includes(selection.target)
-    ) {
-      return {
-        available: true,
-        target: { kind: "base", baseBranch: "main" },
-        scopeLabel: `main → ${selection.target}`,
-      };
-    }
-    return {
-      available: false,
-      reason: "Change Review requires the target to be the current branch.",
-      scopeLabel: `${selection.base} → ${selection.target}`,
-    };
-  },
   runChangeReview: async () => ({
     summary:
       "The change introduces evidence-aware review output and wires it into the existing review flow.",

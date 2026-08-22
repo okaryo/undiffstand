@@ -29,10 +29,13 @@ export interface AppApi {
   removeProject(projectId: string): Promise<void>;
   getUserPreferences(): Promise<UserPreferences>;
   saveUserPreferences(preferences: UserPreferences): Promise<UserPreferences>;
-  getDiffSummary(
+  getDiffWorkspace(
     projectId: string,
     selection: DiffSelection,
-  ): Promise<DiffSummary>;
+  ): Promise<{
+    summary: DiffSummary;
+    reviewAvailability: ChangeReviewAvailability;
+  }>;
   getFileDiffs(
     projectId: string,
     selection: DiffSelection,
@@ -48,10 +51,6 @@ export interface AppApi {
     selection: DiffSelection,
     question: InlineQuestion,
   ): Promise<InlineAnswer>;
-  getChangeReviewAvailability(
-    projectId: string,
-    selection: DiffSelection,
-  ): Promise<ChangeReviewAvailability>;
   runChangeReview(
     projectId: string,
     selection: DiffSelection,

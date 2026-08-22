@@ -244,7 +244,6 @@ pub struct FileDiff {
     pub old_content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_content: Option<String>,
-    pub hunks: Vec<String>,
     pub unified_diff: String,
     pub truncated: bool,
 }
@@ -306,6 +305,13 @@ pub struct ChangeReviewAvailability {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
     pub scope_label: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffWorkspace {
+    pub summary: DiffSummary,
+    pub review_availability: ChangeReviewAvailability,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

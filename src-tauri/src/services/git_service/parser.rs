@@ -68,24 +68,3 @@ pub(super) fn parse_numstat(bytes: &[u8]) -> Vec<(Option<u64>, Option<u64>)> {
     }
     stats
 }
-
-pub(super) fn split_hunks(diff: &str) -> Vec<String> {
-    let mut hunks = Vec::new();
-    let mut current = String::new();
-    for line in diff.lines() {
-        if line.starts_with("@@ ") {
-            if !current.is_empty() {
-                hunks.push(std::mem::take(&mut current));
-            }
-            current.push_str(line);
-            current.push('\n');
-        } else if !current.is_empty() {
-            current.push_str(line);
-            current.push('\n');
-        }
-    }
-    if !current.is_empty() {
-        hunks.push(current);
-    }
-    hunks
-}

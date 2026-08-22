@@ -27,12 +27,10 @@ export class DiffWorkspaceController {
   private pendingPaths = new SvelteSet<string>();
   private batchTimer: ReturnType<typeof setTimeout> | undefined;
   private generation = 0;
+  private loadGeneration = 0;
 
   constructor(
-    private readonly api: Pick<
-      AppApi,
-      "getDiffSummary" | "getChangeReviewAvailability" | "getFileDiffs"
-    >,
+    private readonly api: Pick<AppApi, "getDiffWorkspace" | "getFileDiffs">,
     private readonly onError: (error: unknown) => void,
     private readonly onResetAi: () => void,
   ) {}
@@ -49,6 +47,7 @@ export class DiffWorkspaceController {
     if (!this.projectId) return;
     const projectId = this.projectId;
     const selection = { ...this.selection };
+    const loadGeneration = ++this.loadGeneration;
     const silent = options.silent ?? false;
     this.onError(null);
     if (!silent) {
@@ -58,11 +57,9 @@ export class DiffWorkspaceController {
     }
 
     try {
-      const [loadedSummary, reviewAvailability] = await Promise.all([
-        this.api.getDiffSummary(projectId, selection),
-        this.api.getChangeReviewAvailability(projectId, selection),
-      ]);
-      if (!this.isCurrent(projectId, selection)) return;
+      const { summary: loadedSummary, reviewAvailability } =
+        await this.api.getDiffWorkspace(projectId, selection);
+      if (!this.isCurrentLoad(projectId, selection, loadGeneration)) return;
 
       const orderedSummary = {
         ...loadedSummary,
@@ -83,8 +80,9 @@ export class DiffWorkspaceController {
           selection,
           orderedSummary,
           path,
+          loadGeneration,
         );
-      if (!this.isCurrent(projectId, selection)) return;
+      if (!this.isCurrentLoad(projectId, selection, loadGeneration)) return;
 
       this.summary = orderedSummary;
       if (!silent) this.loading = false;
@@ -93,13 +91,15 @@ export class DiffWorkspaceController {
       if (path) {
         this.queue(path);
         await tick();
-        if (!silent && this.isCurrent(projectId, selection))
+        if (!silent && this.isCurrentLoad(projectId, selection, loadGeneration))
           this.scrollTo(path, false);
       }
     } catch (error) {
-      if (this.projectId === projectId) this.onError(error);
+      if (this.isCurrentLoad(projectId, selection, loadGeneration))
+        this.onError(error);
     } finally {
-      if (!silent && this.projectId === projectId) this.loading = false;
+      if (!silent && this.isCurrentLoad(projectId, selection, loadGeneration))
+        this.loading = false;
     }
   }
 
@@ -141,6 +141,7 @@ export class DiffWorkspaceController {
     this.loadingPaths = {};
     this.errors = {};
     this.reviewAvailability = undefined;
+    this.loadGeneration += 1;
     this.onResetAi();
   }
 
@@ -148,7 +149,8 @@ export class DiffWorkspaceController {
     projectId: string,
     selection: DiffSelection,
     summary: DiffSummary,
-    selectedPath?: string,
+    selectedPath: string | undefined,
+    loadGeneration: number,
   ) {
     const availablePaths = new SvelteSet(summary.files.map(displayPath));
     const refreshPaths = new SvelteSet([
@@ -164,7 +166,7 @@ export class DiffWorkspaceController {
       paths.length > 0
         ? await this.api.getFileDiffs(projectId, selection, paths)
         : [];
-    if (!this.isCurrent(projectId, selection)) return;
+    if (!this.isCurrentLoad(projectId, selection, loadGeneration)) return;
 
     this.clearPending();
     this.diffs = Object.fromEntries(
@@ -239,6 +241,17 @@ export class DiffWorkspaceController {
       this.projectId === projectId &&
       this.selection.base === selection.base &&
       this.selection.target === selection.target
+    );
+  }
+
+  private isCurrentLoad(
+    projectId: string,
+    selection: DiffSelection,
+    loadGeneration: number,
+  ) {
+    return (
+      this.loadGeneration === loadGeneration &&
+      this.isCurrent(projectId, selection)
     );
   }
 

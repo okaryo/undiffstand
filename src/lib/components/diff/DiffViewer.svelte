@@ -15,6 +15,27 @@
   >();
   let currentSearchHighlightQuery = "";
 
+  function scheduleIdle(callback: () => void): () => void {
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      const handle = window.requestIdleCallback(callback, { timeout: 2_000 });
+      return () => window.cancelIdleCallback(handle);
+    }
+    const handle = setTimeout(callback, 100);
+    return () => clearTimeout(handle);
+  }
+
+  function runInIdle<T>(task: () => T | Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      scheduleIdle(() => {
+        try {
+          Promise.resolve(task()).then(resolve, reject);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+  }
+
   function updateGlobalSearchHighlights() {
     if (
       typeof CSS === "undefined" ||
@@ -58,16 +79,18 @@
   }
 
   async function loadHighlighter(language: string) {
-    highlighterPromise ??= getDiffViewHighlighter();
+    highlighterPromise ??= runInIdle(() => getDiffViewHighlighter());
     const highlighter = await highlighterPromise;
 
     if (language in bundledLanguages) {
       let languagePromise = languagePromises.get(language);
       if (!languagePromise) {
-        languagePromise = highlighter
-          .getHighlighterEngine()
-          ?.loadLanguage(language as BundledLanguage);
-        if (languagePromise) languagePromises.set(language, languagePromise);
+        languagePromise = runInIdle(async () => {
+          await highlighter
+            .getHighlighterEngine()
+            ?.loadLanguage(language as BundledLanguage);
+        });
+        languagePromises.set(language, languagePromise);
       }
       await languagePromise;
     }
@@ -330,10 +353,14 @@
 
   onMount(() => {
     let mounted = true;
+    let cancelHighlightActivation: (() => void) | undefined;
 
     void loadHighlighter(language)
       .then((loadedHighlighter) => {
-        if (mounted) highlighter = loadedHighlighter;
+        if (!mounted) return;
+        cancelHighlightActivation = scheduleIdle(() => {
+          if (mounted) highlighter = loadedHighlighter;
+        });
       })
       .catch((error: unknown) => {
         console.error("Failed to initialize Shiki syntax highlighting.", error);
@@ -341,6 +368,7 @@
 
     return () => {
       mounted = false;
+      cancelHighlightActivation?.();
     };
   });
 </script>
@@ -351,7 +379,7 @@
     title="Binary file changed"
     message="Text diff is unavailable for this file."
   />
-{:else if diff.hunks.length === 0}
+{:else if !/^@@ /m.test(diff.unifiedDiff)}
   <EmptyState
     icon={FileExclamationPoint}
     title="No text hunks"

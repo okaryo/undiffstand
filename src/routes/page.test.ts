@@ -6,27 +6,40 @@ import {
   within,
 } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DiffSummary, FileDiff } from "$lib/domain/diff";
+import type { DiffSelection, DiffSummary, FileDiff } from "$lib/domain/diff";
 import type { ProjectConfig } from "$lib/domain/project";
 import Page from "./+page.svelte";
 
-const tauriApi = vi.hoisted(() => ({
-  listProjects: vi.fn(),
-  touchProject: vi.fn(),
-  saveProjectComparison: vi.fn(),
-  getDiffSummary: vi.fn(),
-  getFileDiffs: vi.fn(),
-  validateRepository: vi.fn(),
-  selectRepository: vi.fn(),
-  saveProject: vi.fn(),
-  removeProject: vi.fn(),
-  getUserPreferences: vi.fn(),
-  saveUserPreferences: vi.fn(),
-  explainFileChange: vi.fn(),
-  askInlineQuestion: vi.fn(),
-  getChangeReviewAvailability: vi.fn(),
-  runChangeReview: vi.fn(),
-}));
+const tauriApi = vi.hoisted(() => {
+  const api = {
+    listProjects: vi.fn(),
+    touchProject: vi.fn(),
+    saveProjectComparison: vi.fn(),
+    getDiffSummary: vi.fn(),
+    getFileDiffs: vi.fn(),
+    validateRepository: vi.fn(),
+    selectRepository: vi.fn(),
+    saveProject: vi.fn(),
+    removeProject: vi.fn(),
+    getUserPreferences: vi.fn(),
+    saveUserPreferences: vi.fn(),
+    explainFileChange: vi.fn(),
+    askInlineQuestion: vi.fn(),
+    getChangeReviewAvailability: vi.fn(),
+    runChangeReview: vi.fn(),
+  };
+  return {
+    ...api,
+    getDiffWorkspace: (projectId: string, selection: DiffSelection) =>
+      Promise.all([
+        api.getDiffSummary(projectId, selection),
+        api.getChangeReviewAvailability(projectId, selection),
+      ]).then(([summary, reviewAvailability]) => ({
+        summary,
+        reviewAvailability,
+      })),
+  };
+});
 const notifyReviewComplete = vi.hoisted(() => vi.fn());
 const updater = vi.hoisted(() => ({
   check: vi.fn(),
@@ -76,7 +89,6 @@ const fileDiff: FileDiff = {
   file: summary.files[0],
   oldContent: "const answer = 41;\n",
   newContent: "const answer = 42;\n",
-  hunks: ["@@ -1 +1 @@\n-const answer = 41;\n+const answer = 42;\n"],
   unifiedDiff:
     "diff --git a/src/example.ts b/src/example.ts\n--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1 +1 @@\n-const answer = 41;\n+const answer = 42;\n",
   truncated: false,
@@ -489,6 +501,9 @@ describe("change details auto-refresh", () => {
       expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1),
     );
     await waitFor(() =>
+      expect(screen.queryByText("Loading changes…")).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
       expect(screen.queryByText(/Loading diff/)).not.toBeInTheDocument(),
     );
     const initialCalls = tauriApi.getDiffSummary.mock.calls.length;
@@ -592,6 +607,66 @@ describe("change details auto-refresh", () => {
     await waitFor(() =>
       expect(screen.queryByText("Loading changes…")).not.toBeInTheDocument(),
     );
+  });
+
+  it("changes comparison during loading and ignores the stale response", async () => {
+    let finishInitial: (value: DiffSummary) => void = () => {};
+    let finishComparison: (value: DiffSummary) => void = () => {};
+    tauriApi.getDiffSummary
+      .mockImplementationOnce(
+        () =>
+          new Promise<DiffSummary>((resolve) => {
+            finishInitial = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<DiffSummary>((resolve) => {
+            finishComparison = resolve;
+          }),
+      );
+    history.replaceState(null, "", "/?project=alpha");
+    render(Page);
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1),
+    );
+
+    await fireEvent.click(
+      screen.getByRole("button", {
+        name: "Change comparison. Current: feature → working tree",
+      }),
+    );
+    const compare = screen.getByRole("button", {
+      name: "Compare main → feature",
+    });
+    expect(compare).toBeEnabled();
+    await fireEvent.click(compare);
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(2),
+    );
+
+    finishInitial(summary);
+    await Promise.resolve();
+    expect(screen.getByText("Loading changes…")).toBeInTheDocument();
+
+    finishComparison({
+      ...summary,
+      selection: { base: "main", target: "HEAD" },
+      comparison: {
+        ...summary.comparison,
+        fromLabel: "main",
+        toLabel: "HEAD",
+        toSha: summary.comparison.fromSha,
+      },
+    });
+    await waitFor(() =>
+      expect(screen.queryByText("Loading changes…")).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "Change comparison. Current: main → feature",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("applies quick comparisons using the configured base and current branch", async () => {
