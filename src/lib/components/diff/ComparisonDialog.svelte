@@ -8,7 +8,6 @@
     selection,
     repository,
     activeBaseRef,
-    loading = false,
     baseToCurrentIsActive = false,
     currentToWorkingTreeIsActive = false,
     onApply,
@@ -18,7 +17,6 @@
     selection: DiffSelection;
     repository: RepositoryInfo;
     activeBaseRef?: string | null;
-    loading?: boolean;
     baseToCurrentIsActive?: boolean;
     currentToWorkingTreeIsActive?: boolean;
     onApply: (selection: DiffSelection) => void | Promise<void>;
@@ -30,8 +28,7 @@
 <div
   class="backdrop"
   role="presentation"
-  onclick={(event) =>
-    event.target === event.currentTarget && !loading && onClose()}
+  onclick={(event) => event.target === event.currentTarget && onClose()}
 >
   <div
     class="dialog"
@@ -44,10 +41,8 @@
         <GitBranch size={17} />
         <h2 id="comparison-dialog-title">Change comparison</h2>
       </div>
-      <button
-        aria-label="Close comparison dialog"
-        disabled={loading}
-        onclick={onClose}><X size={17} /></button
+      <button aria-label="Close comparison dialog" onclick={onClose}
+        ><X size={17} /></button
       >
     </header>
     <div class="content">
@@ -59,7 +54,6 @@
           remoteBranches={repository.remoteBranches}
           recentCommits={repository.recentCommits}
           currentBranch={repository.currentBranch}
-          {loading}
           {onApply}
         />
       </section>
@@ -103,9 +97,7 @@
                 type="button"
                 class="compare-button"
                 aria-label={`Compare ${activeBaseRef ?? "base branch"} → ${repository.currentBranch ?? "current branch"}`}
-                disabled={loading ||
-                  !activeBaseRef ||
-                  !repository.currentBranch}
+                disabled={!activeBaseRef || !repository.currentBranch}
                 title={!activeBaseRef
                   ? "Set a base branch in Project settings."
                   : undefined}
@@ -134,7 +126,6 @@
                 type="button"
                 class="compare-button"
                 aria-label={`Compare ${repository.currentBranch ?? "HEAD"} → Working tree`}
-                disabled={loading}
                 onclick={() => onApply({ base: "HEAD", target: "." })}
                 >Compare</button
               >

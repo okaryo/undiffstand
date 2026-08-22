@@ -73,7 +73,6 @@ export type FileDiff = {
   file: DiffFileSummary;
   oldContent?: string;
   newContent?: string;
-  hunks: string[];
   unifiedDiff: string;
   truncated: boolean;
 };

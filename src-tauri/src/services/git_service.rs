@@ -5,18 +5,18 @@ mod repository;
 use crate::{
     domain::{
         ChangeReviewAvailability, ChangeReviewTarget, DiffComparison, DiffFileSummary,
-        DiffSelection, DiffStatus, DiffSummary, FileDiff,
+        DiffSelection, DiffStatus, DiffSummary, DiffWorkspace, FileDiff,
     },
     error::{AppError, AppResult},
     services::file_service,
 };
 use command::{git_output, output_text, successful};
-use parser::{parse_name_status, parse_numstat, split_hunks};
+use parser::{parse_name_status, parse_numstat};
 pub use repository::{canonical_repository, inspect_repository, validate_base_ref};
 use repository::{current_branch, list_local_branches, list_refs};
 #[cfg(test)]
 use repository::{detect_base_ref, recent_branches, recent_commits};
-use std::{path::Path, process::Output};
+use std::{collections::HashSet, path::Path, process::Output};
 
 const MAX_DIFF_BYTES: usize = 1_500_000;
 const MAX_CONTENT_BYTES: usize = 2_000_000;
@@ -32,6 +32,13 @@ struct ResolvedDiff {
     selection: DiffSelection,
     comparison: DiffComparison,
     range: DiffRange,
+}
+
+#[derive(Debug, Clone)]
+pub struct DiffSnapshot {
+    summary: DiffSummary,
+    resolved: ResolvedDiff,
+    untracked_paths: HashSet<String>,
 }
 
 fn normalized_ref(reference: &str) -> &str {
@@ -109,6 +116,32 @@ pub fn change_review_availability(
     repo: &Path,
     selection: &DiffSelection,
 ) -> AppResult<ChangeReviewAvailability> {
+    let has_changes = !diff_summary(repo, selection)?.files.is_empty();
+    change_review_availability_for(repo, selection, has_changes)
+}
+
+pub fn diff_workspace_with_snapshot(
+    repo: &Path,
+    selection: &DiffSelection,
+) -> AppResult<(DiffWorkspace, DiffSnapshot)> {
+    let snapshot = diff_snapshot(repo, selection)?;
+    let summary = snapshot.summary.clone();
+    let review_availability =
+        change_review_availability_for(repo, selection, !summary.files.is_empty())?;
+    Ok((
+        DiffWorkspace {
+            summary,
+            review_availability,
+        },
+        snapshot,
+    ))
+}
+
+fn change_review_availability_for(
+    repo: &Path,
+    selection: &DiffSelection,
+    has_changes: bool,
+) -> AppResult<ChangeReviewAvailability> {
     let base = normalized_ref(selection.base.trim());
     let target = selection.target.trim();
     let current_branch = current_branch(repo)?;
@@ -126,7 +159,7 @@ pub fn change_review_availability(
     };
     let scope_label = format!("{} → {}", display_ref(base), target_label);
 
-    if diff_summary(repo, selection)?.files.is_empty() {
+    if !has_changes {
         return Ok(unavailable_review(
             scope_label,
             "Change Review is unavailable because this comparison has no changes.",
@@ -219,6 +252,10 @@ fn range_output(
 }
 
 pub fn diff_summary(repo: &Path, selection: &DiffSelection) -> AppResult<DiffSummary> {
+    diff_snapshot(repo, selection).map(|snapshot| snapshot.summary)
+}
+
+fn diff_snapshot(repo: &Path, selection: &DiffSelection) -> AppResult<DiffSnapshot> {
     let resolved = resolve_diff(repo, selection)?;
     let name_bytes = successful(
         range_output(
@@ -261,8 +298,15 @@ pub fn diff_summary(repo: &Path, selection: &DiffSelection) -> AppResult<DiffSum
             file.status = DiffStatus::Binary;
         }
     }
+    let mut untracked_paths = HashSet::new();
     if matches!(resolved.range, DiffRange::RevisionToWorkingTree { .. }) {
-        files.extend(untracked_files(repo)?);
+        let untracked = untracked_files(repo)?;
+        untracked_paths.extend(
+            untracked
+                .iter()
+                .filter_map(|file| file.new_path.as_ref().cloned()),
+        );
+        files.extend(untracked);
     }
     files.sort_by(|left, right| {
         let left_path = left
@@ -279,12 +323,16 @@ pub fn diff_summary(repo: &Path, selection: &DiffSelection) -> AppResult<DiffSum
     });
     let total_additions = files.iter().filter_map(|file| file.additions).sum();
     let total_deletions = files.iter().filter_map(|file| file.deletions).sum();
-    Ok(DiffSummary {
-        selection: resolved.selection,
-        comparison: resolved.comparison,
-        files,
-        total_additions,
-        total_deletions,
+    Ok(DiffSnapshot {
+        summary: DiffSummary {
+            selection: resolved.selection.clone(),
+            comparison: resolved.comparison.clone(),
+            files,
+            total_additions,
+            total_deletions,
+        },
+        resolved,
+        untracked_paths,
     })
 }
 
@@ -357,10 +405,9 @@ pub fn file_diff_with_summary(
     selection: &DiffSelection,
     path: &str,
 ) -> AppResult<(DiffSummary, FileDiff)> {
-    let summary = diff_summary(repo, selection)?;
-    let resolved = resolve_diff(repo, selection)?;
-    let diff = file_diff_from_summary(repo, &summary, &resolved, path)?;
-    Ok((summary, diff))
+    let snapshot = diff_snapshot(repo, selection)?;
+    let diff = file_diff_from_snapshot(repo, &snapshot, path)?;
+    Ok((snapshot.summary, diff))
 }
 
 pub fn file_diffs(
@@ -368,21 +415,28 @@ pub fn file_diffs(
     selection: &DiffSelection,
     paths: &[String],
 ) -> AppResult<Vec<FileDiff>> {
-    let summary = diff_summary(repo, selection)?;
-    let resolved = resolve_diff(repo, selection)?;
+    let snapshot = diff_snapshot(repo, selection)?;
+    file_diffs_from_snapshot(repo, &snapshot, paths)
+}
+
+pub fn file_diffs_from_snapshot(
+    repo: &Path,
+    snapshot: &DiffSnapshot,
+    paths: &[String],
+) -> AppResult<Vec<FileDiff>> {
     paths
         .iter()
-        .map(|path| file_diff_from_summary(repo, &summary, &resolved, path))
+        .map(|path| file_diff_from_snapshot(repo, snapshot, path))
         .collect()
 }
 
-fn file_diff_from_summary(
+fn file_diff_from_snapshot(
     repo: &Path,
-    summary: &DiffSummary,
-    resolved: &ResolvedDiff,
+    snapshot: &DiffSnapshot,
     path: &str,
 ) -> AppResult<FileDiff> {
-    let file = summary
+    let file = snapshot
+        .summary
         .files
         .iter()
         .find(|file| {
@@ -395,16 +449,12 @@ fn file_diff_from_summary(
                 "The selected file is not part of this diff.",
             )
         })?;
-    let untracked_working_tree_file =
-        matches!(resolved.range, DiffRange::RevisionToWorkingTree { .. })
-            && !git_output(repo, ["ls-files", "--error-unmatch", "--", path])?
-                .status
-                .success();
+    let untracked_working_tree_file = snapshot.untracked_paths.contains(path);
     let bytes = if !untracked_working_tree_file {
         successful(
             range_output(
                 repo,
-                resolved,
+                &snapshot.resolved,
                 &[
                     "--no-color",
                     "--no-ext-diff",
@@ -445,7 +495,7 @@ fn file_diff_from_summary(
         &bytes
     };
     let unified_diff = String::from_utf8_lossy(visible).into_owned();
-    let (old_source, new_source) = match &resolved.range {
+    let (old_source, new_source) = match &snapshot.resolved.range {
         DiffRange::Revisions { from, to } => {
             (ContentSource::Commit(from), ContentSource::Commit(to))
         }
@@ -463,12 +513,10 @@ fn file_diff_from_summary(
         (Some(new_path), _) => content_from_source(repo, new_source, new_path)?,
         _ => None,
     };
-    let hunks = split_hunks(&unified_diff);
     Ok(FileDiff {
         file,
         old_content,
         new_content,
-        hunks,
         unified_diff,
         truncated,
     })

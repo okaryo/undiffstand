@@ -32,12 +32,27 @@ export function findDiffSearchMatches(
     const diff = diffs[path];
     if (!diff) continue;
 
-    for (const [hunkIndex, hunk] of diff.hunks.entries()) {
+    for (const [hunkIndex, hunk] of splitHunks(diff.unifiedDiff).entries()) {
       appendHunkMatches(matches, path, hunk, hunkIndex, normalizedQuery);
     }
   }
 
   return matches;
+}
+
+function splitHunks(diff: string): string[] {
+  const hunks: string[] = [];
+  let current: string[] = [];
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("@@ ")) {
+      if (current.length > 0) hunks.push(`${current.join("\n")}\n`);
+      current = [line];
+    } else if (current.length > 0) {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) hunks.push(`${current.join("\n")}\n`);
+  return hunks;
 }
 
 function appendHunkMatches(

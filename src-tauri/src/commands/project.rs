@@ -8,7 +8,7 @@ use std::path::Path;
 use tauri::{AppHandle, Runtime};
 use uuid::Uuid;
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn validate_repository(path: String) -> AppResult<RepositoryInfo> {
     git_service::inspect_repository(Path::new(&path))
 }
@@ -20,7 +20,7 @@ pub fn list_projects<R: Runtime>(app: AppHandle<R>) -> AppResult<Vec<ProjectConf
     Ok(projects)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_project<R: Runtime>(
     app: AppHandle<R>,
     input: SaveProjectInput,
@@ -60,7 +60,7 @@ pub fn save_project<R: Runtime>(
     Ok(project)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn touch_project<R: Runtime>(
     app: AppHandle<R>,
     project_id: String,
@@ -95,7 +95,7 @@ pub fn touch_project<R: Runtime>(
     Ok(result)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_project_comparison<R: Runtime>(
     app: AppHandle<R>,
     project_id: String,
