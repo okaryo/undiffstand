@@ -1,3 +1,4 @@
+import type { ChangeReviewAvailability } from "$lib/domain/ai";
 import type { DiffSelection, DiffSummary, FileDiff } from "$lib/domain/diff";
 import { defaultUserPreferences } from "$lib/domain/preferences";
 import type { ProjectConfig } from "$lib/domain/project";
@@ -73,6 +74,33 @@ function summaryFor(selection: DiffSelection): DiffSummary {
       fromSha: summary.comparison.fromSha,
       toSha: selection.target === "." ? undefined : summary.comparison.fromSha,
     },
+  };
+}
+
+function reviewAvailabilityFor(
+  selection: DiffSelection,
+): ChangeReviewAvailability {
+  if (selection.base === "HEAD" && selection.target === ".") {
+    return {
+      available: true,
+      target: { kind: "uncommitted" },
+      scopeLabel: "feature/undiffstand → working tree",
+    };
+  }
+  if (
+    selection.base === "main" &&
+    ["HEAD", "feature/undiffstand"].includes(selection.target)
+  ) {
+    return {
+      available: true,
+      target: { kind: "base", baseBranch: "main" },
+      scopeLabel: `main → ${selection.target}`,
+    };
+  }
+  return {
+    available: false,
+    reason: "Change Review requires the target to be the current branch.",
+    scopeLabel: `${selection.base} → ${selection.target}`,
   };
 }
 
@@ -165,7 +193,10 @@ export const demoApi: AppApi = {
     userPreferences = structuredClone(preferences);
     return structuredClone(userPreferences);
   },
-  getDiffSummary: async (_projectId, selection) => summaryFor(selection),
+  getDiffWorkspace: async (_projectId, selection) => ({
+    summary: summaryFor(selection),
+    reviewAvailability: reviewAvailabilityFor(selection),
+  }),
   getFileDiffs: async (_projectId, _selection, paths) => paths.map(diffFor),
   explainFileChange: async (_projectId, _selection, path) => ({
     summary:
@@ -193,30 +224,6 @@ export const demoApi: AppApi = {
     ],
     caveats: ["This answer is inferred from the displayed diff."],
   }),
-  getChangeReviewAvailability: async (_projectId, selection) => {
-    if (selection.base === "HEAD" && selection.target === ".") {
-      return {
-        available: true,
-        target: { kind: "uncommitted" },
-        scopeLabel: "feature/undiffstand → working tree",
-      };
-    }
-    if (
-      selection.base === "main" &&
-      ["HEAD", "feature/undiffstand"].includes(selection.target)
-    ) {
-      return {
-        available: true,
-        target: { kind: "base", baseBranch: "main" },
-        scopeLabel: `main → ${selection.target}`,
-      };
-    }
-    return {
-      available: false,
-      reason: "Change Review requires the target to be the current branch.",
-      scopeLabel: `${selection.base} → ${selection.target}`,
-    };
-  },
   runChangeReview: async () => ({
     summary:
       "The change introduces evidence-aware review output and wires it into the existing review flow.",

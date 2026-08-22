@@ -5,7 +5,7 @@ mod repository;
 use crate::{
     domain::{
         ChangeReviewAvailability, ChangeReviewTarget, DiffComparison, DiffFileSummary,
-        DiffSelection, DiffStatus, DiffSummary, FileDiff,
+        DiffSelection, DiffStatus, DiffSummary, DiffWorkspace, FileDiff,
     },
     error::{AppError, AppResult},
     services::file_service,
@@ -109,6 +109,25 @@ pub fn change_review_availability(
     repo: &Path,
     selection: &DiffSelection,
 ) -> AppResult<ChangeReviewAvailability> {
+    let has_changes = !diff_summary(repo, selection)?.files.is_empty();
+    change_review_availability_for(repo, selection, has_changes)
+}
+
+pub fn diff_workspace(repo: &Path, selection: &DiffSelection) -> AppResult<DiffWorkspace> {
+    let summary = diff_summary(repo, selection)?;
+    let review_availability =
+        change_review_availability_for(repo, selection, !summary.files.is_empty())?;
+    Ok(DiffWorkspace {
+        summary,
+        review_availability,
+    })
+}
+
+fn change_review_availability_for(
+    repo: &Path,
+    selection: &DiffSelection,
+    has_changes: bool,
+) -> AppResult<ChangeReviewAvailability> {
     let base = normalized_ref(selection.base.trim());
     let target = selection.target.trim();
     let current_branch = current_branch(repo)?;
@@ -126,7 +145,7 @@ pub fn change_review_availability(
     };
     let scope_label = format!("{} → {}", display_ref(base), target_label);
 
-    if diff_summary(repo, selection)?.files.is_empty() {
+    if !has_changes {
         return Ok(unavailable_review(
             scope_label,
             "Change Review is unavailable because this comparison has no changes.",

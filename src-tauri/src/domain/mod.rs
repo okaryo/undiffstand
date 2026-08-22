@@ -308,6 +308,13 @@ pub struct ChangeReviewAvailability {
     pub scope_label: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffWorkspace {
+    pub summary: DiffSummary,
+    pub review_availability: ChangeReviewAvailability,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangeReviewGroup {

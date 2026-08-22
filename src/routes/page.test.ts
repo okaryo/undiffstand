@@ -6,27 +6,40 @@ import {
   within,
 } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DiffSummary, FileDiff } from "$lib/domain/diff";
+import type { DiffSelection, DiffSummary, FileDiff } from "$lib/domain/diff";
 import type { ProjectConfig } from "$lib/domain/project";
 import Page from "./+page.svelte";
 
-const tauriApi = vi.hoisted(() => ({
-  listProjects: vi.fn(),
-  touchProject: vi.fn(),
-  saveProjectComparison: vi.fn(),
-  getDiffSummary: vi.fn(),
-  getFileDiffs: vi.fn(),
-  validateRepository: vi.fn(),
-  selectRepository: vi.fn(),
-  saveProject: vi.fn(),
-  removeProject: vi.fn(),
-  getUserPreferences: vi.fn(),
-  saveUserPreferences: vi.fn(),
-  explainFileChange: vi.fn(),
-  askInlineQuestion: vi.fn(),
-  getChangeReviewAvailability: vi.fn(),
-  runChangeReview: vi.fn(),
-}));
+const tauriApi = vi.hoisted(() => {
+  const api = {
+    listProjects: vi.fn(),
+    touchProject: vi.fn(),
+    saveProjectComparison: vi.fn(),
+    getDiffSummary: vi.fn(),
+    getFileDiffs: vi.fn(),
+    validateRepository: vi.fn(),
+    selectRepository: vi.fn(),
+    saveProject: vi.fn(),
+    removeProject: vi.fn(),
+    getUserPreferences: vi.fn(),
+    saveUserPreferences: vi.fn(),
+    explainFileChange: vi.fn(),
+    askInlineQuestion: vi.fn(),
+    getChangeReviewAvailability: vi.fn(),
+    runChangeReview: vi.fn(),
+  };
+  return {
+    ...api,
+    getDiffWorkspace: (projectId: string, selection: DiffSelection) =>
+      Promise.all([
+        api.getDiffSummary(projectId, selection),
+        api.getChangeReviewAvailability(projectId, selection),
+      ]).then(([summary, reviewAvailability]) => ({
+        summary,
+        reviewAvailability,
+      })),
+  };
+});
 const notifyReviewComplete = vi.hoisted(() => vi.fn());
 const updater = vi.hoisted(() => ({
   check: vi.fn(),
@@ -487,6 +500,9 @@ describe("change details auto-refresh", () => {
     render(Page);
     await waitFor(() =>
       expect(tauriApi.getDiffSummary).toHaveBeenCalledTimes(1),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText("Loading changes…")).not.toBeInTheDocument(),
     );
     await waitFor(() =>
       expect(screen.queryByText(/Loading diff/)).not.toBeInTheDocument(),

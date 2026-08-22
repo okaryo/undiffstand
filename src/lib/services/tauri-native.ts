@@ -22,16 +22,14 @@ export const nativeApi: AppApi = {
   getUserPreferences: () => invoke("get_user_preferences"),
   saveUserPreferences: (preferences) =>
     invoke("save_user_preferences", { preferences }),
-  getDiffSummary: (projectId, selection) =>
-    invoke("get_diff_summary", { projectId, selection }),
+  getDiffWorkspace: (projectId, selection) =>
+    invoke("get_diff_workspace", { projectId, selection }),
   getFileDiffs: (projectId, selection, paths) =>
     invoke("get_file_diffs", { projectId, selection, paths }),
   explainFileChange: (projectId, selection, path) =>
     invoke("explain_file_change", { projectId, selection, path }),
   askInlineQuestion: (projectId, selection, question) =>
     invoke("ask_inline_question", { projectId, selection, question }),
-  getChangeReviewAvailability: (projectId, selection) =>
-    invoke("get_change_review_availability", { projectId, selection }),
   runChangeReview: (projectId, selection) =>
     invoke("run_change_review", { projectId, selection }),
 };

@@ -1,7 +1,7 @@
 use crate::{
     domain::{
-        ChangeReviewAvailability, ChangeReviewReport, DiffExplanation, DiffSelection, InlineAnswer,
-        InlineQuestion, ReviewOutputLanguage,
+        ChangeReviewReport, DiffExplanation, DiffSelection, InlineAnswer, InlineQuestion,
+        ReviewOutputLanguage,
     },
     error::{AppError, AppResult},
     services::{
@@ -69,16 +69,6 @@ pub async fn ask_inline_question<R: Runtime>(
             language,
         )
         .await
-}
-
-#[tauri::command(async)]
-pub fn get_change_review_availability<R: Runtime>(
-    app: AppHandle<R>,
-    project_id: String,
-    selection: DiffSelection,
-) -> AppResult<ChangeReviewAvailability> {
-    let project = config_service::find_project(&app, &project_id)?;
-    git_service::change_review_availability(Path::new(&project.repo_path), &selection)
 }
 
 #[tauri::command]

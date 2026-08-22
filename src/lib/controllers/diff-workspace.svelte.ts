@@ -29,10 +29,7 @@ export class DiffWorkspaceController {
   private generation = 0;
 
   constructor(
-    private readonly api: Pick<
-      AppApi,
-      "getDiffSummary" | "getChangeReviewAvailability" | "getFileDiffs"
-    >,
+    private readonly api: Pick<AppApi, "getDiffWorkspace" | "getFileDiffs">,
     private readonly onError: (error: unknown) => void,
     private readonly onResetAi: () => void,
   ) {}
@@ -58,10 +55,8 @@ export class DiffWorkspaceController {
     }
 
     try {
-      const [loadedSummary, reviewAvailability] = await Promise.all([
-        this.api.getDiffSummary(projectId, selection),
-        this.api.getChangeReviewAvailability(projectId, selection),
-      ]);
+      const { summary: loadedSummary, reviewAvailability } =
+        await this.api.getDiffWorkspace(projectId, selection);
       if (!this.isCurrent(projectId, selection)) return;
 
       const orderedSummary = {

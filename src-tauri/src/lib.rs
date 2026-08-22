@@ -20,11 +20,10 @@ pub fn run() {
             commands::project::remove_project,
             commands::preferences::get_user_preferences,
             commands::preferences::save_user_preferences,
-            commands::git::get_diff_summary,
+            commands::git::get_diff_workspace,
             commands::git::get_file_diffs,
             commands::ai::explain_file_change,
             commands::ai::ask_inline_question,
-            commands::ai::get_change_review_availability,
             commands::ai::run_change_review,
         ])
         .run(tauri::generate_context!())
