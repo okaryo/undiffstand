@@ -2,7 +2,7 @@
   import {
     CirclePlus,
     FolderGit2,
-    GitBranch,
+    GitCompareArrows,
     LoaderCircle,
     Pencil,
     Settings,
@@ -10,6 +10,7 @@
   import ErrorBanner from "$lib/components/common/ErrorBanner.svelte";
   import UpdateAction from "$lib/components/common/UpdateAction.svelte";
   import type { AppError } from "$lib/domain/error";
+  import { diffSelectionLabel } from "$lib/domain/diff";
   import type { ProjectConfig } from "$lib/domain/project";
   import type { UpdateState } from "$lib/domain/update";
 
@@ -85,7 +86,11 @@
               <div class="project-info">
                 <h3>{project.name}</h3>
                 <p>{project.repoPath}</p>
-                <span><GitBranch size={11} />Current branch → working tree</span
+                <span
+                  title={`Saved comparison: ${diffSelectionLabel(project.comparison)}`}
+                  ><GitCompareArrows size={11} />{diffSelectionLabel(
+                    project.comparison,
+                  )}</span
                 >
               </div>
             </button>
@@ -259,8 +264,15 @@
     display: flex;
     align-items: center;
     gap: 4px;
+    min-width: 0;
+    overflow: hidden;
     color: #8b9a95;
     font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .project-info span :global(svg) {
+    flex: none;
   }
   .project-meta {
     display: flex;

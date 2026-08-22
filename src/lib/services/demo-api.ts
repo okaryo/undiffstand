@@ -8,6 +8,7 @@ const demoProject: ProjectConfig = {
   name: "undiffstand-demo",
   repoPath: "/Users/example/src/undiffstand-demo",
   baseRef: "main",
+  comparison: { base: "HEAD", target: "." },
   lastOpenedAt: new Date().toISOString(),
 };
 
@@ -130,15 +131,31 @@ export const demoApi: AppApi = {
       name: input.name,
       repoPath: input.repoPath,
       baseRef: input.baseRef,
+      comparison:
+        projects.find((item) => item.id === input.id)?.comparison ??
+        ({ base: "HEAD", target: "." } as const),
       lastOpenedAt: new Date().toISOString(),
     };
     projects = [project, ...projects.filter((item) => item.id !== project.id)];
     return project;
   },
-  touchProject: async (projectId) => {
+  touchProject: async (projectId, selection) => {
     const project =
       projects.find((item) => item.id === projectId) ?? demoProject;
-    return { ...project, lastOpenedAt: new Date().toISOString() };
+    const updated = {
+      ...project,
+      comparison: selection ?? project.comparison,
+      lastOpenedAt: new Date().toISOString(),
+    };
+    projects = projects.map((item) => (item.id === projectId ? updated : item));
+    return updated;
+  },
+  saveProjectComparison: async (projectId, selection) => {
+    const project = projects.find((item) => item.id === projectId);
+    if (!project) throw new Error("The selected project no longer exists.");
+    const updated = { ...project, comparison: { ...selection } };
+    projects = projects.map((item) => (item.id === projectId ? updated : item));
+    return updated;
   },
   removeProject: async (projectId) => {
     projects = projects.filter((item) => item.id !== projectId);

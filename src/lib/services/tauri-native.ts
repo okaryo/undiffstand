@@ -14,7 +14,10 @@ export const nativeApi: AppApi = {
   validateRepository: (path) => invoke("validate_repository", { path }),
   listProjects: () => invoke("list_projects"),
   saveProject: (input) => invoke("save_project", { input }),
-  touchProject: (projectId) => invoke("touch_project", { projectId }),
+  touchProject: (projectId, selection) =>
+    invoke("touch_project", { projectId, selection: selection ?? null }),
+  saveProjectComparison: (projectId, selection) =>
+    invoke("save_project_comparison", { projectId, selection }),
   removeProject: (projectId) => invoke("remove_project", { projectId }),
   getUserPreferences: () => invoke("get_user_preferences"),
   saveUserPreferences: (preferences) =>

@@ -353,11 +353,14 @@
       if (projectId) {
         const project = projects.find((item) => item.id === projectId);
         if (project) {
+          const hasRequestedComparison =
+            params.has("base") || params.has("compare") || params.has("target");
           const target = params.get("target") ?? ".";
           const base = params.get("base") ?? params.get("compare") ?? "HEAD";
           await openProject(project, params.get("file") ?? undefined, {
-            base,
-            target,
+            requestedSelection: hasRequestedComparison
+              ? { base, target }
+              : undefined,
           });
         }
       }
@@ -408,7 +411,7 @@
       activeRepository = refreshedRepository;
 
       if (selectionHasDeletedBranch)
-        await workspace.applySelection(defaultDiffSelection());
+        await applyDiffSelection(defaultDiffSelection());
       else await workspace.load(workspace.selectedPath, { silent: true });
     } catch (caught) {
       if (activeProject?.id === project.id)
@@ -503,19 +506,19 @@
   async function openProject(
     project: ProjectConfig,
     requestedFile?: string,
-    requestedSelection: DiffSelection = defaultDiffSelection(),
+    options: { requestedSelection?: DiffSelection } = {},
   ) {
     resetDiffSearch();
     loading = true;
     workspaceError = null;
     try {
       const [openedProject, repository] = await Promise.all([
-        tauriApi.touchProject(project.id),
+        tauriApi.touchProject(project.id, options.requestedSelection),
         tauriApi.validateRepository(project.repoPath),
       ]);
       activeProject = openedProject;
       activeRepository = repository;
-      workspace.activate(openedProject.id, requestedSelection);
+      workspace.activate(openedProject.id, openedProject.comparison);
       projects = [
         activeProject,
         ...projects.filter((item) => item.id !== activeProject?.id),
@@ -531,7 +534,20 @@
   async function applyDiffSelection(selection: DiffSelection) {
     showComparisonDialog = false;
     resetDiffSearch();
-    await workspace.applySelection(selection);
+    if (!activeProject) return;
+    try {
+      const updatedProject = await tauriApi.saveProjectComparison(
+        activeProject.id,
+        selection,
+      );
+      activeProject = updatedProject;
+      projects = projects.map((project) =>
+        project.id === updatedProject.id ? updatedProject : project,
+      );
+      await workspace.applySelection(selection);
+    } catch (caught) {
+      workspaceError = normalizeError(caught);
+    }
   }
 
   async function configureBaseBranch() {
