@@ -70,19 +70,22 @@
   let copiedPath = $state<string>();
   let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
   let renderTimer: ReturnType<typeof setTimeout> | undefined;
+  let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
   const sectionElements = new SvelteMap<string, HTMLElement>();
   const requestedPaths = new SvelteSet<string>();
   const pendingRenderPaths: string[] = [];
   const pendingRenderPathSet = new SvelteSet<string>();
   const activeSectionPaths = new SvelteSet<string>();
-  const INITIAL_RENDERED_FILE_COUNT = 8;
-  const LAZY_RENDER_ROOT_MARGIN = "1200px 0px";
+  const INITIAL_PREFETCH_FILE_COUNT = 2;
+  const INITIAL_PREFETCH_DELAY_MS = 64;
+  const LAZY_RENDER_ROOT_MARGIN = "400px 0px";
   const ACTIVE_FILE_OFFSET = 52;
   const RENDER_INTERVAL_MS = 32;
 
   onDestroy(() => {
     if (copyResetTimer !== undefined) clearTimeout(copyResetTimer);
     if (renderTimer !== undefined) clearTimeout(renderTimer);
+    if (prefetchTimer !== undefined) clearTimeout(prefetchTimer);
   });
 
   onMount(() => {
@@ -106,10 +109,16 @@
     if (filesKey === lastFilesKey) return;
     lastFilesKey = filesKey;
     resetDeferredRendering();
-    for (const file of files.slice(0, INITIAL_RENDERED_FILE_COUNT)) {
-      requestFileRender(displayPath(file));
+    const initialPath =
+      activePath && files.some((file) => displayPath(file) === activePath)
+        ? activePath
+        : files[0]
+          ? displayPath(files[0])
+          : undefined;
+    if (initialPath) {
+      requestFileRender(initialPath, true);
+      scheduleInitialPrefetch(initialPath, filesKey);
     }
-    if (activePath) requestFileRender(activePath, true);
     observeDeferredSections();
   });
 
@@ -203,12 +212,40 @@
 
   function resetDeferredRendering() {
     if (renderTimer !== undefined) clearTimeout(renderTimer);
+    if (prefetchTimer !== undefined) clearTimeout(prefetchTimer);
     renderTimer = undefined;
+    prefetchTimer = undefined;
     requestedPaths.clear();
     pendingRenderPaths.length = 0;
     pendingRenderPathSet.clear();
     renderedPaths = {};
     requestedPathsVersion += 1;
+  }
+
+  function scheduleInitialPrefetch(initialPath: string, filesKey: string) {
+    const initialIndex = files.findIndex(
+      (file) => displayPath(file) === initialPath,
+    );
+    if (initialIndex < 0) return;
+    prefetchTimer = setTimeout(() => {
+      prefetchTimer = undefined;
+      if (filesKey !== lastFilesKey) return;
+      const paths: string[] = [];
+      for (
+        let distance = 1;
+        paths.length < INITIAL_PREFETCH_FILE_COUNT &&
+        (initialIndex + distance < files.length ||
+          initialIndex - distance >= 0);
+        distance += 1
+      ) {
+        const after = files[initialIndex + distance];
+        const before = files[initialIndex - distance];
+        if (after) paths.push(displayPath(after));
+        if (before && paths.length < INITIAL_PREFETCH_FILE_COUNT)
+          paths.push(displayPath(before));
+      }
+      for (const path of paths) requestFileRender(path);
+    }, INITIAL_PREFETCH_DELAY_MS);
   }
 
   function requestFileRender(path: string, priority = false) {
@@ -217,8 +254,8 @@
       requestedPathsVersion += 1;
       const section = sectionElements.get(path);
       if (section) renderObserver?.unobserve(section);
+      onLoad(path);
     }
-    onLoad(path);
     if (diffs[path]) queueReadyRender(path, priority);
   }
 

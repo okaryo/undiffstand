@@ -91,7 +91,7 @@ describe("DiffFeed deferred rendering", () => {
     HTMLCanvasElement.prototype.getContext = originalGetContext;
   });
 
-  it("requests only the first eight files initially and mounts ready viewers one at a time", async () => {
+  it("loads the selected file first and prefetches only two adjacent files", async () => {
     const files = createFiles(10);
     const diffs = Object.fromEntries(
       files.map((file) => [file.newPath as string, createDiff(file)]),
@@ -103,6 +103,7 @@ describe("DiffFeed deferred rendering", () => {
         diffs,
         loadingPaths: {},
         errors: {},
+        activePath: "src/file-5.ts",
         mode: "split",
         wrap: false,
         onLoad,
@@ -110,9 +111,7 @@ describe("DiffFeed deferred rendering", () => {
       },
     });
 
-    expect(onLoad.mock.calls.map(([path]) => path)).toEqual(
-      files.slice(0, 8).map((file) => file.newPath),
-    );
+    expect(onLoad.mock.calls.map(([path]) => path)).toEqual(["src/file-5.ts"]);
     expect(container.querySelectorAll(".diff-host")).toHaveLength(0);
 
     await vi.advanceTimersByTimeAsync(32);
@@ -121,11 +120,16 @@ describe("DiffFeed deferred rendering", () => {
 
     await vi.advanceTimersByTimeAsync(32);
     await tick();
-    expect(container.querySelectorAll(".diff-host")).toHaveLength(2);
+    expect(onLoad.mock.calls.map(([path]) => path)).toEqual([
+      "src/file-5.ts",
+      "src/file-6.ts",
+      "src/file-4.ts",
+    ]);
+    expect(container.querySelectorAll(".diff-host")).toHaveLength(1);
 
-    await vi.advanceTimersByTimeAsync(32 * 6);
+    await vi.advanceTimersByTimeAsync(32 * 2);
     await tick();
-    expect(container.querySelectorAll(".diff-host")).toHaveLength(8);
+    expect(container.querySelectorAll(".diff-host")).toHaveLength(3);
     unmount();
   });
 
@@ -151,7 +155,7 @@ describe("DiffFeed deferred rendering", () => {
     expect(ninthSection).not.toBeNull();
 
     const renderObserver = IntersectionObserverMock.instances.find(
-      (observer) => observer.options?.rootMargin === "1200px 0px",
+      (observer) => observer.options?.rootMargin === "400px 0px",
     );
     const activeObserver = IntersectionObserverMock.instances.find(
       (observer) => observer !== renderObserver,
@@ -231,7 +235,7 @@ describe("DiffFeed deferred rendering", () => {
     };
     const { rerender, unmount } = render(DiffFeed, { props });
 
-    await vi.advanceTimersByTimeAsync(64);
+    await vi.advanceTimersByTimeAsync(128);
     await tick();
     const prefixHighlights = highlights.get("undiffstand-diff-search-match");
     expect(
