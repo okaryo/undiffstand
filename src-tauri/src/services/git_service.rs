@@ -146,6 +146,9 @@ pub fn comparison_commits_for_range(
     base: &str,
     target: &str,
 ) -> AppResult<Vec<ComparisonCommit>> {
+    if base == target {
+        return Ok(Vec::new());
+    }
     let range = format!("{base}..{target}");
     let bytes = successful(
         git_output(
@@ -1078,6 +1081,15 @@ mod tests {
         assert!(subjects.contains(&"side change"));
         assert_eq!(subjects.last(), Some(&"merge side"));
         assert_eq!(commits.last().unwrap().parent_count, 2);
+    }
+
+    #[test]
+    fn comparison_commits_skip_git_log_for_identical_endpoints() {
+        let temp = tempfile::tempdir().unwrap();
+
+        let commits = comparison_commits_for_range(temp.path(), "same", "same").unwrap();
+
+        assert!(commits.is_empty());
     }
 
     #[test]
