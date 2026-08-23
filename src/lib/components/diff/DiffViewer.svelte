@@ -1,15 +1,8 @@
 <script module lang="ts">
   import { SvelteMap } from "svelte/reactivity";
-  import {
-    bundledLanguages,
-    getDiffViewHighlighter,
-    type BundledLanguage,
-    type DiffHighlighter,
-  } from "@git-diff-view/shiki";
+  import type { DiffHighlighter } from "@git-diff-view/shiki";
+  import { prepareSyntaxHighlighter } from "$lib/services/syntax-highlighter";
 
-  let highlighterPromise: Promise<DiffHighlighter> | undefined;
-  const languagePromises = new SvelteMap<string, Promise<void>>();
-  let languageLoadQueue: Promise<void> = Promise.resolve();
   const highlightActivationQueue: Array<{
     cancelled: boolean;
     callback: () => void;
@@ -20,7 +13,6 @@
     { query: string; matches: Range[]; active: Range[] }
   >();
   let currentSearchHighlightQuery = "";
-  const MINIMAL_BOOTSTRAP_LANGUAGE: BundledLanguage = "diff";
 
   function scheduleIdle(callback: () => void): () => void {
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
@@ -29,24 +21,6 @@
     }
     const handle = setTimeout(callback, 100);
     return () => clearTimeout(handle);
-  }
-
-  function runInIdle<T>(task: () => T | Promise<T>): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      scheduleIdle(() => {
-        try {
-          Promise.resolve(task()).then(resolve, reject);
-        } catch (error) {
-          reject(error);
-        }
-      });
-    });
-  }
-
-  function enqueueLanguageLoad(task: () => void | Promise<void>) {
-    const loading = languageLoadQueue.then(() => runInIdle(task));
-    languageLoadQueue = loading.catch(() => undefined);
-    return loading;
   }
 
   function scheduleNextHighlightActivation() {
@@ -113,39 +87,10 @@
     viewerSearchRanges.delete(id);
     updateGlobalSearchHighlights();
   }
-
-  async function loadHighlighter(language: string) {
-    const bundledLanguage =
-      language in bundledLanguages
-        ? (language as BundledLanguage)
-        : MINIMAL_BOOTSTRAP_LANGUAGE;
-    highlighterPromise ??= runInIdle(() =>
-      getDiffViewHighlighter([bundledLanguage]),
-    );
-    const highlighter = await highlighterPromise;
-
-    if (
-      language in bundledLanguages &&
-      !highlighter.hasRegisteredCurrentLang(language)
-    ) {
-      let languagePromise = languagePromises.get(language);
-      if (!languagePromise) {
-        languagePromise = enqueueLanguageLoad(async () => {
-          await highlighter
-            .getHighlighterEngine()
-            ?.loadLanguage(language as BundledLanguage);
-        });
-        languagePromises.set(language, languagePromise);
-      }
-      await languagePromise;
-    }
-
-    return highlighter;
-  }
 </script>
 
 <script lang="ts">
-  import { onDestroy, onMount, tick } from "svelte";
+  import { onDestroy, tick } from "svelte";
   import {
     DiffModeEnum,
     DiffViewWithMultiSelect,
@@ -396,23 +341,45 @@
     removeViewerSearchRanges(viewerSearchId);
   });
 
-  onMount(() => {
-    let mounted = true;
+  $effect(() => {
+    const controller = new AbortController();
     let cancelHighlightActivation: (() => void) | undefined;
+    const sources = [
+      diff.file.oldPath && diff.oldContent !== undefined
+        ? {
+            raw: diff.oldContent,
+            fileName: diff.file.oldPath,
+            language,
+            theme: "dark" as const,
+          }
+        : undefined,
+      diff.file.newPath && diff.newContent !== undefined
+        ? {
+            raw: diff.newContent,
+            fileName: diff.file.newPath,
+            language,
+            theme: "dark" as const,
+          }
+        : undefined,
+    ].filter((source) => source !== undefined);
 
-    void loadHighlighter(language)
+    highlighter = undefined;
+
+    void prepareSyntaxHighlighter(sources, controller.signal)
       .then((loadedHighlighter) => {
-        if (!mounted) return;
+        if (controller.signal.aborted || !loadedHighlighter) return;
         cancelHighlightActivation = enqueueHighlightActivation(() => {
-          if (mounted) highlighter = loadedHighlighter;
+          if (!controller.signal.aborted) highlighter = loadedHighlighter;
         });
       })
       .catch((error: unknown) => {
-        console.error("Failed to initialize Shiki syntax highlighting.", error);
+        if (error instanceof DOMException && error.name === "AbortError")
+          return;
+        console.error("Failed to prepare syntax highlighting.", error);
       });
 
     return () => {
-      mounted = false;
+      controller.abort();
       cancelHighlightActivation?.();
     };
   });

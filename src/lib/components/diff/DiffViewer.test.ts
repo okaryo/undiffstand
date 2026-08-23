@@ -4,38 +4,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileDiff } from "$lib/domain/diff";
 import DiffViewer from "./DiffViewer.svelte";
 
-const shiki = vi.hoisted(() => {
-  const loadedLanguages = new Set<string>(["ts"]);
-  const loadLanguage = vi.fn(async (language: string) => {
-    loadedLanguages.add(language);
-  });
+const syntaxHighlighter = vi.hoisted(() => {
   const highlighter = {
-    name: "shiki",
+    name: "shiki-worker-test",
     type: "class",
     maxLineToIgnoreSyntax: 2_000,
     ignoreSyntaxHighlightList: [],
     setMaxLineToIgnoreSyntax: vi.fn(),
     setIgnoreSyntaxHighlightList: vi.fn(),
-    getAST: vi.fn(() => undefined),
+    getAST: vi.fn(() => ({ type: "root", children: [] })),
     processAST: vi.fn(() => ({
       syntaxFileObject: {},
       syntaxFileLineNumber: 0,
     })),
-    hasRegisteredCurrentLang: vi.fn((language: string) =>
-      loadedLanguages.has(language),
-    ),
-    getHighlighterEngine: () => ({ loadLanguage }),
+    hasRegisteredCurrentLang: vi.fn(() => true),
+    getHighlighterEngine: () => null,
   };
   return {
-    loadedLanguages,
-    loadLanguage,
-    getDiffViewHighlighter: vi.fn(async () => highlighter),
+    highlighter,
+    prepare: vi.fn(async () => highlighter),
   };
 });
 
-vi.mock("@git-diff-view/shiki", () => ({
-  bundledLanguages: { diff: {}, rs: {}, ts: {} },
-  getDiffViewHighlighter: shiki.getDiffViewHighlighter,
+vi.mock("$lib/services/syntax-highlighter", () => ({
+  prepareSyntaxHighlighter: syntaxHighlighter.prepare,
 }));
 
 function diff(path: string): FileDiff {
@@ -59,10 +51,9 @@ describe("DiffViewer syntax highlighting", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    shiki.loadedLanguages.clear();
-    shiki.loadedLanguages.add("ts");
-    shiki.loadLanguage.mockClear();
-    shiki.getDiffViewHighlighter.mockClear();
+    syntaxHighlighter.prepare.mockClear();
+    syntaxHighlighter.highlighter.getAST.mockClear();
+    syntaxHighlighter.highlighter.processAST.mockClear();
     HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
       font: "",
       measureText: () => ({ width: 0 }),
@@ -74,7 +65,7 @@ describe("DiffViewer syntax highlighting", () => {
     HTMLCanvasElement.prototype.getContext = originalGetContext;
   });
 
-  it("initializes one language and loads additional languages on demand", async () => {
+  it("prepares syntax off-thread and activates one viewer per idle slot", async () => {
     const first = render(DiffViewer, {
       props: { diff: diff("src/example.ts"), mode: "split", wrap: false },
     });
@@ -82,18 +73,38 @@ describe("DiffViewer syntax highlighting", () => {
       props: { diff: diff("src/example.rs"), mode: "split", wrap: false },
     });
 
+    await tick();
+
+    expect(syntaxHighlighter.prepare).toHaveBeenCalledTimes(2);
+    expect(syntaxHighlighter.prepare).toHaveBeenNthCalledWith(
+      1,
+      [
+        {
+          raw: "const value = 1;\n",
+          fileName: "src/example.ts",
+          language: "ts",
+          theme: "dark",
+        },
+        {
+          raw: "const value = 2;\n",
+          fileName: "src/example.ts",
+          language: "ts",
+          theme: "dark",
+        },
+      ],
+      expect.any(AbortSignal),
+    );
+    expect(syntaxHighlighter.highlighter.getAST).not.toHaveBeenCalled();
+
     await vi.advanceTimersByTimeAsync(100);
     await tick();
 
-    expect(shiki.getDiffViewHighlighter).toHaveBeenCalledTimes(1);
-    expect(shiki.getDiffViewHighlighter).toHaveBeenCalledWith(["ts"]);
-    expect(shiki.loadLanguage).not.toHaveBeenCalled();
+    expect(syntaxHighlighter.highlighter.getAST).toHaveBeenCalledTimes(2);
 
     await vi.advanceTimersByTimeAsync(100);
     await tick();
 
-    expect(shiki.loadLanguage).toHaveBeenCalledTimes(1);
-    expect(shiki.loadLanguage).toHaveBeenCalledWith("rs");
+    expect(syntaxHighlighter.highlighter.getAST).toHaveBeenCalledTimes(4);
 
     first.unmount();
     second.unmount();
