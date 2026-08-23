@@ -119,6 +119,7 @@ fn resolve_diff(repo: &Path, selection: &DiffSelection) -> AppResult<ResolvedDif
     }
 }
 
+#[cfg(test)]
 pub fn comparison_commits(
     repo: &Path,
     selection: &DiffSelection,
@@ -212,16 +213,15 @@ fn resolve_scoped_diff(
             resolve_diff(repo, &DiffSelection::default())
         }
         DiffScope::Commit { sha } => {
-            let commit = comparison_commits(repo, selection)?
-                .into_iter()
-                .find(|commit| commit.sha == *sha)
-                .ok_or_else(|| {
-                    AppError::new(
-                        "INVALID_DIFF_SCOPE",
-                        "The selected commit is not part of this comparison.",
-                    )
-                })?;
-            let parents = commit_parents(repo, &commit.sha)?;
+            let commit_sha = resolve_commit(repo, sha)?;
+            let (base, target) = comparison_commit_range(repo, selection)?;
+            if !is_ancestor(repo, &commit_sha, &target)? || is_ancestor(repo, &commit_sha, &base)? {
+                return Err(AppError::new(
+                    "INVALID_DIFF_SCOPE",
+                    "The selected commit is not part of this comparison.",
+                ));
+            }
+            let parents = commit_parents(repo, &commit_sha)?;
             resolve_diff(
                 repo,
                 &DiffSelection {
@@ -229,10 +229,23 @@ fn resolve_scoped_diff(
                         .first()
                         .cloned()
                         .unwrap_or_else(|| EMPTY_TREE_SHA.to_owned()),
-                    target: commit.sha,
+                    target: commit_sha,
                 },
             )
         }
+    }
+}
+
+fn is_ancestor(repo: &Path, ancestor: &str, descendant: &str) -> AppResult<bool> {
+    let output = git_output(repo, ["merge-base", "--is-ancestor", ancestor, descendant])?;
+    match output.status.code() {
+        Some(0) => Ok(true),
+        Some(1) => Ok(false),
+        _ => Err(AppError::new(
+            "UNKNOWN",
+            "The selected commit could not be validated against this comparison.",
+        )
+        .with_detail(String::from_utf8_lossy(&output.stderr).trim())),
     }
 }
 
@@ -1065,6 +1078,34 @@ mod tests {
         assert!(subjects.contains(&"side change"));
         assert_eq!(subjects.last(), Some(&"merge side"));
         assert_eq!(commits.last().unwrap().parent_count, 2);
+    }
+
+    #[test]
+    fn commit_scope_rejects_a_commit_outside_the_target_only_range() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        initialize_repository(repo, "main");
+        git(repo, &["switch", "-c", "feature"]);
+        fs::write(repo.join("feature.txt"), "feature\n").unwrap();
+        git(repo, &["add", "feature.txt"]);
+        git(repo, &["commit", "-m", "feature change"]);
+        git(repo, &["switch", "main"]);
+        fs::write(repo.join("main.txt"), "main\n").unwrap();
+        git(repo, &["add", "main.txt"]);
+        git(repo, &["commit", "-m", "main only"]);
+        let main_only = resolve_commit(repo, "main").unwrap();
+
+        let error = diff_workspace_with_snapshot(
+            repo,
+            &DiffSelection {
+                base: "main".to_owned(),
+                target: "feature".to_owned(),
+            },
+            &DiffScope::Commit { sha: main_only },
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "INVALID_DIFF_SCOPE");
     }
 
     #[test]
