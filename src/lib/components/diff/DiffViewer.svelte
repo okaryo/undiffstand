@@ -9,11 +9,18 @@
 
   let highlighterPromise: Promise<DiffHighlighter> | undefined;
   const languagePromises = new SvelteMap<string, Promise<void>>();
+  let languageLoadQueue: Promise<void> = Promise.resolve();
+  const highlightActivationQueue: Array<{
+    cancelled: boolean;
+    callback: () => void;
+  }> = [];
+  let highlightActivationScheduled = false;
   const viewerSearchRanges = new SvelteMap<
     object,
     { query: string; matches: Range[]; active: Range[] }
   >();
   let currentSearchHighlightQuery = "";
+  const MINIMAL_BOOTSTRAP_LANGUAGE: BundledLanguage = "diff";
 
   function scheduleIdle(callback: () => void): () => void {
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
@@ -34,6 +41,35 @@
         }
       });
     });
+  }
+
+  function enqueueLanguageLoad(task: () => void | Promise<void>) {
+    const loading = languageLoadQueue.then(() => runInIdle(task));
+    languageLoadQueue = loading.catch(() => undefined);
+    return loading;
+  }
+
+  function scheduleNextHighlightActivation() {
+    if (highlightActivationScheduled) return;
+    let next = highlightActivationQueue.shift();
+    while (next?.cancelled) next = highlightActivationQueue.shift();
+    if (!next) return;
+
+    highlightActivationScheduled = true;
+    scheduleIdle(() => {
+      highlightActivationScheduled = false;
+      if (!next.cancelled) next.callback();
+      scheduleNextHighlightActivation();
+    });
+  }
+
+  function enqueueHighlightActivation(callback: () => void) {
+    const item = { cancelled: false, callback };
+    highlightActivationQueue.push(item);
+    scheduleNextHighlightActivation();
+    return () => {
+      item.cancelled = true;
+    };
   }
 
   function updateGlobalSearchHighlights() {
@@ -79,13 +115,22 @@
   }
 
   async function loadHighlighter(language: string) {
-    highlighterPromise ??= runInIdle(() => getDiffViewHighlighter());
+    const bundledLanguage =
+      language in bundledLanguages
+        ? (language as BundledLanguage)
+        : MINIMAL_BOOTSTRAP_LANGUAGE;
+    highlighterPromise ??= runInIdle(() =>
+      getDiffViewHighlighter([bundledLanguage]),
+    );
     const highlighter = await highlighterPromise;
 
-    if (language in bundledLanguages) {
+    if (
+      language in bundledLanguages &&
+      !highlighter.hasRegisteredCurrentLang(language)
+    ) {
       let languagePromise = languagePromises.get(language);
       if (!languagePromise) {
-        languagePromise = runInIdle(async () => {
+        languagePromise = enqueueLanguageLoad(async () => {
           await highlighter
             .getHighlighterEngine()
             ?.loadLanguage(language as BundledLanguage);
@@ -358,7 +403,7 @@
     void loadHighlighter(language)
       .then((loadedHighlighter) => {
         if (!mounted) return;
-        cancelHighlightActivation = scheduleIdle(() => {
+        cancelHighlightActivation = enqueueHighlightActivation(() => {
           if (mounted) highlighter = loadedHighlighter;
         });
       })
