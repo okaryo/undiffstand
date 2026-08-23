@@ -26,6 +26,12 @@
   let open = $state(false);
   let trigger: HTMLButtonElement;
   let menu = $state<HTMLDivElement>();
+  let menuPosition = $state({
+    top: 0,
+    left: 0,
+    width: 390,
+    maxHeight: 440,
+  });
 
   const selectedCommit = $derived(
     scope.kind === "commit"
@@ -49,6 +55,40 @@
   function select(nextScope: DiffScope) {
     open = false;
     onSelect(nextScope);
+  }
+
+  function positionMenu() {
+    const viewportGutter = 8;
+    const triggerRect = trigger.getBoundingClientRect();
+    const width = Math.min(390, window.innerWidth - viewportGutter * 2);
+    const left = Math.min(
+      Math.max(viewportGutter, triggerRect.left),
+      window.innerWidth - width - viewportGutter,
+    );
+    const top = triggerRect.bottom + 1;
+
+    menuPosition = {
+      top,
+      left,
+      width,
+      maxHeight: Math.max(
+        80,
+        Math.min(440, window.innerHeight - top - viewportGutter),
+      ),
+    };
+  }
+
+  function toggleMenu() {
+    if (open) {
+      open = false;
+      return;
+    }
+    positionMenu();
+    open = true;
+  }
+
+  function handleViewportResize() {
+    if (open) positionMenu();
   }
 
   function isSelected(candidate: DiffScope) {
@@ -89,7 +129,11 @@
   }
 </script>
 
-<svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} />
+<svelte:window
+  onclick={handleWindowClick}
+  onkeydown={handleWindowKeydown}
+  onresize={handleViewportResize}
+/>
 
 <div class="commit-scope-selector">
   <button
@@ -101,7 +145,7 @@
     aria-expanded={open}
     aria-label={`Choose changes to view. Current: ${currentLabel}`}
     {disabled}
-    onclick={() => (open = !open)}
+    onclick={toggleMenu}
   >
     {#if scope.kind === "commit" && selectedCommit?.parentCount !== 1}
       <GitMerge size={14} />
@@ -122,6 +166,10 @@
       class="menu"
       role="menu"
       aria-label="Comparison commits"
+      style:top={`${menuPosition.top}px`}
+      style:left={`${menuPosition.left}px`}
+      style:width={`${menuPosition.width}px`}
+      style:max-height={`${menuPosition.maxHeight}px`}
     >
       <button
         type="button"
@@ -232,12 +280,8 @@
   }
 
   .menu {
-    position: absolute;
+    position: fixed;
     z-index: 70;
-    top: calc(100% + 1px);
-    left: 8px;
-    width: min(390px, calc(100vw - 32px));
-    max-height: min(440px, calc(100vh - 120px));
     padding: 6px;
     overflow: auto;
     background: #111923;
