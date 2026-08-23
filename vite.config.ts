@@ -12,6 +12,9 @@ export default defineConfig({
     strictPort: true,
   },
   envPrefix: ["VITE_", "TAURI_ENV_"],
+  worker: {
+    format: "es",
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
