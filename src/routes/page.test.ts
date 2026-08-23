@@ -750,6 +750,36 @@ describe("change details auto-refresh", () => {
     );
   });
 
+  it("keeps diff and comparison controls usable while commits are pending", async () => {
+    tauriApi.getComparisonCommits.mockImplementation(
+      () => new Promise(() => {}),
+    );
+    history.replaceState(null, "", "/?project=alpha");
+    render(Page);
+
+    const scopeSelector = await screen.findByRole("button", {
+      name: "Choose changes to view. Current: All changes",
+    });
+    await waitFor(() =>
+      expect(screen.queryByText("Loading changes…")).not.toBeInTheDocument(),
+    );
+    expect(scopeSelector).toBeEnabled();
+    await fireEvent.click(scopeSelector);
+    expect(screen.getByText("Loading commits…")).toBeInTheDocument();
+
+    await fireEvent.click(
+      screen.getByRole("button", {
+        name: "Change comparison. Current: feature → working tree",
+      }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Change comparison" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Compare main → feature" }),
+    ).toBeEnabled();
+  });
+
   it("changes comparison during loading and ignores the stale response", async () => {
     let finishInitial: (value: DiffSummary) => void = () => {};
     let finishComparison: (value: DiffSummary) => void = () => {};

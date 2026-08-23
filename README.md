@@ -33,6 +33,16 @@ pnpm tauri dev
 
 The frontend can also be opened independently with `pnpm dev`. Outside Tauri it uses deterministic in-memory demo data so the Review flow can be tested without filesystem access or a Codex CLI invocation.
 
+### Git performance diagnostics
+
+Git commands that take at least 250 ms are written to the diagnostic output with their command name, duration, and exit status. Set `UNDIFFSTAND_GIT_TIMING=1` when starting the app to record every Git command:
+
+```bash
+UNDIFFSTAND_GIT_TIMING=1 pnpm tauri dev
+```
+
+Arguments and repository paths are intentionally omitted from these timing records.
+
 ## AI configuration
 
 Install and authenticate Codex CLI before launching undiffstand:
