@@ -201,6 +201,28 @@ impl Default for DiffSelection {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum DiffScope {
+    #[default]
+    All,
+    Commit {
+        sha: String,
+    },
+    Uncommitted,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ComparisonCommit {
+    pub sha: String,
+    pub short_sha: String,
+    pub subject: String,
+    pub author_name: String,
+    pub authored_at: String,
+    pub parent_count: usize,
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DiffComparison {
@@ -293,6 +315,10 @@ pub enum ChangeReviewTarget {
     Base {
         #[serde(rename = "baseBranch")]
         base_branch: String,
+    },
+    Commit {
+        sha: String,
+        title: String,
     },
 }
 

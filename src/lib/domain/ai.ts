@@ -28,7 +28,9 @@ export type InlineAnswer = {
 };
 
 export type ChangeReviewTarget =
-  { kind: "uncommitted" } | { kind: "base"; baseBranch: string };
+  | { kind: "uncommitted" }
+  | { kind: "base"; baseBranch: string }
+  | { kind: "commit"; sha: string; title: string };
 
 export type ChangeReviewAvailability = {
   available: boolean;

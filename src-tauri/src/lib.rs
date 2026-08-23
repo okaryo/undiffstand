@@ -7,6 +7,7 @@ mod services;
 pub fn run() {
     tauri::Builder::default()
         .manage(commands::git::DiffSnapshotCache::default())
+        .manage(commands::git::ComparisonCommitCache::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
@@ -22,6 +23,7 @@ pub fn run() {
             commands::preferences::get_user_preferences,
             commands::preferences::save_user_preferences,
             commands::git::get_diff_workspace,
+            commands::git::get_comparison_commits,
             commands::git::get_file_diffs,
             commands::ai::explain_file_change,
             commands::ai::ask_inline_question,

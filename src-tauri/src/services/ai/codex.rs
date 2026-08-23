@@ -201,6 +201,14 @@ fn native_review_args(target: &ChangeReviewTarget) -> Vec<String> {
         ChangeReviewTarget::Base { base_branch } => {
             args.extend(["--base".to_owned(), base_branch.clone()]);
         }
+        ChangeReviewTarget::Commit { sha, title } => {
+            args.extend([
+                "--commit".to_owned(),
+                sha.clone(),
+                "--title".to_owned(),
+                title.clone(),
+            ]);
+        }
     }
     args
 }
@@ -500,6 +508,23 @@ mod tests {
                 "review",
                 "--base",
                 "main"
+            ]
+        );
+        assert_eq!(
+            native_review_args(&ChangeReviewTarget::Commit {
+                sha: "1234567890abcdef".to_owned(),
+                title: "Add commit review".to_owned(),
+            }),
+            [
+                "--sandbox",
+                "read-only",
+                "--ask-for-approval",
+                "never",
+                "review",
+                "--commit",
+                "1234567890abcdef",
+                "--title",
+                "Add commit review",
             ]
         );
     }

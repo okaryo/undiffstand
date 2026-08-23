@@ -1,5 +1,11 @@
 import type { ChangeReviewAvailability } from "$lib/domain/ai";
-import type { DiffSelection, DiffSummary, FileDiff } from "$lib/domain/diff";
+import type {
+  ComparisonCommit,
+  DiffScope,
+  DiffSelection,
+  DiffSummary,
+  FileDiff,
+} from "$lib/domain/diff";
 import { defaultUserPreferences } from "$lib/domain/preferences";
 import type { ProjectConfig } from "$lib/domain/project";
 import type { AppApi } from "./api";
@@ -64,6 +70,17 @@ const summary: DiffSummary = {
   ],
 };
 
+const comparisonCommits: ComparisonCommit[] = [
+  {
+    sha: "8f31dc290c98f3ebd149ebf4e9cdb594d7356cb7",
+    shortSha: "8f31dc2",
+    subject: "Improve review context",
+    authorName: "Demo Author",
+    authoredAt: "2026-08-23T10:00:00Z",
+    parentCount: 1,
+  },
+];
+
 function summaryFor(selection: DiffSelection): DiffSummary {
   return {
     ...summary,
@@ -75,6 +92,21 @@ function summaryFor(selection: DiffSelection): DiffSummary {
       toSha: selection.target === "." ? undefined : summary.comparison.fromSha,
     },
   };
+}
+
+function scopedSummary(
+  selection: DiffSelection,
+  scope: DiffScope,
+): DiffSummary {
+  if (scope.kind === "commit") {
+    return summaryFor({
+      base: "71e432190c98f3ebd149ebf4e9cdb594d7356abc",
+      target: scope.sha,
+    });
+  }
+  if (scope.kind === "uncommitted")
+    return summaryFor({ base: "HEAD", target: "." });
+  return summaryFor(selection);
 }
 
 function reviewAvailabilityFor(
@@ -187,10 +219,26 @@ export const demoApi: AppApi = {
     userPreferences = structuredClone(preferences);
     return structuredClone(userPreferences);
   },
-  getDiffWorkspace: async (_projectId, selection) => ({
-    summary: summaryFor(selection),
-    reviewAvailability: reviewAvailabilityFor(selection),
+  getDiffWorkspace: async (_projectId, selection, scope) => ({
+    summary: scopedSummary(selection, scope),
+    reviewAvailability:
+      scope.kind === "commit"
+        ? {
+            available: true,
+            target: {
+              kind: "commit",
+              sha: scope.sha,
+              title: "Improve review context",
+            },
+            scopeLabel: "commit 8f31dc2 · Improve review context",
+          }
+        : reviewAvailabilityFor(
+            scope.kind === "uncommitted"
+              ? { base: "HEAD", target: "." }
+              : selection,
+          ),
   }),
+  getComparisonCommits: async () => comparisonCommits,
   getFileDiffs: async (_projectId, _selection, paths) => paths.map(diffFor),
   explainFileChange: async (_projectId, _selection, path) => ({
     summary:

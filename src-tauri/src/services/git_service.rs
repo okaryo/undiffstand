@@ -4,8 +4,9 @@ mod repository;
 
 use crate::{
     domain::{
-        ChangeReviewAvailability, ChangeReviewTarget, DiffComparison, DiffFileSummary,
-        DiffSelection, DiffStatus, DiffSummary, DiffWorkspace, FileDiff,
+        ChangeReviewAvailability, ChangeReviewTarget, ComparisonCommit, DiffComparison,
+        DiffFileSummary, DiffScope, DiffSelection, DiffStatus, DiffSummary, DiffWorkspace,
+        FileDiff,
     },
     error::{AppError, AppResult},
     services::file_service,
@@ -20,6 +21,7 @@ use std::{collections::HashSet, path::Path, process::Output};
 
 const MAX_DIFF_BYTES: usize = 1_500_000;
 const MAX_CONTENT_BYTES: usize = 2_000_000;
+const EMPTY_TREE_SHA: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 #[derive(Debug, Clone)]
 enum DiffRange {
@@ -81,12 +83,21 @@ fn resolve_diff(repo: &Path, selection: &DiffSelection) -> AppResult<ResolvedDif
         ));
     }
 
-    let from = resolve_commit(repo, base)?;
+    let from = if base == EMPTY_TREE_SHA {
+        EMPTY_TREE_SHA.to_owned()
+    } else {
+        resolve_commit(repo, base)?
+    };
+    let from_label = if base == EMPTY_TREE_SHA {
+        "empty tree".to_owned()
+    } else {
+        normalized_ref(base).to_owned()
+    };
     if target == "." {
         Ok(ResolvedDiff {
             selection: selection.clone(),
             comparison: DiffComparison {
-                from_label: normalized_ref(base).to_owned(),
+                from_label: from_label.clone(),
                 to_label: "working tree".to_owned(),
                 from_sha: Some(from.clone()),
                 to_sha: None,
@@ -98,7 +109,7 @@ fn resolve_diff(repo: &Path, selection: &DiffSelection) -> AppResult<ResolvedDif
         Ok(ResolvedDiff {
             selection: selection.clone(),
             comparison: DiffComparison {
-                from_label: normalized_ref(base).to_owned(),
+                from_label,
                 to_label: normalized_ref(target).to_owned(),
                 from_sha: Some(from.clone()),
                 to_sha: Some(to.clone()),
@@ -106,6 +117,151 @@ fn resolve_diff(repo: &Path, selection: &DiffSelection) -> AppResult<ResolvedDif
             range: DiffRange::Revisions { from, to },
         })
     }
+}
+
+#[cfg(test)]
+pub fn comparison_commits(
+    repo: &Path,
+    selection: &DiffSelection,
+) -> AppResult<Vec<ComparisonCommit>> {
+    let (base, target) = comparison_commit_range(repo, selection)?;
+    comparison_commits_for_range(repo, &base, &target)
+}
+
+pub fn comparison_commit_range(
+    repo: &Path,
+    selection: &DiffSelection,
+) -> AppResult<(String, String)> {
+    let base = resolve_commit(repo, selection.base.trim())?;
+    let target = if selection.target.trim() == "." {
+        resolve_commit(repo, "HEAD")?
+    } else {
+        resolve_commit(repo, selection.target.trim())?
+    };
+    Ok((base, target))
+}
+
+pub fn comparison_commits_for_range(
+    repo: &Path,
+    base: &str,
+    target: &str,
+) -> AppResult<Vec<ComparisonCommit>> {
+    if base == target {
+        return Ok(Vec::new());
+    }
+    let range = format!("{base}..{target}");
+    let bytes = successful(
+        git_output(
+            repo,
+            [
+                "log",
+                "--reverse",
+                "--topo-order",
+                "--format=%H%x1f%h%x1f%s%x1f%an%x1f%aI%x1f%P%x1e",
+                &range,
+            ],
+        )?,
+        "UNKNOWN",
+        "The commits in this comparison could not be read.",
+    )?;
+
+    Ok(bytes
+        .split(|byte| *byte == 0x1e)
+        .filter_map(|record| {
+            let record = record
+                .iter()
+                .copied()
+                .filter(|byte| *byte != b'\n')
+                .collect::<Vec<_>>();
+            if record.is_empty() {
+                return None;
+            }
+            let mut fields = record.split(|byte| *byte == 0x1f);
+            let text = |bytes: &[u8]| String::from_utf8_lossy(bytes).into_owned();
+            let sha = text(fields.next()?);
+            let short_sha = text(fields.next()?);
+            let subject = text(fields.next()?);
+            let author_name = text(fields.next()?);
+            let authored_at = text(fields.next()?);
+            let parents = fields.next().unwrap_or_default();
+            Some(ComparisonCommit {
+                sha,
+                short_sha,
+                subject,
+                author_name,
+                authored_at,
+                parent_count: parents
+                    .split(|byte| *byte == b' ')
+                    .filter(|parent| !parent.is_empty())
+                    .count(),
+            })
+        })
+        .collect())
+}
+
+fn resolve_scoped_diff(
+    repo: &Path,
+    selection: &DiffSelection,
+    scope: &DiffScope,
+) -> AppResult<ResolvedDiff> {
+    match scope {
+        DiffScope::All => resolve_diff(repo, selection),
+        DiffScope::Uncommitted => {
+            if selection.target.trim() != "." {
+                return Err(AppError::new(
+                    "INVALID_DIFF_SCOPE",
+                    "Uncommitted changes are not part of this comparison.",
+                ));
+            }
+            resolve_diff(repo, &DiffSelection::default())
+        }
+        DiffScope::Commit { sha } => {
+            let commit_sha = resolve_commit(repo, sha)?;
+            let (base, target) = comparison_commit_range(repo, selection)?;
+            if !is_ancestor(repo, &commit_sha, &target)? || is_ancestor(repo, &commit_sha, &base)? {
+                return Err(AppError::new(
+                    "INVALID_DIFF_SCOPE",
+                    "The selected commit is not part of this comparison.",
+                ));
+            }
+            let parents = commit_parents(repo, &commit_sha)?;
+            resolve_diff(
+                repo,
+                &DiffSelection {
+                    base: parents
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| EMPTY_TREE_SHA.to_owned()),
+                    target: commit_sha,
+                },
+            )
+        }
+    }
+}
+
+fn is_ancestor(repo: &Path, ancestor: &str, descendant: &str) -> AppResult<bool> {
+    let output = git_output(repo, ["merge-base", "--is-ancestor", ancestor, descendant])?;
+    match output.status.code() {
+        Some(0) => Ok(true),
+        Some(1) => Ok(false),
+        _ => Err(AppError::new(
+            "UNKNOWN",
+            "The selected commit could not be validated against this comparison.",
+        )
+        .with_detail(String::from_utf8_lossy(&output.stderr).trim())),
+    }
+}
+
+fn commit_parents(repo: &Path, sha: &str) -> AppResult<Vec<String>> {
+    let output = git_output(repo, ["show", "-s", "--format=%P", sha])?;
+    Ok(output_text(
+        output,
+        "INVALID_DIFF_TARGET",
+        "The selected commit could not be read.",
+    )?
+    .split_whitespace()
+    .map(ToOwned::to_owned)
+    .collect())
 }
 
 pub fn validate_diff_selection(repo: &Path, selection: &DiffSelection) -> AppResult<()> {
@@ -123,11 +279,12 @@ pub fn change_review_availability(
 pub fn diff_workspace_with_snapshot(
     repo: &Path,
     selection: &DiffSelection,
+    scope: &DiffScope,
 ) -> AppResult<(DiffWorkspace, DiffSnapshot)> {
-    let snapshot = diff_snapshot(repo, selection)?;
+    let snapshot = diff_snapshot_for_scope(repo, selection, scope)?;
     let summary = snapshot.summary.clone();
     let review_availability =
-        change_review_availability_for(repo, selection, !summary.files.is_empty())?;
+        change_review_availability_for(repo, &summary.selection, !summary.files.is_empty())?;
     Ok((
         DiffWorkspace {
             summary,
@@ -182,6 +339,21 @@ fn change_review_availability_for(
         ));
     }
 
+    if let Some(commit) = commit_review_target(repo, base, target)? {
+        let commit_scope_label = match &commit {
+            ChangeReviewTarget::Commit { sha, title } => {
+                format!("commit {} · {title}", &sha[..7])
+            }
+            _ => scope_label.clone(),
+        };
+        return Ok(ChangeReviewAvailability {
+            available: true,
+            target: Some(commit),
+            reason: None,
+            scope_label: commit_scope_label,
+        });
+    }
+
     let Some(branch) = current_branch else {
         return Ok(unavailable_review(
             scope_label,
@@ -213,6 +385,35 @@ fn change_review_availability_for(
         reason: None,
         scope_label,
     })
+}
+
+fn commit_review_target(
+    repo: &Path,
+    base: &str,
+    target: &str,
+) -> AppResult<Option<ChangeReviewTarget>> {
+    let looks_like_sha =
+        |value: &str| value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit());
+    if !looks_like_sha(base) || !looks_like_sha(target) {
+        return Ok(None);
+    }
+    let parents = commit_parents(repo, target)?;
+    let matches_parent = parents.first().map(String::as_str) == Some(base)
+        || (parents.is_empty() && base == EMPTY_TREE_SHA);
+    if !matches_parent {
+        return Ok(None);
+    }
+    let title = output_text(
+        git_output(repo, ["show", "-s", "--format=%s", target])?,
+        "INVALID_DIFF_TARGET",
+        "The selected commit could not be read.",
+    )?
+    .trim()
+    .to_owned();
+    Ok(Some(ChangeReviewTarget::Commit {
+        sha: target.to_owned(),
+        title,
+    }))
 }
 
 fn unavailable_review(scope_label: String, reason: &str) -> ChangeReviewAvailability {
@@ -256,7 +457,15 @@ pub fn diff_summary(repo: &Path, selection: &DiffSelection) -> AppResult<DiffSum
 }
 
 fn diff_snapshot(repo: &Path, selection: &DiffSelection) -> AppResult<DiffSnapshot> {
-    let resolved = resolve_diff(repo, selection)?;
+    diff_snapshot_for_scope(repo, selection, &DiffScope::All)
+}
+
+fn diff_snapshot_for_scope(
+    repo: &Path,
+    selection: &DiffSelection,
+    scope: &DiffScope,
+) -> AppResult<DiffSnapshot> {
+    let resolved = resolve_scoped_diff(repo, selection, scope)?;
     let name_bytes = successful(
         range_output(
             repo,
@@ -834,6 +1043,197 @@ mod tests {
         assert_eq!(summary.files[0].new_path.as_deref(), Some("latest.txt"));
         let diff = file_diff(repo, &selection, "latest.txt").unwrap();
         assert!(diff.unified_diff.contains("+latest"));
+    }
+
+    #[test]
+    fn comparison_commits_include_merged_history_in_topological_order() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        initialize_repository(repo, "main");
+        let base = resolve_commit(repo, "HEAD").unwrap();
+
+        git(repo, &["switch", "-c", "feature"]);
+        fs::write(repo.join("feature.txt"), "feature\n").unwrap();
+        git(repo, &["add", "feature.txt"]);
+        git(repo, &["commit", "-m", "feature change"]);
+        git(repo, &["switch", "-c", "side", &base]);
+        fs::write(repo.join("side.txt"), "side\n").unwrap();
+        git(repo, &["add", "side.txt"]);
+        git(repo, &["commit", "-m", "side change"]);
+        git(repo, &["switch", "feature"]);
+        git(repo, &["merge", "--no-ff", "side", "-m", "merge side"]);
+
+        let commits = comparison_commits(
+            repo,
+            &DiffSelection {
+                base,
+                target: "feature".to_owned(),
+            },
+        )
+        .unwrap();
+        let subjects: Vec<&str> = commits
+            .iter()
+            .map(|commit| commit.subject.as_str())
+            .collect();
+
+        assert_eq!(subjects.len(), 3);
+        assert!(subjects.contains(&"feature change"));
+        assert!(subjects.contains(&"side change"));
+        assert_eq!(subjects.last(), Some(&"merge side"));
+        assert_eq!(commits.last().unwrap().parent_count, 2);
+    }
+
+    #[test]
+    fn comparison_commits_skip_git_log_for_identical_endpoints() {
+        let temp = tempfile::tempdir().unwrap();
+
+        let commits = comparison_commits_for_range(temp.path(), "same", "same").unwrap();
+
+        assert!(commits.is_empty());
+    }
+
+    #[test]
+    fn commit_scope_rejects_a_commit_outside_the_target_only_range() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        initialize_repository(repo, "main");
+        git(repo, &["switch", "-c", "feature"]);
+        fs::write(repo.join("feature.txt"), "feature\n").unwrap();
+        git(repo, &["add", "feature.txt"]);
+        git(repo, &["commit", "-m", "feature change"]);
+        git(repo, &["switch", "main"]);
+        fs::write(repo.join("main.txt"), "main\n").unwrap();
+        git(repo, &["add", "main.txt"]);
+        git(repo, &["commit", "-m", "main only"]);
+        let main_only = resolve_commit(repo, "main").unwrap();
+
+        let error = diff_workspace_with_snapshot(
+            repo,
+            &DiffSelection {
+                base: "main".to_owned(),
+                target: "feature".to_owned(),
+            },
+            &DiffScope::Commit { sha: main_only },
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "INVALID_DIFF_SCOPE");
+    }
+
+    #[test]
+    fn merge_commit_scope_uses_the_first_parent_and_supports_change_review() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        initialize_repository(repo, "main");
+        let base = resolve_commit(repo, "HEAD").unwrap();
+
+        git(repo, &["switch", "-c", "feature"]);
+        fs::write(repo.join("feature.txt"), "feature\n").unwrap();
+        git(repo, &["add", "feature.txt"]);
+        git(repo, &["commit", "-m", "feature change"]);
+        git(repo, &["switch", "-c", "side", &base]);
+        fs::write(repo.join("side.txt"), "side\n").unwrap();
+        git(repo, &["add", "side.txt"]);
+        git(repo, &["commit", "-m", "side change"]);
+        git(repo, &["switch", "feature"]);
+        git(repo, &["merge", "--no-ff", "side", "-m", "merge side"]);
+        let merge_sha = resolve_commit(repo, "HEAD").unwrap();
+
+        let (workspace, _) = diff_workspace_with_snapshot(
+            repo,
+            &DiffSelection {
+                base,
+                target: "feature".to_owned(),
+            },
+            &DiffScope::Commit {
+                sha: merge_sha.clone(),
+            },
+        )
+        .unwrap();
+        let paths: Vec<&str> = workspace
+            .summary
+            .files
+            .iter()
+            .filter_map(|file| file.new_path.as_deref())
+            .collect();
+
+        assert_eq!(paths, ["side.txt"]);
+        assert_eq!(workspace.summary.selection.target, merge_sha);
+        assert_eq!(
+            workspace.review_availability.target,
+            Some(ChangeReviewTarget::Commit {
+                sha: workspace.summary.selection.target.clone(),
+                title: "merge side".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn uncommitted_scope_excludes_committed_changes_from_a_working_tree_comparison() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        initialize_repository(repo, "main");
+        let base = resolve_commit(repo, "HEAD").unwrap();
+        fs::write(repo.join("committed.txt"), "committed\n").unwrap();
+        git(repo, &["add", "committed.txt"]);
+        git(repo, &["commit", "-m", "committed change"]);
+        fs::write(repo.join("working.txt"), "working\n").unwrap();
+
+        let (workspace, _) = diff_workspace_with_snapshot(
+            repo,
+            &DiffSelection {
+                base,
+                target: ".".to_owned(),
+            },
+            &DiffScope::Uncommitted,
+        )
+        .unwrap();
+        let paths: Vec<&str> = workspace
+            .summary
+            .files
+            .iter()
+            .filter_map(|file| file.new_path.as_deref())
+            .collect();
+
+        assert_eq!(paths, ["working.txt"]);
+        assert_eq!(workspace.summary.selection, DiffSelection::default());
+    }
+
+    #[test]
+    fn root_commit_scope_uses_the_empty_tree_as_its_parent() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        initialize_repository(repo, "main");
+        let base = resolve_commit(repo, "main").unwrap();
+        git(repo, &["switch", "--orphan", "unrelated"]);
+        fs::write(repo.join("root.txt"), "root\n").unwrap();
+        git(repo, &["add", "root.txt"]);
+        git(repo, &["commit", "-m", "unrelated root"]);
+        let root_sha = resolve_commit(repo, "HEAD").unwrap();
+
+        let (workspace, _) = diff_workspace_with_snapshot(
+            repo,
+            &DiffSelection {
+                base,
+                target: "unrelated".to_owned(),
+            },
+            &DiffScope::Commit {
+                sha: root_sha.clone(),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(workspace.summary.selection.base, EMPTY_TREE_SHA);
+        assert_eq!(workspace.summary.selection.target, root_sha);
+        assert_eq!(workspace.summary.files.len(), 1);
+        assert_eq!(
+            workspace.summary.files[0].new_path.as_deref(),
+            Some("root.txt")
+        );
+        assert!(matches!(
+            workspace.review_availability.target,
+            Some(ChangeReviewTarget::Commit { .. })
+        ));
     }
 
     #[test]
