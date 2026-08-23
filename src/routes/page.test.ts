@@ -418,6 +418,7 @@ describe("change details auto-refresh", () => {
         target: commitSha,
       }),
     );
+    expect(tauriApi.getComparisonCommits).toHaveBeenCalledTimes(1);
     expect(
       screen.getByRole("button", {
         name: "Change comparison. Current: feature → working tree",

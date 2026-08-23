@@ -123,12 +123,28 @@ pub fn comparison_commits(
     repo: &Path,
     selection: &DiffSelection,
 ) -> AppResult<Vec<ComparisonCommit>> {
+    let (base, target) = comparison_commit_range(repo, selection)?;
+    comparison_commits_for_range(repo, &base, &target)
+}
+
+pub fn comparison_commit_range(
+    repo: &Path,
+    selection: &DiffSelection,
+) -> AppResult<(String, String)> {
     let base = resolve_commit(repo, selection.base.trim())?;
     let target = if selection.target.trim() == "." {
         resolve_commit(repo, "HEAD")?
     } else {
         resolve_commit(repo, selection.target.trim())?
     };
+    Ok((base, target))
+}
+
+pub fn comparison_commits_for_range(
+    repo: &Path,
+    base: &str,
+    target: &str,
+) -> AppResult<Vec<ComparisonCommit>> {
     let range = format!("{base}..{target}");
     let bytes = successful(
         git_output(

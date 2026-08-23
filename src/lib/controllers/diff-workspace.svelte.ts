@@ -60,13 +60,17 @@ export class DiffWorkspaceController {
     this.clearCommits();
   }
 
-  async load(requestedFile?: string, options: { silent?: boolean } = {}) {
+  async load(
+    requestedFile?: string,
+    options: { silent?: boolean; refreshCommits?: boolean } = {},
+  ) {
     if (!this.projectId) return;
     const projectId = this.projectId;
     const selection = { ...this.selection };
     const scope = cloneScope(this.scope);
     const loadGeneration = ++this.loadGeneration;
     const silent = options.silent ?? false;
+    const refreshCommits = options.refreshCommits ?? true;
     this.onError(null);
     if (!silent) {
       this.summary = null;
@@ -110,7 +114,7 @@ export class DiffWorkspaceController {
       if (!silent) this.loading = false;
       this.selectedPath = path;
       this.syncUrl(path);
-      void this.loadCommits(projectId, selection);
+      if (refreshCommits) void this.loadCommits(projectId, selection);
       if (path) {
         this.queue(path);
         await tick();
@@ -144,7 +148,7 @@ export class DiffWorkspaceController {
     if (sameDiffScope(this.scope, scope)) return;
     this.scope = cloneScope(scope);
     this.selectedPath = undefined;
-    await this.load();
+    await this.load(undefined, { refreshCommits: false });
   }
 
   select(path: string) {
