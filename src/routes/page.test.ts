@@ -810,6 +810,58 @@ describe("change details auto-refresh", () => {
     ).toBeInTheDocument();
   });
 
+  it("returns to all changes while a commit scope is still loading", async () => {
+    const commitSha = "abcdef1234567890abcdef1234567890abcdef12";
+    tauriApi.getComparisonCommits.mockResolvedValue([
+      {
+        sha: commitSha,
+        shortSha: "abcdef1",
+        subject: "Focused commit",
+        authorName: "Test Author",
+        authoredAt: "2026-08-23T10:00:00Z",
+        parentCount: 1,
+      },
+    ]);
+    tauriApi.getDiffSummary
+      .mockResolvedValueOnce(summary)
+      .mockImplementationOnce(() => new Promise<DiffSummary>(() => {}))
+      .mockResolvedValueOnce(summary);
+    history.replaceState(null, "", "/?project=alpha");
+    render(Page);
+
+    await fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Choose changes to view. Current: All changes",
+      }),
+    );
+    await fireEvent.click(
+      await screen.findByRole("menuitemradio", { name: /Focused commit/ }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText("Loading changes…")).toBeInTheDocument(),
+    );
+
+    const scopeSelector = screen.getByRole("button", {
+      name: /Choose changes to view\. Current: abcdef1 Focused commit/,
+    });
+    expect(scopeSelector).toBeEnabled();
+    await fireEvent.click(scopeSelector);
+    await fireEvent.click(
+      screen.getByRole("menuitemradio", { name: /All changes/ }),
+    );
+
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenLastCalledWith("alpha", {
+        base: "HEAD",
+        target: ".",
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText("Loading changes…")).not.toBeInTheDocument(),
+    );
+    expect(tauriApi.getComparisonCommits).toHaveBeenCalledTimes(1);
+  });
+
   it("applies quick comparisons using the configured base and current branch", async () => {
     tauriApi.getDiffSummary.mockImplementation(
       async (

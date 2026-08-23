@@ -838,7 +838,6 @@
             scope={workspace.scope}
             includeUncommitted={workspace.selection.target === "."}
             loading={workspace.commitsLoading}
-            disabled={workspace.loading}
             onSelect={applyDiffScope}
           />
           <div class="pane-title">

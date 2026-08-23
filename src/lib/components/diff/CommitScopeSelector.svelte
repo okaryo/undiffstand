@@ -14,14 +14,12 @@
     scope,
     includeUncommitted,
     loading = false,
-    disabled = false,
     onSelect,
   }: {
     commits: ComparisonCommit[];
     scope: DiffScope;
     includeUncommitted: boolean;
     loading?: boolean;
-    disabled?: boolean;
     onSelect: (scope: DiffScope) => void | Promise<void>;
   } = $props();
 
@@ -49,10 +47,6 @@
           ? `${selectedCommit.shortSha} ${selectedCommit.subject}`
           : scope.sha.slice(0, 7),
   );
-
-  $effect(() => {
-    if (disabled) open = false;
-  });
 
   function select(nextScope: DiffScope) {
     open = false;
@@ -146,7 +140,6 @@
     aria-haspopup="menu"
     aria-expanded={open}
     aria-label={`Choose changes to view. Current: ${currentLabel}`}
-    {disabled}
     onclick={toggleMenu}
   >
     {#if scope.kind === "commit" && selectedCommit?.parentCount !== 1}
@@ -274,11 +267,6 @@
     border-color: var(--accent);
     outline: none;
     box-shadow: 0 0 0 2px rgba(87, 184, 142, 0.08);
-  }
-
-  .trigger:disabled {
-    opacity: 0.6;
-    cursor: default;
   }
 
   .menu {
