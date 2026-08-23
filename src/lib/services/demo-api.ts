@@ -237,8 +237,8 @@ export const demoApi: AppApi = {
               ? { base: "HEAD", target: "." }
               : selection,
           ),
-    commits: comparisonCommits,
   }),
+  getComparisonCommits: async () => comparisonCommits,
   getFileDiffs: async (_projectId, _selection, paths) => paths.map(diffFor),
   explainFileChange: async (_projectId, _selection, path) => ({
     summary:

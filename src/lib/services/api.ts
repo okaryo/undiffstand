@@ -42,8 +42,11 @@ export interface AppApi {
   ): Promise<{
     summary: DiffSummary;
     reviewAvailability: ChangeReviewAvailability;
-    commits: ComparisonCommit[];
   }>;
+  getComparisonCommits(
+    projectId: string,
+    selection: DiffSelection,
+  ): Promise<ComparisonCommit[]>;
   getFileDiffs(
     projectId: string,
     selection: DiffSelection,

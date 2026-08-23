@@ -1,5 +1,5 @@
 use crate::{
-    domain::{DiffScope, DiffSelection, DiffWorkspace, FileDiff},
+    domain::{ComparisonCommit, DiffScope, DiffSelection, DiffWorkspace, FileDiff},
     error::AppResult,
     services::{config_service, git_service},
 };
@@ -87,6 +87,16 @@ pub fn get_diff_workspace<R: Runtime>(
         snapshot,
     );
     Ok(workspace)
+}
+
+#[tauri::command(async)]
+pub fn get_comparison_commits<R: Runtime>(
+    app: AppHandle<R>,
+    project_id: String,
+    selection: DiffSelection,
+) -> AppResult<Vec<ComparisonCommit>> {
+    let project = config_service::find_project(&app, &project_id)?;
+    git_service::comparison_commits(Path::new(&project.repo_path), &selection)
 }
 
 #[tauri::command(async)]

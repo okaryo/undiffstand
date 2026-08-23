@@ -833,15 +833,14 @@
     >
       {#if preferences.sidebarOpen}
         <aside id="changed-files-sidebar" class="sidebar">
-          {#if workspace.commits.length > 0 || workspace.selection.target === "."}
-            <CommitScopeSelector
-              commits={workspace.commits}
-              scope={workspace.scope}
-              includeUncommitted={workspace.selection.target === "."}
-              disabled={workspace.loading}
-              onSelect={applyDiffScope}
-            />
-          {/if}
+          <CommitScopeSelector
+            commits={workspace.commits}
+            scope={workspace.scope}
+            includeUncommitted={workspace.selection.target === "."}
+            loading={workspace.commitsLoading}
+            disabled={workspace.loading}
+            onSelect={applyDiffScope}
+          />
           <div class="pane-title">
             <span>Changed files</span>
             {#if workspace.summary}<DiffSummaryView

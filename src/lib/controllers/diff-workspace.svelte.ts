@@ -22,6 +22,7 @@ export class DiffWorkspaceController {
   selection = $state<DiffSelection>(defaultDiffSelection());
   scope = $state<DiffScope>(defaultDiffScope());
   commits = $state<ComparisonCommit[]>([]);
+  commitsLoading = $state(false);
   selectedPath = $state<string>();
   diffs = $state<Record<string, FileDiff | undefined>>({});
   loadingPaths = $state<Record<string, boolean | undefined>>({});
@@ -34,9 +35,13 @@ export class DiffWorkspaceController {
   private batchTimer: ReturnType<typeof setTimeout> | undefined;
   private generation = 0;
   private loadGeneration = 0;
+  private commitLoadGeneration = 0;
 
   constructor(
-    private readonly api: Pick<AppApi, "getDiffWorkspace" | "getFileDiffs">,
+    private readonly api: Pick<
+      AppApi,
+      "getDiffWorkspace" | "getComparisonCommits" | "getFileDiffs"
+    >,
     private readonly onError: (error: unknown) => void,
     private readonly onResetAi: () => void,
   ) {}
@@ -52,7 +57,7 @@ export class DiffWorkspaceController {
     this.projectId = projectId;
     this.selection = { ...selection };
     this.scope = defaultDiffScope();
-    this.commits = [];
+    this.clearCommits();
   }
 
   async load(requestedFile?: string, options: { silent?: boolean } = {}) {
@@ -70,11 +75,8 @@ export class DiffWorkspaceController {
     }
 
     try {
-      const {
-        summary: loadedSummary,
-        reviewAvailability,
-        commits,
-      } = await this.api.getDiffWorkspace(projectId, selection, scope);
+      const { summary: loadedSummary, reviewAvailability } =
+        await this.api.getDiffWorkspace(projectId, selection, scope);
       if (!this.isCurrentLoad(projectId, selection, scope, loadGeneration))
         return;
 
@@ -83,7 +85,6 @@ export class DiffWorkspaceController {
         files: sortDiffFilesByTreeOrder(loadedSummary.files),
       };
       this.reviewAvailability = reviewAvailability;
-      this.commits = commits;
       const path =
         requestedFile &&
         orderedSummary.files.some((file) => displayPath(file) === requestedFile)
@@ -109,6 +110,7 @@ export class DiffWorkspaceController {
       if (!silent) this.loading = false;
       this.selectedPath = path;
       this.syncUrl(path);
+      void this.loadCommits(projectId, selection);
       if (path) {
         this.queue(path);
         await tick();
@@ -133,7 +135,7 @@ export class DiffWorkspaceController {
   async applySelection(selection: DiffSelection) {
     this.selection = { ...selection };
     this.scope = defaultDiffScope();
-    this.commits = [];
+    this.clearCommits();
     this.selectedPath = undefined;
     await this.load();
   }
@@ -172,7 +174,7 @@ export class DiffWorkspaceController {
     this.summary = null;
     this.selection = defaultDiffSelection();
     this.scope = defaultDiffScope();
-    this.commits = [];
+    this.clearCommits();
     this.selectedPath = undefined;
     this.clearPending();
     this.diffs = {};
@@ -181,6 +183,29 @@ export class DiffWorkspaceController {
     this.reviewAvailability = undefined;
     this.loadGeneration += 1;
     this.onResetAi();
+  }
+
+  private async loadCommits(projectId: string, selection: DiffSelection) {
+    const commitLoadGeneration = ++this.commitLoadGeneration;
+    this.commitsLoading = true;
+    try {
+      const commits = await this.api.getComparisonCommits(projectId, selection);
+      if (!this.isCurrentCommitLoad(projectId, selection, commitLoadGeneration))
+        return;
+      this.commits = commits;
+    } catch (error) {
+      if (this.isCurrentCommitLoad(projectId, selection, commitLoadGeneration))
+        this.onError(error);
+    } finally {
+      if (this.isCurrentCommitLoad(projectId, selection, commitLoadGeneration))
+        this.commitsLoading = false;
+    }
+  }
+
+  private clearCommits() {
+    this.commits = [];
+    this.commitsLoading = false;
+    this.commitLoadGeneration += 1;
   }
 
   private async refreshLoadedDiffs(
@@ -298,6 +323,19 @@ export class DiffWorkspaceController {
       this.selection.base === selection.base &&
       this.selection.target === selection.target &&
       sameDiffScope(this.scope, scope)
+    );
+  }
+
+  private isCurrentCommitLoad(
+    projectId: string,
+    selection: DiffSelection,
+    commitLoadGeneration: number,
+  ) {
+    return (
+      this.commitLoadGeneration === commitLoadGeneration &&
+      this.projectId === projectId &&
+      this.selection.base === selection.base &&
+      this.selection.target === selection.target
     );
   }
 

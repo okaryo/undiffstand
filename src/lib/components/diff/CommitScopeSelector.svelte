@@ -13,12 +13,14 @@
     commits,
     scope,
     includeUncommitted,
+    loading = false,
     disabled = false,
     onSelect,
   }: {
     commits: ComparisonCommit[];
     scope: DiffScope;
     includeUncommitted: boolean;
+    loading?: boolean;
     disabled?: boolean;
     onSelect: (scope: DiffScope) => void | Promise<void>;
   } = $props();
@@ -182,8 +184,8 @@
         <span class="details">
           <strong>All changes</strong>
           <small
-            >{commits.length}
-            {commits.length === 1 ? "commit" : "commits"}</small
+            >{#if loading}Loading commits…{:else}{commits.length}
+              {commits.length === 1 ? "commit" : "commits"}{/if}</small
           >
         </span>
         {#if isSelected({ kind: "all" })}<Check size={14} />{/if}

@@ -249,7 +249,6 @@ pub fn diff_workspace_with_snapshot(
     selection: &DiffSelection,
     scope: &DiffScope,
 ) -> AppResult<(DiffWorkspace, DiffSnapshot)> {
-    let commits = comparison_commits(repo, selection)?;
     let snapshot = diff_snapshot_for_scope(repo, selection, scope)?;
     let summary = snapshot.summary.clone();
     let review_availability =
@@ -258,7 +257,6 @@ pub fn diff_workspace_with_snapshot(
         DiffWorkspace {
             summary,
             review_availability,
-            commits,
         },
         snapshot,
     ))

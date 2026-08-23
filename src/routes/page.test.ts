@@ -50,11 +50,9 @@ const tauriApi = vi.hoisted(() => {
       return Promise.all([
         api.getDiffSummary(projectId, activeSelection),
         api.getChangeReviewAvailability(projectId, activeSelection),
-        api.getComparisonCommits(projectId, selection),
-      ]).then(([summary, reviewAvailability, commits]) => ({
+      ]).then(([summary, reviewAvailability]) => ({
         summary: { ...summary, selection: activeSelection },
         reviewAvailability,
-        commits,
       }));
     },
   };

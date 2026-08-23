@@ -338,7 +338,6 @@ pub struct ChangeReviewAvailability {
 pub struct DiffWorkspace {
     pub summary: DiffSummary,
     pub review_availability: ChangeReviewAvailability,
-    pub commits: Vec<ComparisonCommit>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

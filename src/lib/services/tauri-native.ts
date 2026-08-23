@@ -24,6 +24,8 @@ export const nativeApi: AppApi = {
     invoke("save_user_preferences", { preferences }),
   getDiffWorkspace: (projectId, selection, scope) =>
     invoke("get_diff_workspace", { projectId, selection, scope }),
+  getComparisonCommits: (projectId, selection) =>
+    invoke("get_comparison_commits", { projectId, selection }),
   getFileDiffs: (projectId, selection, paths) =>
     invoke("get_file_diffs", { projectId, selection, paths }),
   explainFileChange: (projectId, selection, path) =>
