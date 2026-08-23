@@ -6,7 +6,12 @@ import {
   within,
 } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DiffSelection, DiffSummary, FileDiff } from "$lib/domain/diff";
+import type {
+  DiffScope,
+  DiffSelection,
+  DiffSummary,
+  FileDiff,
+} from "$lib/domain/diff";
 import type { ProjectConfig } from "$lib/domain/project";
 import Page from "./+page.svelte";
 
@@ -26,18 +31,32 @@ const tauriApi = vi.hoisted(() => {
     explainFileChange: vi.fn(),
     askInlineQuestion: vi.fn(),
     getChangeReviewAvailability: vi.fn(),
+    getComparisonCommits: vi.fn(),
     runChangeReview: vi.fn(),
   };
   return {
     ...api,
-    getDiffWorkspace: (projectId: string, selection: DiffSelection) =>
-      Promise.all([
-        api.getDiffSummary(projectId, selection),
-        api.getChangeReviewAvailability(projectId, selection),
-      ]).then(([summary, reviewAvailability]) => ({
-        summary,
+    getDiffWorkspace: (
+      projectId: string,
+      selection: DiffSelection,
+      scope: DiffScope,
+    ) => {
+      const activeSelection =
+        scope.kind === "commit"
+          ? { base: "commit-parent", target: scope.sha }
+          : scope.kind === "uncommitted"
+            ? { base: "HEAD", target: "." }
+            : selection;
+      return Promise.all([
+        api.getDiffSummary(projectId, activeSelection),
+        api.getChangeReviewAvailability(projectId, activeSelection),
+        api.getComparisonCommits(projectId, selection),
+      ]).then(([summary, reviewAvailability, commits]) => ({
+        summary: { ...summary, selection: activeSelection },
         reviewAvailability,
-      })),
+        commits,
+      }));
+    },
   };
 });
 const notifyReviewComplete = vi.hoisted(() => vi.fn());
@@ -152,6 +171,7 @@ describe("change details auto-refresh", () => {
       async (preferences) => preferences,
     );
     tauriApi.getDiffSummary.mockResolvedValue(summary);
+    tauriApi.getComparisonCommits.mockResolvedValue([]);
     tauriApi.getFileDiffs.mockResolvedValue([fileDiff]);
     updater.check.mockResolvedValue(null);
     updater.downloadAndInstall.mockResolvedValue(undefined);
@@ -338,6 +358,128 @@ describe("change details auto-refresh", () => {
         ["src/example.ts"],
       ),
     );
+  });
+
+  it("views a single commit without changing the saved comparison and scopes AI actions", async () => {
+    const commitSha = "abcdef1234567890abcdef1234567890abcdef12";
+    tauriApi.getComparisonCommits.mockResolvedValue([
+      {
+        sha: commitSha,
+        shortSha: "abcdef1",
+        subject: "Focused commit",
+        authorName: "Test Author",
+        authoredAt: "2026-08-23T10:00:00Z",
+        parentCount: 1,
+      },
+    ]);
+    tauriApi.getDiffSummary.mockImplementation(
+      async (_projectId: string, selection: DiffSelection) => ({
+        ...summary,
+        selection,
+        comparison: {
+          fromLabel: selection.base,
+          toLabel: selection.target === "." ? "working tree" : selection.target,
+          fromSha: selection.base,
+          toSha: selection.target === "." ? undefined : selection.target,
+        },
+      }),
+    );
+    tauriApi.getChangeReviewAvailability.mockResolvedValue({
+      available: true,
+      scopeLabel: "commit abcdef1 · Focused commit",
+    });
+    tauriApi.explainFileChange.mockResolvedValue({
+      summary: "Focused explanation",
+      inferredIntent: "Focused intent",
+      keyChanges: [],
+      references: [],
+      caveats: [],
+    });
+    tauriApi.runChangeReview.mockResolvedValue({
+      summary: "Focused review",
+      inferredIntent: "Focused intent",
+      groups: [],
+      findings: [],
+      caveats: [],
+    });
+    history.replaceState(null, "", "/?project=alpha");
+    render(Page);
+
+    await fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Choose changes to view. Current: All changes",
+      }),
+    );
+    await fireEvent.click(
+      screen.getByRole("menuitemradio", { name: /Focused commit/ }),
+    );
+
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenLastCalledWith("alpha", {
+        base: "commit-parent",
+        target: commitSha,
+      }),
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "Change comparison. Current: feature → working tree",
+      }),
+    ).toBeInTheDocument();
+    expect(tauriApi.saveProjectComparison).not.toHaveBeenCalled();
+
+    await fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Explain changes in src/example.ts",
+      }),
+    );
+    await waitFor(() =>
+      expect(tauriApi.explainFileChange).toHaveBeenCalledWith(
+        "alpha",
+        { base: "commit-parent", target: commitSha },
+        "src/example.ts",
+      ),
+    );
+
+    await fireEvent.click(screen.getByRole("button", { name: "Run review" }));
+    await waitFor(() =>
+      expect(tauriApi.runChangeReview).toHaveBeenCalledWith("alpha", {
+        base: "commit-parent",
+        target: commitSha,
+      }),
+    );
+  });
+
+  it("offers uncommitted changes as a separate scope for working tree comparisons", async () => {
+    history.replaceState(null, "", "/?project=alpha&base=main");
+    render(Page);
+
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenCalledWith("alpha", {
+        base: "main",
+        target: ".",
+      }),
+    );
+    await fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Choose changes to view. Current: All changes",
+      }),
+    );
+    await fireEvent.click(
+      screen.getByRole("menuitemradio", { name: /Uncommitted changes/ }),
+    );
+
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenLastCalledWith("alpha", {
+        base: "HEAD",
+        target: ".",
+      }),
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "Change comparison. Current: main → working tree",
+      }),
+    ).toBeInTheDocument();
+    expect(tauriApi.saveProjectComparison).not.toHaveBeenCalled();
   });
 
   it("uses the fallback comparison returned when a saved ref no longer exists", async () => {

@@ -20,6 +20,18 @@ export type DiffSelection = {
   target: string;
 };
 
+export type DiffScope =
+  { kind: "all" } | { kind: "commit"; sha: string } | { kind: "uncommitted" };
+
+export type ComparisonCommit = {
+  sha: string;
+  shortSha: string;
+  subject: string;
+  authorName: string;
+  authoredAt: string;
+  parentCount: number;
+};
+
 export type DiffComparison = {
   fromLabel: string;
   toLabel: string;
@@ -39,6 +51,16 @@ export const defaultDiffSelection = (): DiffSelection => ({
   base: "HEAD",
   target: ".",
 });
+
+export const defaultDiffScope = (): DiffScope => ({ kind: "all" });
+
+export function sameDiffScope(left: DiffScope, right: DiffScope): boolean {
+  return (
+    left.kind === right.kind &&
+    (left.kind !== "commit" ||
+      (right.kind === "commit" && left.sha === right.sha))
+  );
+}
 
 export function revisionDisplayLabel(
   revision: string,

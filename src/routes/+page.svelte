@@ -21,6 +21,7 @@
   import ResizeHandle from "$lib/components/common/ResizeHandle.svelte";
   import UpdateAction from "$lib/components/common/UpdateAction.svelte";
   import ComparisonDialog from "$lib/components/diff/ComparisonDialog.svelte";
+  import CommitScopeSelector from "$lib/components/diff/CommitScopeSelector.svelte";
   import DiffFeed from "$lib/components/diff/DiffFeed.svelte";
   import DiffFileList from "$lib/components/diff/DiffFileList.svelte";
   import DiffSearchBar from "$lib/components/diff/DiffSearchBar.svelte";
@@ -35,9 +36,9 @@
   import type { InlineAnswer } from "$lib/domain/ai";
   import {
     defaultDiffSelection,
-    diffComparisonLabel,
     diffSelectionLabel,
     revisionDisplayLabel,
+    type DiffScope,
     type DiffSelection,
   } from "$lib/domain/diff";
   import {
@@ -652,7 +653,11 @@
 
   async function explainFileChange(path: string) {
     if (activeProject)
-      await aiReview.explainFile(activeProject.id, workspace.selection, path);
+      await aiReview.explainFile(
+        activeProject.id,
+        workspace.activeSelection,
+        path,
+      );
   }
 
   async function askInline(
@@ -665,7 +670,7 @@
     if (!activeProject) return Promise.reject(new Error("No project is open."));
     return aiReview.askInline(
       activeProject.id,
-      workspace.selection,
+      workspace.activeSelection,
       path,
       side,
       startLine,
@@ -678,10 +683,15 @@
     if (activeProject) {
       await aiReview.review(
         activeProject.id,
-        workspace.selection,
+        workspace.activeSelection,
         workspace.reviewAvailability,
       );
     }
+  }
+
+  async function applyDiffScope(scope: DiffScope) {
+    resetDiffSearch();
+    await workspace.applyScope(scope);
   }
 
   function goHome() {
@@ -754,15 +764,10 @@
       <ProjectSwitcher
         {projects}
         {activeProject}
-        comparisonLabel={workspace.summary
-          ? diffComparisonLabel(
-              workspace.summary.comparison,
-              activeRepository?.currentBranch,
-            )
-          : diffSelectionLabel(
-              workspace.selection,
-              activeRepository?.currentBranch,
-            )}
+        comparisonLabel={diffSelectionLabel(
+          workspace.selection,
+          activeRepository?.currentBranch,
+        )}
         onEditComparison={() => (showComparisonDialog = true)}
         onEditProject={editActiveProject}
         onSelect={openProject}
@@ -828,6 +833,15 @@
     >
       {#if preferences.sidebarOpen}
         <aside id="changed-files-sidebar" class="sidebar">
+          {#if workspace.commits.length > 0 || workspace.selection.target === "."}
+            <CommitScopeSelector
+              commits={workspace.commits}
+              scope={workspace.scope}
+              includeUncommitted={workspace.selection.target === "."}
+              disabled={workspace.loading}
+              onSelect={applyDiffScope}
+            />
+          {/if}
           <div class="pane-title">
             <span>Changed files</span>
             {#if workspace.summary}<DiffSummaryView

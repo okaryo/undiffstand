@@ -1,5 +1,5 @@
 use crate::{
-    domain::{DiffSelection, DiffWorkspace, FileDiff},
+    domain::{DiffScope, DiffSelection, DiffWorkspace, FileDiff},
     error::AppResult,
     services::{config_service, git_service},
 };
@@ -72,11 +72,20 @@ pub fn get_diff_workspace<R: Runtime>(
     cache: State<'_, DiffSnapshotCache>,
     project_id: String,
     selection: DiffSelection,
+    scope: DiffScope,
 ) -> AppResult<DiffWorkspace> {
     let project = config_service::find_project(&app, &project_id)?;
-    let (workspace, snapshot) =
-        git_service::diff_workspace_with_snapshot(Path::new(&project.repo_path), &selection)?;
-    cache.store(project_id, project.repo_path, selection, snapshot);
+    let (workspace, snapshot) = git_service::diff_workspace_with_snapshot(
+        Path::new(&project.repo_path),
+        &selection,
+        &scope,
+    )?;
+    cache.store(
+        project_id,
+        project.repo_path,
+        workspace.summary.selection.clone(),
+        snapshot,
+    );
     Ok(workspace)
 }
 

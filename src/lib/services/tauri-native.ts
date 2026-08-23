@@ -22,8 +22,8 @@ export const nativeApi: AppApi = {
   getUserPreferences: () => invoke("get_user_preferences"),
   saveUserPreferences: (preferences) =>
     invoke("save_user_preferences", { preferences }),
-  getDiffWorkspace: (projectId, selection) =>
-    invoke("get_diff_workspace", { projectId, selection }),
+  getDiffWorkspace: (projectId, selection, scope) =>
+    invoke("get_diff_workspace", { projectId, selection, scope }),
   getFileDiffs: (projectId, selection, paths) =>
     invoke("get_file_diffs", { projectId, selection, paths }),
   explainFileChange: (projectId, selection, path) =>

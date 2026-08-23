@@ -5,7 +5,13 @@ import type {
   InlineAnswer,
   InlineQuestion,
 } from "$lib/domain/ai";
-import type { DiffSelection, DiffSummary, FileDiff } from "$lib/domain/diff";
+import type {
+  ComparisonCommit,
+  DiffScope,
+  DiffSelection,
+  DiffSummary,
+  FileDiff,
+} from "$lib/domain/diff";
 import type { UserPreferences } from "$lib/domain/preferences";
 import type {
   ProjectConfig,
@@ -32,9 +38,11 @@ export interface AppApi {
   getDiffWorkspace(
     projectId: string,
     selection: DiffSelection,
+    scope: DiffScope,
   ): Promise<{
     summary: DiffSummary;
     reviewAvailability: ChangeReviewAvailability;
+    commits: ComparisonCommit[];
   }>;
   getFileDiffs(
     projectId: string,

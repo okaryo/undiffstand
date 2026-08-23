@@ -2,9 +2,13 @@ import { tick } from "svelte";
 import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
 import {
   defaultDiffSelection,
+  defaultDiffScope,
   diffAnchorId,
   displayPath,
+  sameDiffScope,
   sortDiffFilesByTreeOrder,
+  type ComparisonCommit,
+  type DiffScope,
   type DiffSelection,
   type DiffSummary,
   type FileDiff,
@@ -16,6 +20,8 @@ import type { AppApi } from "$lib/services/api";
 export class DiffWorkspaceController {
   summary = $state<DiffSummary | null>(null);
   selection = $state<DiffSelection>(defaultDiffSelection());
+  scope = $state<DiffScope>(defaultDiffScope());
+  commits = $state<ComparisonCommit[]>([]);
   selectedPath = $state<string>();
   diffs = $state<Record<string, FileDiff | undefined>>({});
   loadingPaths = $state<Record<string, boolean | undefined>>({});
@@ -35,18 +41,25 @@ export class DiffWorkspaceController {
     private readonly onResetAi: () => void,
   ) {}
 
+  get activeSelection(): DiffSelection {
+    return this.summary?.selection ?? this.selection;
+  }
+
   activate(
     projectId: string,
     selection: DiffSelection = defaultDiffSelection(),
   ) {
     this.projectId = projectId;
     this.selection = { ...selection };
+    this.scope = defaultDiffScope();
+    this.commits = [];
   }
 
   async load(requestedFile?: string, options: { silent?: boolean } = {}) {
     if (!this.projectId) return;
     const projectId = this.projectId;
     const selection = { ...this.selection };
+    const scope = cloneScope(this.scope);
     const loadGeneration = ++this.loadGeneration;
     const silent = options.silent ?? false;
     this.onError(null);
@@ -57,15 +70,20 @@ export class DiffWorkspaceController {
     }
 
     try {
-      const { summary: loadedSummary, reviewAvailability } =
-        await this.api.getDiffWorkspace(projectId, selection);
-      if (!this.isCurrentLoad(projectId, selection, loadGeneration)) return;
+      const {
+        summary: loadedSummary,
+        reviewAvailability,
+        commits,
+      } = await this.api.getDiffWorkspace(projectId, selection, scope);
+      if (!this.isCurrentLoad(projectId, selection, scope, loadGeneration))
+        return;
 
       const orderedSummary = {
         ...loadedSummary,
         files: sortDiffFilesByTreeOrder(loadedSummary.files),
       };
       this.reviewAvailability = reviewAvailability;
+      this.commits = commits;
       const path =
         requestedFile &&
         orderedSummary.files.some((file) => displayPath(file) === requestedFile)
@@ -78,11 +96,14 @@ export class DiffWorkspaceController {
         await this.refreshLoadedDiffs(
           projectId,
           selection,
+          scope,
+          loadedSummary.selection,
           orderedSummary,
           path,
           loadGeneration,
         );
-      if (!this.isCurrentLoad(projectId, selection, loadGeneration)) return;
+      if (!this.isCurrentLoad(projectId, selection, scope, loadGeneration))
+        return;
 
       this.summary = orderedSummary;
       if (!silent) this.loading = false;
@@ -91,20 +112,35 @@ export class DiffWorkspaceController {
       if (path) {
         this.queue(path);
         await tick();
-        if (!silent && this.isCurrentLoad(projectId, selection, loadGeneration))
+        if (
+          !silent &&
+          this.isCurrentLoad(projectId, selection, scope, loadGeneration)
+        )
           this.scrollTo(path, false);
       }
     } catch (error) {
-      if (this.isCurrentLoad(projectId, selection, loadGeneration))
+      if (this.isCurrentLoad(projectId, selection, scope, loadGeneration))
         this.onError(error);
     } finally {
-      if (!silent && this.isCurrentLoad(projectId, selection, loadGeneration))
+      if (
+        !silent &&
+        this.isCurrentLoad(projectId, selection, scope, loadGeneration)
+      )
         this.loading = false;
     }
   }
 
   async applySelection(selection: DiffSelection) {
     this.selection = { ...selection };
+    this.scope = defaultDiffScope();
+    this.commits = [];
+    this.selectedPath = undefined;
+    await this.load();
+  }
+
+  async applyScope(scope: DiffScope) {
+    if (sameDiffScope(this.scope, scope)) return;
+    this.scope = cloneScope(scope);
     this.selectedPath = undefined;
     await this.load();
   }
@@ -135,6 +171,8 @@ export class DiffWorkspaceController {
     this.projectId = undefined;
     this.summary = null;
     this.selection = defaultDiffSelection();
+    this.scope = defaultDiffScope();
+    this.commits = [];
     this.selectedPath = undefined;
     this.clearPending();
     this.diffs = {};
@@ -147,7 +185,9 @@ export class DiffWorkspaceController {
 
   private async refreshLoadedDiffs(
     projectId: string,
-    selection: DiffSelection,
+    rootSelection: DiffSelection,
+    scope: DiffScope,
+    activeSelection: DiffSelection,
     summary: DiffSummary,
     selectedPath: string | undefined,
     loadGeneration: number,
@@ -164,9 +204,10 @@ export class DiffWorkspaceController {
     const paths = [...refreshPaths].filter((path) => availablePaths.has(path));
     const refreshedDiffs =
       paths.length > 0
-        ? await this.api.getFileDiffs(projectId, selection, paths)
+        ? await this.api.getFileDiffs(projectId, activeSelection, paths)
         : [];
-    if (!this.isCurrentLoad(projectId, selection, loadGeneration)) return;
+    if (!this.isCurrentLoad(projectId, rootSelection, scope, loadGeneration))
+      return;
 
     this.clearPending();
     this.diffs = Object.fromEntries(
@@ -191,7 +232,7 @@ export class DiffWorkspaceController {
     const projectId = this.projectId;
     const generation = this.generation;
     const paths = [...this.pendingPaths];
-    const selection = { ...this.selection };
+    const selection = { ...this.activeSelection };
     this.pendingPaths.clear();
 
     try {
@@ -201,7 +242,7 @@ export class DiffWorkspaceController {
         paths,
       );
       if (
-        !this.isCurrent(projectId, selection) ||
+        !this.isCurrentView(projectId, selection) ||
         this.generation !== generation
       )
         return;
@@ -213,7 +254,7 @@ export class DiffWorkspaceController {
       }
     } catch (error) {
       if (
-        this.isCurrent(projectId, selection) &&
+        this.isCurrentView(projectId, selection) &&
         this.generation === generation
       ) {
         const message = normalizeError(error).message;
@@ -221,7 +262,7 @@ export class DiffWorkspaceController {
       }
     } finally {
       if (
-        this.isCurrent(projectId, selection) &&
+        this.isCurrentView(projectId, selection) &&
         this.generation === generation
       ) {
         for (const path of paths) this.loadingPaths[path] = false;
@@ -236,22 +277,27 @@ export class DiffWorkspaceController {
     this.generation += 1;
   }
 
-  private isCurrent(projectId: string, selection: DiffSelection) {
+  private isCurrentView(projectId: string, selection: DiffSelection) {
+    const activeSelection = this.summary?.selection;
     return (
       this.projectId === projectId &&
-      this.selection.base === selection.base &&
-      this.selection.target === selection.target
+      activeSelection?.base === selection.base &&
+      activeSelection.target === selection.target
     );
   }
 
   private isCurrentLoad(
     projectId: string,
     selection: DiffSelection,
+    scope: DiffScope,
     loadGeneration: number,
   ) {
     return (
       this.loadGeneration === loadGeneration &&
-      this.isCurrent(projectId, selection)
+      this.projectId === projectId &&
+      this.selection.base === selection.base &&
+      this.selection.target === selection.target &&
+      sameDiffScope(this.scope, scope)
     );
   }
 
@@ -271,4 +317,8 @@ export class DiffWorkspaceController {
       block: "start",
     });
   }
+}
+
+function cloneScope(scope: DiffScope): DiffScope {
+  return scope.kind === "commit" ? { ...scope } : { kind: scope.kind };
 }
