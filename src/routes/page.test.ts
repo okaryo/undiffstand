@@ -976,6 +976,24 @@ describe("change details auto-refresh", () => {
     );
     expect(new URLSearchParams(location.search).has("base")).toBe(false);
     expect(new URLSearchParams(location.search).has("target")).toBe(false);
+
+    await fireEvent.click(
+      screen.getByRole("button", {
+        name: "Change comparison. Current: feature → working tree",
+      }),
+    );
+    await fireEvent.click(
+      screen.getByRole("button", { name: /main → Working tree/ }),
+    );
+
+    await waitFor(() =>
+      expect(tauriApi.getDiffSummary).toHaveBeenLastCalledWith("alpha", {
+        base: "main",
+        target: ".",
+      }),
+    );
+    expect(new URLSearchParams(location.search).get("base")).toBe("main");
+    expect(new URLSearchParams(location.search).has("target")).toBe(false);
   });
 
   it("disables Change Review and explains an unsupported comparison", async () => {
