@@ -9,6 +9,7 @@
     repository,
     activeBaseRef,
     baseToCurrentIsActive = false,
+    baseToWorkingTreeIsActive = false,
     currentToWorkingTreeIsActive = false,
     onApply,
     onConfigureBase,
@@ -18,6 +19,7 @@
     repository: RepositoryInfo;
     activeBaseRef?: string | null;
     baseToCurrentIsActive?: boolean;
+    baseToWorkingTreeIsActive?: boolean;
     currentToWorkingTreeIsActive?: boolean;
     onApply: (selection: DiffSelection) => void | Promise<void>;
     onConfigureBase: () => void | Promise<void>;
@@ -128,6 +130,32 @@
                 aria-label={`Compare ${repository.currentBranch ?? "HEAD"} → Working tree`}
                 onclick={() => onApply({ base: "HEAD", target: "." })}
                 >Compare</button
+              >
+            {/if}
+          </div>
+          <div class="quick-comparison-row">
+            <div>
+              <strong>{activeBaseRef ?? "Base branch"} → Working tree</strong>
+              <span>Base branch → Working tree</span>
+            </div>
+            {#if baseToWorkingTreeIsActive}
+              <span
+                class="current-comparison"
+                role="status"
+                aria-label="Current comparison"><Check size={13} />Current</span
+              >
+            {:else}
+              <button
+                type="button"
+                class="compare-button"
+                aria-label={`Compare ${activeBaseRef ?? "base branch"} → Working tree`}
+                disabled={!activeBaseRef}
+                title={!activeBaseRef
+                  ? "Set a base branch in Project settings."
+                  : undefined}
+                onclick={() =>
+                  activeBaseRef &&
+                  onApply({ base: activeBaseRef, target: "." })}>Compare</button
               >
             {/if}
           </div>

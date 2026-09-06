@@ -147,6 +147,11 @@
       workspace.selection.base === activeBaseRef &&
       workspace.selection.target === "HEAD",
   );
+  let baseToWorkingTreeIsActive = $derived(
+    Boolean(activeBaseRef) &&
+      workspace.selection.base === activeBaseRef &&
+      workspace.selection.target === ".",
+  );
   let currentToWorkingTreeIsActive = $derived(
     workspace.selection.base === "HEAD" && workspace.selection.target === ".",
   );
@@ -973,6 +978,7 @@
     repository={activeRepository}
     {activeBaseRef}
     {baseToCurrentIsActive}
+    {baseToWorkingTreeIsActive}
     {currentToWorkingTreeIsActive}
     onApply={applyDiffSelection}
     onConfigureBase={configureBaseBranch}
