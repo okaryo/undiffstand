@@ -28,7 +28,7 @@ describe("DiffFileList", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows a check badge on reviewed file icons", () => {
+  it("shows a prominent check indicator on reviewed file rows", () => {
     const { container } = render(DiffFileList, {
       files: [
         {
@@ -44,8 +44,11 @@ describe("DiffFileList", () => {
     });
 
     expect(
-      container.querySelector(".file-row .file-icon .review-check"),
+      container.querySelector(
+        '.file-row .reviewed-indicator[title="Reviewed"]',
+      ),
     ).toBeInTheDocument();
+    expect(container.querySelector(".file-row.reviewed")).toBeInTheDocument();
   });
 
   it("filters by the complete repository path", async () => {
