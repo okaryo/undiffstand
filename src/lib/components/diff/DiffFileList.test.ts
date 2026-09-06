@@ -28,6 +28,26 @@ describe("DiffFileList", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a check badge on reviewed file icons", () => {
+    const { container } = render(DiffFileList, {
+      files: [
+        {
+          oldPath: "src/review.ts",
+          newPath: "src/review.ts",
+          status: "modified",
+          additions: 3,
+          deletions: 1,
+        },
+      ],
+      reviewedPaths: new Set(["src/review.ts"]),
+      onSelect: vi.fn(),
+    });
+
+    expect(
+      container.querySelector(".file-row .file-icon .review-check"),
+    ).toBeInTheDocument();
+  });
+
   it("filters by the complete repository path", async () => {
     render(DiffFileList, {
       files: [

@@ -27,6 +27,7 @@ export class DiffWorkspaceController {
   diffs = $state<Record<string, FileDiff | undefined>>({});
   loadingPaths = $state<Record<string, boolean | undefined>>({});
   errors = $state<Record<string, string | undefined>>({});
+  reviewedPaths = new SvelteSet<string>();
   reviewAvailability = $state<ChangeReviewAvailability>();
   loading = $state(false);
 
@@ -57,6 +58,7 @@ export class DiffWorkspaceController {
     this.projectId = projectId;
     this.selection = { ...selection };
     this.scope = defaultDiffScope();
+    this.reviewedPaths.clear();
     this.clearCommits();
   }
 
@@ -137,8 +139,13 @@ export class DiffWorkspaceController {
   }
 
   async applySelection(selection: DiffSelection) {
+    const viewChanged =
+      this.selection.base !== selection.base ||
+      this.selection.target !== selection.target ||
+      this.scope.kind !== "all";
     this.selection = { ...selection };
     this.scope = defaultDiffScope();
+    if (viewChanged) this.reviewedPaths.clear();
     this.clearCommits();
     this.selectedPath = undefined;
     await this.load();
@@ -147,8 +154,14 @@ export class DiffWorkspaceController {
   async applyScope(scope: DiffScope) {
     if (sameDiffScope(this.scope, scope)) return;
     this.scope = cloneScope(scope);
+    this.reviewedPaths.clear();
     this.selectedPath = undefined;
     await this.load(undefined, { refreshCommits: false });
+  }
+
+  setReviewed(path: string, reviewed: boolean) {
+    if (reviewed) this.reviewedPaths.add(path);
+    else this.reviewedPaths.delete(path);
   }
 
   select(path: string) {
@@ -184,6 +197,7 @@ export class DiffWorkspaceController {
     this.diffs = {};
     this.loadingPaths = {};
     this.errors = {};
+    this.reviewedPaths.clear();
     this.reviewAvailability = undefined;
     this.loadGeneration += 1;
     this.onResetAi();

@@ -1,5 +1,6 @@
-import { render } from "@testing-library/svelte";
+import { fireEvent, render, screen } from "@testing-library/svelte";
 import { tick } from "svelte";
+import { SvelteSet } from "svelte/reactivity";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DiffFileSummary, FileDiff } from "$lib/domain/diff";
 import DiffFeed from "./DiffFeed.svelte";
@@ -166,6 +167,48 @@ describe("DiffFeed deferred rendering", () => {
 
     activeObserver?.trigger(ninthSection as HTMLElement, true);
     expect(onActive).toHaveBeenCalledWith("src/file-9.ts");
+    unmount();
+  });
+
+  it("marks a file as reviewed and collapses its diff", async () => {
+    const files = createFiles(1);
+    const path = files[0].newPath as string;
+    const reviewedPaths = new SvelteSet<string>();
+    const onReviewChange = vi.fn((reviewedPath: string, reviewed: boolean) => {
+      if (reviewed) reviewedPaths.add(reviewedPath);
+      else reviewedPaths.delete(reviewedPath);
+    });
+    const { container, unmount } = render(DiffFeed, {
+      props: {
+        files,
+        diffs: { [path]: createDiff(files[0]) },
+        loadingPaths: {},
+        errors: {},
+        reviewedPaths,
+        mode: "split",
+        wrap: false,
+        onLoad: vi.fn(),
+        onActive: vi.fn(),
+        onReviewChange,
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(32);
+    await tick();
+    expect(container.querySelector(".diff-host")).toBeInTheDocument();
+
+    await fireEvent.click(
+      screen.getByRole("button", { name: `Mark ${path} as reviewed` }),
+    );
+
+    expect(onReviewChange).toHaveBeenCalledWith(path, true);
+    expect(
+      screen.getByRole("button", { name: `Mark ${path} as unreviewed` }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: `Expand diff for ${path}` }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(container.querySelector(".diff-host")).not.toBeInTheDocument();
     unmount();
   });
 

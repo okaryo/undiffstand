@@ -16,11 +16,13 @@
   let {
     files,
     selectedPath,
+    reviewedPaths = new Set<string>(),
     matchCounts = {},
     onSelect,
   }: {
     files: DiffFileSummary[];
     selectedPath?: string;
+    reviewedPaths?: ReadonlySet<string>;
     matchCounts?: Record<string, number | undefined>;
     onSelect: (path: string) => void;
   } = $props();
@@ -174,7 +176,10 @@
         onclick={() => onSelect(row.path)}
         title={row.path}
       >
-        <DiffFileStatusIcon status={row.file.status} />
+        <DiffFileStatusIcon
+          status={row.file.status}
+          reviewed={reviewedPaths.has(row.path)}
+        />
         <strong>{row.name}</strong>
         {#if matchCounts[row.path]}
           <span class="match-count" title={`${matchCounts[row.path]} matches`}

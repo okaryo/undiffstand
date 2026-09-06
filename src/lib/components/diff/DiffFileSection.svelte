@@ -27,6 +27,7 @@
     error,
     active = false,
     collapsed = false,
+    reviewed = false,
     copied = false,
     rendered = false,
     mode,
@@ -38,6 +39,7 @@
     searchQuery = "",
     searchMatch,
     onToggle,
+    onToggleReviewed,
     onCopy,
     onLoad,
     onExplain,
@@ -50,6 +52,7 @@
     error?: string;
     active?: boolean;
     collapsed?: boolean;
+    reviewed?: boolean;
     copied?: boolean;
     rendered?: boolean;
     mode: "split" | "unified";
@@ -61,6 +64,7 @@
     searchQuery?: string;
     searchMatch?: DiffSearchMatch;
     onToggle: () => void;
+    onToggleReviewed: () => void;
     onCopy: () => void;
     onLoad: () => void;
     onExplain: () => void;
@@ -101,6 +105,19 @@
     {#if file.additions !== undefined}<b>+{file.additions}</b>{/if}
     {#if file.deletions !== undefined}<em>−{file.deletions}</em>{/if}
   </span>
+  <button
+    class="review-file"
+    class:reviewed
+    aria-pressed={reviewed}
+    aria-label={`Mark ${path} as ${reviewed ? "unreviewed" : "reviewed"}`}
+    title={reviewed ? "Mark file as unreviewed" : "Mark file as reviewed"}
+    onclick={onToggleReviewed}
+  >
+    <span class="review-checkbox"
+      >{#if reviewed}<Check size={10} strokeWidth={3} />{/if}</span
+    >
+    <span>Viewed</span>
+  </button>
   <button
     class="explain-file"
     disabled={aiLoading || file.status === "binary"}
@@ -160,7 +177,7 @@
     z-index: 5;
     top: 0;
     display: grid;
-    grid-template-columns: 22px 14px minmax(0, 1fr) auto auto;
+    grid-template-columns: 22px 14px minmax(0, 1fr) auto auto auto;
     align-items: center;
     gap: 7px;
     min-height: 36px;
@@ -233,6 +250,38 @@
   .file-counts em {
     color: var(--red);
     font-style: normal;
+  }
+  .review-file {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 6px;
+    color: #7f8b96;
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    border-radius: 5px;
+    font-size: 11px;
+  }
+  .review-file:hover {
+    color: #c7d0d8;
+    background: var(--hover);
+  }
+  .review-file.reviewed {
+    color: var(--accent-bright);
+  }
+  .review-checkbox {
+    display: grid;
+    width: 13px;
+    height: 13px;
+    place-items: center;
+    border: 1px solid #53606b;
+    border-radius: 3px;
+  }
+  .reviewed .review-checkbox {
+    color: #07120e;
+    background: var(--accent-bright);
+    border-color: var(--accent-bright);
   }
   .explain-file {
     display: flex;

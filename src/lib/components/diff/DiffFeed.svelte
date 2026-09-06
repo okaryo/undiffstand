@@ -21,6 +21,7 @@
     loadingPaths,
     errors,
     activePath,
+    reviewedPaths = new Set<string>(),
     mode,
     wrap,
     fileExplanations = {},
@@ -31,6 +32,7 @@
     searchMatch,
     onLoad,
     onActive,
+    onReviewChange = () => {},
     onExplainFile = () => {},
     onAskInline = () => Promise.reject(new Error("Inline Ask is unavailable.")),
   }: {
@@ -39,6 +41,7 @@
     loadingPaths: Record<string, boolean | undefined>;
     errors: Record<string, string | undefined>;
     activePath?: string;
+    reviewedPaths?: ReadonlySet<string>;
     mode: "split" | "unified";
     wrap: boolean;
     fileExplanations?: Record<string, DiffExplanation | undefined>;
@@ -49,6 +52,7 @@
     searchMatch?: DiffSearchMatch;
     onLoad: (path: string) => void;
     onActive: (path: string) => void;
+    onReviewChange?: (path: string, reviewed: boolean) => void;
     onExplainFile?: (path: string) => void;
     onAskInline?: (
       path: string,
@@ -67,6 +71,7 @@
   let requestedPathsVersion = $state(0);
   let lastFilesKey = $state("");
   let collapsed = $state<Record<string, boolean>>({});
+  let initializedReviewedPaths = false;
   let copiedPath = $state<string>();
   let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
   let renderTimer: ReturnType<typeof setTimeout> | undefined;
@@ -81,6 +86,12 @@
   const LAZY_RENDER_ROOT_MARGIN = "400px 0px";
   const ACTIVE_FILE_OFFSET = 52;
   const RENDER_INTERVAL_MS = 32;
+
+  $effect(() => {
+    if (initializedReviewedPaths) return;
+    for (const path of reviewedPaths) collapsed[path] = true;
+    initializedReviewedPaths = true;
+  });
 
   onDestroy(() => {
     if (copyResetTimer !== undefined) clearTimeout(copyResetTimer);
@@ -306,6 +317,12 @@
     if (!collapsed[path] && diffs[path]) queueReadyRender(path, true);
   }
 
+  function toggleReviewed(path: string) {
+    const reviewed = !reviewedPaths.has(path);
+    onReviewChange(path, reviewed);
+    if (reviewed) collapsed[path] = true;
+  }
+
   async function copyPath(path: string) {
     try {
       await writeClipboard(path);
@@ -357,6 +374,7 @@
         error={errors[path]}
         active={activePath === path}
         collapsed={collapsed[path]}
+        reviewed={reviewedPaths.has(path)}
         copied={copiedPath === path}
         rendered={renderedPaths[path]}
         {mode}
@@ -368,6 +386,7 @@
         {searchQuery}
         searchMatch={searchMatch?.path === path ? searchMatch : undefined}
         onToggle={() => toggleCollapsed(path)}
+        onToggleReviewed={() => toggleReviewed(path)}
         onCopy={() => copyPath(path)}
         onLoad={() => onLoad(path)}
         onExplain={() => onExplainFile(path)}
