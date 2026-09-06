@@ -854,6 +854,7 @@
           {#if workspace.summary}<DiffFileList
               files={workspace.summary.files}
               selectedPath={workspace.selectedPath}
+              reviewedPaths={workspace.reviewedPaths}
               matchCounts={diffSearchOpen ? diffSearchMatchCounts : {}}
               onSelect={(path) => workspace.select(path)}
             />{/if}
@@ -896,6 +897,7 @@
               loadingPaths={workspace.loadingPaths}
               errors={workspace.errors}
               activePath={workspace.selectedPath}
+              reviewedPaths={workspace.reviewedPaths}
               mode={preferences.diffMode}
               wrap={preferences.wrapLines}
               fileExplanations={aiReview.fileExplanations}
@@ -906,6 +908,8 @@
               searchMatch={diffSearchOpen ? activeDiffSearchMatch : undefined}
               onLoad={(path) => workspace.queue(path)}
               onActive={(path) => workspace.setActive(path)}
+              onReviewChange={(path, reviewed) =>
+                workspace.setReviewed(path, reviewed)}
               onExplainFile={explainFileChange}
               onAskInline={askInline}
             />

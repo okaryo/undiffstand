@@ -28,6 +28,29 @@ describe("DiffFileList", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a prominent check indicator on reviewed file rows", () => {
+    const { container } = render(DiffFileList, {
+      files: [
+        {
+          oldPath: "src/review.ts",
+          newPath: "src/review.ts",
+          status: "modified",
+          additions: 3,
+          deletions: 1,
+        },
+      ],
+      reviewedPaths: new Set(["src/review.ts"]),
+      onSelect: vi.fn(),
+    });
+
+    expect(
+      container.querySelector(
+        '.file-row .reviewed-indicator[title="Reviewed"]',
+      ),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".file-row.reviewed")).toBeInTheDocument();
+  });
+
   it("filters by the complete repository path", async () => {
     render(DiffFileList, {
       files: [

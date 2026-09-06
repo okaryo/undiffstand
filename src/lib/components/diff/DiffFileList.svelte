@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    Check,
     ChevronDown,
     ChevronRight,
     Folder,
@@ -16,11 +17,13 @@
   let {
     files,
     selectedPath,
+    reviewedPaths = new Set<string>(),
     matchCounts = {},
     onSelect,
   }: {
     files: DiffFileSummary[];
     selectedPath?: string;
+    reviewedPaths?: ReadonlySet<string>;
     matchCounts?: Record<string, number | undefined>;
     onSelect: (path: string) => void;
   } = $props();
@@ -169,6 +172,7 @@
       <button
         class="file-row"
         class:active={selectedPath === row.path}
+        class:reviewed={reviewedPaths.has(row.path)}
         aria-current={selectedPath === row.path ? "true" : undefined}
         style={`--depth: ${row.depth}`}
         onclick={() => onSelect(row.path)}
@@ -176,10 +180,26 @@
       >
         <DiffFileStatusIcon status={row.file.status} />
         <strong>{row.name}</strong>
-        {#if matchCounts[row.path]}
-          <span class="match-count" title={`${matchCounts[row.path]} matches`}
-            >{matchCounts[row.path]}</span
-          >
+        {#if reviewedPaths.has(row.path) || matchCounts[row.path]}
+          <span class="file-indicators">
+            {#if reviewedPaths.has(row.path)}
+              <span
+                class="reviewed-indicator"
+                role="img"
+                aria-label="Reviewed"
+                title="Reviewed"
+              >
+                <Check size={11} strokeWidth={3} />
+              </span>
+            {/if}
+            {#if matchCounts[row.path]}
+              <span
+                class="match-count"
+                title={`${matchCounts[row.path]} matches`}
+                >{matchCounts[row.path]}</span
+              >
+            {/if}
+          </span>
         {/if}
       </button>
     {/if}
@@ -258,6 +278,25 @@
   .file-row.active {
     color: var(--text);
     background: rgba(87, 184, 142, 0.11);
+  }
+  .file-row.reviewed:not(.active) {
+    color: #a8cbb9;
+  }
+  .file-indicators {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .reviewed-indicator {
+    display: grid;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    place-items: center;
+    color: #07120e;
+    background: var(--accent-bright);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(87, 184, 142, 0.12);
   }
   .match-count {
     min-width: 17px;
