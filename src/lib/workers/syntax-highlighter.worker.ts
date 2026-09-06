@@ -40,17 +40,21 @@ async function getHighlighter(language: string) {
   highlighterPromise ??= getDiffViewHighlighter([bundledLanguage]);
   const highlighter = await highlighterPromise;
 
-  if (
-    language in bundledLanguages &&
-    !highlighter.hasRegisteredCurrentLang(language)
-  ) {
+  let isLanguageRegistered = false;
+  try {
+    isLanguageRegistered = highlighter.hasRegisteredCurrentLang(language);
+  } catch {
+    // Shiki throws when getLanguage is called for a language that is not loaded.
+  }
+
+  if (language in bundledLanguages && !isLanguageRegistered) {
     let languagePromise = languagePromises.get(language);
     if (!languagePromise) {
       languagePromise = languageLoadQueue.then(() =>
         Promise.resolve(
           highlighter
             .getHighlighterEngine()
-            ?.loadLanguage(language as BundledLanguage),
+            ?.loadLanguage(bundledLanguages[language as BundledLanguage]),
         ).then(() => undefined),
       );
       languageLoadQueue = languagePromise.catch(() => undefined);
