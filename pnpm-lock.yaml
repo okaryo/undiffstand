@@ -15,7 +15,7 @@ importers:
         specifier: ^0.1.7
         version: 0.1.7(svelte@5.57.0(@typescript-eslint/types@8.66.0))
       '@lucide/svelte':
-        specifier: ^1.33.0
+        specifier: ^1.37.0
         version: 1.40.0(svelte@5.57.0(@typescript-eslint/types@8.66.0))
       '@tauri-apps/api':
         specifier: ^2.11.1
