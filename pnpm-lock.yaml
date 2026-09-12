@@ -58,7 +58,7 @@ importers:
         specifier: ^24.13.3
         version: 24.13.3
       eslint:
-        specifier: ^10.9.0
+        specifier: ^10.9.1
         version: 10.10.0
       eslint-plugin-svelte:
         specifier: ^3.23.0
@@ -76,7 +76,7 @@ importers:
         specifier: ^3.5.2
         version: 3.5.2(prettier@3.9.6)(svelte@5.57.0(@typescript-eslint/types@8.66.0))
       svelte:
-        specifier: ^5.56.10
+        specifier: ^5.57.0
         version: 5.57.0(@typescript-eslint/types@8.66.0)
       svelte-check:
         specifier: ^4.7.6
@@ -85,7 +85,7 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
       typescript-eslint:
-        specifier: ^8.67.0
+        specifier: ^8.68.0
         version: 8.69.0(eslint@10.10.0)(typescript@5.9.3)
       vite:
         specifier: ^7.3.6
