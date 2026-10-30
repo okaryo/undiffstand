@@ -44,10 +44,10 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Setup pnpm and Node.js
-        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+        uses: pnpm/setup@fa36a5ef7dcdefc3a7cb25655c122e00cf6e636e # v3.1.2
         with:
           version: 12.3.4
-          runtime: node@24.20.0
+          runtime: node@26.13.0
           cache: true
           require-lockfile: true
 
